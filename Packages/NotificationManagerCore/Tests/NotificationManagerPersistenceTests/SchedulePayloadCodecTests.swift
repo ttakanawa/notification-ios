@@ -27,9 +27,14 @@ import Testing
         #expect(codec.decode(data) == .unsupportedFuture(version: UInt32(version)!, originalData: data))
     }
 
-    @Test func futureVersionProbeSkipsNestedDuplicateKeysAndDeepPayloadShape() {
+    @Test func futureVersionProbeSkipsNestedDuplicateKeys() {
         let duplicateKeys = Data(#"{"format":"notification-manager.schedule","version":2,"payload":{"a":1,"a":2}}"#.utf8)
-        let depth = 256
+
+        #expect(codec.decode(duplicateKeys) == .unsupportedFuture(version: 2, originalData: duplicateKeys))
+    }
+
+    @Test func futureVersionProbeHandlesNearLimitNestingWithoutUsingTheCallStack() {
+        let depth = 8_000
         let deeplyNested = Data(
             (#"{"format":"notification-manager.schedule","version":2,"payload":"#
                 + String(repeating: "[", count: depth)
@@ -38,7 +43,8 @@ import Testing
                 + "}").utf8
         )
 
-        #expect(codec.decode(duplicateKeys) == .unsupportedFuture(version: 2, originalData: duplicateKeys))
+        #expect(deeplyNested.count > 15 * 1_024)
+        #expect(deeplyNested.count < 16 * 1_024)
         #expect(codec.decode(deeplyNested) == .unsupportedFuture(version: 2, originalData: deeplyNested))
     }
 
@@ -46,7 +52,8 @@ import Testing
         let documents = [
             #"{"format":"notification-manager.schedule","format":"notification-manager.schedule","version":2}"#,
             #"{"format":"notification-manager.schedule","version":2,"version":3}"#,
-            #"{"format":"notification-manager.schedule","version":2,"payload":[}"#
+            #"{"format":"notification-manager.schedule","version":2,"payload":[}"#,
+            #"{"format":"notification-manager.schedule","version":2,"payload":null}null"#
         ]
 
         for document in documents {

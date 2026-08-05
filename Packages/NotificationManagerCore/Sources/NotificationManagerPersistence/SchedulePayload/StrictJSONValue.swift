@@ -129,58 +129,65 @@ private struct StrictJSONParser {
     }
 
     private mutating func skipValue() throws {
-        guard let byte = current else { throw StrictJSONError.invalidDocument }
-        switch byte {
-        case 0x7B:
-            try skipObject()
-        case 0x5B:
-            try skipArray()
-        case 0x22:
-            _ = try parseString()
-        case 0x74:
-            try consumeLiteral([0x74, 0x72, 0x75, 0x65])
-        case 0x66:
-            try consumeLiteral([0x66, 0x61, 0x6C, 0x73, 0x65])
-        case 0x6E:
-            try consumeLiteral([0x6E, 0x75, 0x6C, 0x6C])
-        case 0x2D, 0x30 ... 0x39:
-            _ = try parseNumber()
-        default:
-            throw StrictJSONError.invalidDocument
+        var tasks: [SkippedJSONTask] = [.value]
+        while let task = tasks.popLast() {
+            switch task {
+            case .value:
+                guard let byte = current else { throw StrictJSONError.invalidDocument }
+                switch byte {
+                case 0x7B:
+                    try consume(0x7B)
+                    skipWhitespace()
+                    tasks.append(.objectContents)
+                case 0x5B:
+                    try consume(0x5B)
+                    skipWhitespace()
+                    tasks.append(.arrayContents)
+                case 0x22:
+                    _ = try parseString()
+                case 0x74:
+                    try consumeLiteral([0x74, 0x72, 0x75, 0x65])
+                case 0x66:
+                    try consumeLiteral([0x66, 0x61, 0x6C, 0x73, 0x65])
+                case 0x6E:
+                    try consumeLiteral([0x6E, 0x75, 0x6C, 0x6C])
+                case 0x2D, 0x30 ... 0x39:
+                    _ = try parseNumber()
+                default:
+                    throw StrictJSONError.invalidDocument
+                }
+            case .arrayContents:
+                if consumeIfPresent(0x5D) { continue }
+                tasks.append(.arrayContinuation)
+                tasks.append(.value)
+            case .arrayContinuation:
+                skipWhitespace()
+                if consumeIfPresent(0x5D) { continue }
+                try consume(0x2C)
+                skipWhitespace()
+                tasks.append(.arrayContinuation)
+                tasks.append(.value)
+            case .objectContents:
+                if consumeIfPresent(0x7D) { continue }
+                try parseSkippedObjectMember(tasks: &tasks)
+            case .objectContinuation:
+                skipWhitespace()
+                if consumeIfPresent(0x7D) { continue }
+                try consume(0x2C)
+                skipWhitespace()
+                try parseSkippedObjectMember(tasks: &tasks)
+            }
         }
     }
 
-    private mutating func skipObject() throws {
-        try consume(0x7B)
+    private mutating func parseSkippedObjectMember(tasks: inout [SkippedJSONTask]) throws {
+        guard current == 0x22 else { throw StrictJSONError.invalidDocument }
+        _ = try parseString()
         skipWhitespace()
-        if consumeIfPresent(0x7D) { return }
-
-        while true {
-            guard current == 0x22 else { throw StrictJSONError.invalidDocument }
-            _ = try parseString()
-            skipWhitespace()
-            try consume(0x3A)
-            skipWhitespace()
-            try skipValue()
-            skipWhitespace()
-            if consumeIfPresent(0x7D) { return }
-            try consume(0x2C)
-            skipWhitespace()
-        }
-    }
-
-    private mutating func skipArray() throws {
-        try consume(0x5B)
+        try consume(0x3A)
         skipWhitespace()
-        if consumeIfPresent(0x5D) { return }
-
-        while true {
-            try skipValue()
-            skipWhitespace()
-            if consumeIfPresent(0x5D) { return }
-            try consume(0x2C)
-            skipWhitespace()
-        }
+        tasks.append(.objectContinuation)
+        tasks.append(.value)
     }
 
     private mutating func parseValue(depth: Int) throws -> StrictJSONValue {
@@ -389,4 +396,12 @@ private struct StrictJSONParser {
         index += 1
         return true
     }
+}
+
+private enum SkippedJSONTask {
+    case value
+    case arrayContents
+    case arrayContinuation
+    case objectContents
+    case objectContinuation
 }
