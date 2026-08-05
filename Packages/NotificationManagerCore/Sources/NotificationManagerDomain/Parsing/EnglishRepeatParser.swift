@@ -229,6 +229,7 @@ public struct EnglishRepeatParser: Sendable {
                 let suffix = String(String.UnicodeScalarView(scalars[token.scalarRange.upperBound...]))
                 let replaced = prefix + replacement + suffix
                 guard let candidate = try? parseExact(replaced),
+                      !candidate.requiresSourceResolution,
                       let rule = try? RepeatRuleValidator().validate(
                         candidate,
                         source: Self.validationSource
@@ -294,6 +295,12 @@ public struct EnglishRepeatParser: Sendable {
         "may", "june", "jun", "july", "jul", "august", "aug", "september", "sep",
         "october", "oct", "november", "nov", "december", "dec"
     ]
+}
+
+private extension RepeatCandidate {
+    var requiresSourceResolution: Bool {
+        frequency == .weekly && weekdaySetKind == nil && weekdays.isEmpty
+    }
 }
 
 private enum SyntaxFailure: Error {

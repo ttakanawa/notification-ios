@@ -3,7 +3,7 @@ import Testing
 
 @Suite("Parsing.PresetRepeatRuleFactory")
 struct ParsingPresetRepeatRuleFactoryTests {
-    @Test func mapsEveryPresetExactlyUsingTheSourceDateForWeeklyAnchors() {
+    @Test func mapsEveryPresetExactlyUsingTheSourceDateForWeeklyAnchors() throws {
         let expected: [(RepeatPreset, RepeatRule)] = [
             (.doesNotRepeat, .none),
             (.hourly, .hourly(interval: 1)),
@@ -19,11 +19,11 @@ struct ParsingPresetRepeatRuleFactoryTests {
         ]
 
         for (preset, rule) in expected {
-            #expect(factory.rule(for: preset, source: .repeatFixture) == rule)
+            #expect(try factory.rule(for: preset, source: .repeatFixture) == rule)
         }
     }
 
-    @Test func derivesWeekdayAcrossGregorianCenturyAndLeapYearBoundaries() {
+    @Test func derivesWeekdayAcrossGregorianCenturyAndLeapYearBoundaries() throws {
         let fixtures: [(SourceWallClock, Weekday)] = [
             (.init(year: 1, month: 1, day: 1, hour: 0, minute: 0, timeZoneIdentifier: "UTC"), .monday),
             (.init(year: 2000, month: 2, day: 29, hour: 0, minute: 0, timeZoneIdentifier: "UTC"), .tuesday),
@@ -32,7 +32,27 @@ struct ParsingPresetRepeatRuleFactoryTests {
         ]
 
         for (source, weekday) in fixtures {
-            #expect(factory.rule(for: .weekly, source: source) == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [weekday]))
+            #expect(try factory.rule(for: .weekly, source: source) == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [weekday]))
+        }
+    }
+
+    @Test func weeklyAndBiweeklyFailForEveryInvalidSourceDateComponent() {
+        let invalidSources = [
+            SourceWallClock(year: 0, month: 1, day: 1, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 2026, month: 0, day: 1, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 2026, month: 13, day: 1, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 2026, month: 1, day: 0, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 2026, month: 4, day: 31, hour: 0, minute: 0, timeZoneIdentifier: "UTC"),
+            SourceWallClock(year: 2026, month: 2, day: 29, hour: 0, minute: 0, timeZoneIdentifier: "UTC")
+        ]
+
+        for preset in [RepeatPreset.weekly, .biweekly] {
+            for source in invalidSources {
+                #expect(throws: PresetRepeatRuleFactoryError.invalidSourceDate) {
+                    _ = try factory.rule(for: preset, source: source)
+                }
+            }
         }
     }
 

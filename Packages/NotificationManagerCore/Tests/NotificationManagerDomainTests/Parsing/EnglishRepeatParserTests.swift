@@ -155,6 +155,23 @@ struct ParsingEnglishRepeatParserTests {
         #expect(failure(for: "Every year on the 31st of Apri").suggestion == nil)
     }
 
+    @Test func doesNotFabricateAWeekdayForSourceAnchoredWeeklySuggestion() {
+        let parseFailure = failure(for: "Every wekk")
+        let countedParseFailure = failure(for: "Every 2 weks")
+
+        #expect(parseFailure.suggestion == nil)
+        #expect(countedParseFailure.suggestion == nil)
+        #expect(throws: RepeatParseFailure.self) {
+            _ = try parser.parse("Every wekk").get()
+        }
+
+        let correctedCandidate = try? parser.parse("Every week").get()
+        let actualSourceRule = correctedCandidate.flatMap {
+            try? validator.validate($0, source: .repeatFixture)
+        }
+        #expect(actualSourceRule == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.tuesday]))
+    }
+
     @Test func suggestionNeverAutoAppliesTheCorrection() {
         let result = parser.parse("Every Tuseday")
         #expect(throws: RepeatParseFailure.self) { _ = try result.get() }

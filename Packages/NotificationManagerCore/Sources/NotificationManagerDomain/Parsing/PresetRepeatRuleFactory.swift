@@ -12,10 +12,17 @@ public enum RepeatPreset: String, Sendable, Equatable, CaseIterable {
     case yearly
 }
 
+public enum PresetRepeatRuleFactoryError: Error, Sendable, Equatable {
+    case invalidSourceDate
+}
+
 public struct PresetRepeatRuleFactory: Sendable {
     public init() {}
 
-    public func rule(for preset: RepeatPreset, source: SourceWallClock) -> RepeatRule {
+    public func rule(
+        for preset: RepeatPreset,
+        source: SourceWallClock
+    ) throws -> RepeatRule {
         switch preset {
         case .doesNotRepeat:
             return .none
@@ -36,11 +43,13 @@ public struct PresetRepeatRuleFactory: Sendable {
                 weekdays: [.saturday, .sunday]
             )
         case .weekly, .biweekly:
-            let weekday = GregorianDate.weekday(
+            guard let weekday = GregorianDate.weekday(
                 year: source.year,
                 month: source.month,
                 day: source.day
-            ) ?? .monday
+            ) else {
+                throw PresetRepeatRuleFactoryError.invalidSourceDate
+            }
             return .weekly(
                 interval: preset == .weekly ? 1 : 2,
                 weekdaySetKind: .explicit,
