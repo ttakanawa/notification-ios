@@ -1,0 +1,1 @@
+{"format":"notification-manager.schedule","payload":{"early":{"mainEnabled":true,"unit":"minutes","value":5},"end":{"type":"never"},"rule":{"interval":1,"type":"weekly","weekdaySetKind":"weekday","weekdays":["monday","tuesday","wednesday","thursday","friday"]},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}
