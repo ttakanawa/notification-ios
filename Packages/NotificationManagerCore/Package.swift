@@ -15,6 +15,10 @@ let package = Package(
         .target(
             name: "NotificationManagerPersistence",
             dependencies: ["NotificationManagerDomain", "NotificationManagerApplication"]
+        ),
+        .testTarget(
+            name: "NotificationManagerDomainTests",
+            dependencies: ["NotificationManagerDomain"]
         )
     ]
 )
