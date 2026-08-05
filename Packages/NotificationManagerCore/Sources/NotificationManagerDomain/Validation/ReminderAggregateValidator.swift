@@ -287,15 +287,21 @@ public struct ReminderAggregateValidator: Sendable {
     }
 
     private static func isValidDate(year: Int, month: Int, day: Int) -> Bool {
-        guard (1...9_999).contains(year), (1...12).contains(month), (1...31).contains(day) else {
+        guard (1...9_999).contains(year), (1...12).contains(month), day >= 1 else {
             return false
         }
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        let components = DateComponents(year: year, month: month, day: day)
-        guard let date = calendar.date(from: components) else { return false }
-        let resolved = calendar.dateComponents([.year, .month, .day], from: date)
-        return resolved.year == year && resolved.month == month && resolved.day == day
+        let daysInMonth: Int
+        switch month {
+        case 2:
+            let isLeapYear = year.isMultiple(of: 4)
+                && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
+            daysInMonth = isLeapYear ? 29 : 28
+        case 4, 6, 9, 11:
+            daysInMonth = 30
+        default:
+            daysInMonth = 31
+        }
+        return day <= daysInMonth
     }
 
     private static func isFiniteIntegralSecond(_ date: Date) -> Bool {

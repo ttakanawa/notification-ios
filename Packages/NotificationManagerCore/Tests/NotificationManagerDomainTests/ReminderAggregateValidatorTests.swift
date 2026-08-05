@@ -246,6 +246,153 @@ struct ReminderAggregateValidatorTests {
         }
     }
 
+    @Test func acceptsProlepticGregorianDateInsideHistoricalCutoverGap() throws {
+        let source = SourceWallClock(
+            year: 1582,
+            month: 10,
+            day: 10,
+            hour: 9,
+            minute: 30,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let schedule = ScheduleDefinition(source: source, rule: .none, end: .never, early: nil)
+
+        try validator.validate(
+            draft(scheduleChange: .replace(schedule)),
+            replacementScheduleData: Data()
+        )
+    }
+
+    @Test func rejectsJulianOnlyLeapDayUnderProlepticGregorianRules() {
+        let source = SourceWallClock(
+            year: 1500,
+            month: 2,
+            day: 29,
+            hour: 9,
+            minute: 30,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let schedule = ScheduleDefinition(source: source, rule: .none, end: .never, early: nil)
+
+        #expect(throws: ReminderValidationIssue.invalidSchedule) {
+            try validator.validate(draft(scheduleChange: .replace(schedule)))
+        }
+    }
+
+    @Test func accepts9999RecurrenceIntervalForEveryRuleFamily() throws {
+        let rules: [RepeatRule] = [
+            .hourly(interval: 9_999),
+            .daily(interval: 9_999),
+            .weekly(interval: 9_999, weekdaySetKind: .explicit, weekdays: [.monday]),
+            .monthly(interval: 9_999, selector: .anchorDay),
+            .yearly(interval: 9_999, month: nil, selector: .anchorMonthDay)
+        ]
+
+        for rule in rules {
+            let schedule = ScheduleDefinition(source: validSource, rule: rule, end: .never, early: nil)
+            try validator.validate(
+                draft(scheduleChange: .replace(schedule)),
+                replacementScheduleData: Data()
+            )
+        }
+    }
+
+    @Test func rejects10000RecurrenceIntervalForEveryRuleFamily() {
+        let rules: [RepeatRule] = [
+            .hourly(interval: 10_000),
+            .daily(interval: 10_000),
+            .weekly(interval: 10_000, weekdaySetKind: .explicit, weekdays: [.monday]),
+            .monthly(interval: 10_000, selector: .anchorDay),
+            .yearly(interval: 10_000, month: nil, selector: .anchorMonthDay)
+        ]
+
+        for rule in rules {
+            let schedule = ScheduleDefinition(source: validSource, rule: rule, end: .never, early: nil)
+            #expect(throws: ReminderValidationIssue.invalidSchedule) {
+                try validator.validate(draft(scheduleChange: .replace(schedule)))
+            }
+        }
+    }
+
+    @Test func rejectsEarlyValueAt10000() {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .daily(interval: 1),
+            end: .never,
+            early: EarlyReminder(value: 10_000, unit: .minutes)
+        )
+
+        #expect(throws: ReminderValidationIssue.invalidSchedule) {
+            try validator.validate(draft(scheduleChange: .replace(schedule)))
+        }
+    }
+
+    @Test func enforcesOrdinalDaySetBoundaries() throws {
+        for ordinal in [1, 5] {
+            let schedule = ScheduleDefinition(
+                source: validSource,
+                rule: .monthly(
+                    interval: 1,
+                    selector: .ordinalDaySet(ordinal: ordinal, daySet: .weekday)
+                ),
+                end: .never,
+                early: nil
+            )
+            try validator.validate(
+                draft(scheduleChange: .replace(schedule)),
+                replacementScheduleData: Data()
+            )
+        }
+
+        for ordinal in [0, 6] {
+            let schedule = ScheduleDefinition(
+                source: validSource,
+                rule: .monthly(
+                    interval: 1,
+                    selector: .ordinalDaySet(ordinal: ordinal, daySet: .weekday)
+                ),
+                end: .never,
+                early: nil
+            )
+            #expect(throws: ReminderValidationIssue.invalidSchedule) {
+                try validator.validate(draft(scheduleChange: .replace(schedule)))
+            }
+        }
+    }
+
+    @Test func enforcesOrdinalWeekdayBoundaries() throws {
+        for ordinal in [-5, -1, 1, 5] {
+            let schedule = ScheduleDefinition(
+                source: validSource,
+                rule: .monthly(
+                    interval: 1,
+                    selector: .ordinalWeekday(ordinal: ordinal, weekday: .monday)
+                ),
+                end: .never,
+                early: nil
+            )
+            try validator.validate(
+                draft(scheduleChange: .replace(schedule)),
+                replacementScheduleData: Data()
+            )
+        }
+
+        for ordinal in [-6, 0, 6] {
+            let schedule = ScheduleDefinition(
+                source: validSource,
+                rule: .monthly(
+                    interval: 1,
+                    selector: .ordinalWeekday(ordinal: ordinal, weekday: .monday)
+                ),
+                end: .never,
+                early: nil
+            )
+            #expect(throws: ReminderValidationIssue.invalidSchedule) {
+                try validator.validate(draft(scheduleChange: .replace(schedule)))
+            }
+        }
+    }
+
     @Test func rejectsInvalidRuleSelectorCombinations() {
         let invalidRules: [RepeatRule] = [
             .hourly(interval: 0),
