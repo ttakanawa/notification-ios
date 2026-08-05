@@ -27,6 +27,34 @@ import Testing
         #expect(codec.decode(data) == .unsupportedFuture(version: UInt32(version)!, originalData: data))
     }
 
+    @Test func futureVersionProbeSkipsNestedDuplicateKeysAndDeepPayloadShape() {
+        let duplicateKeys = Data(#"{"format":"notification-manager.schedule","version":2,"payload":{"a":1,"a":2}}"#.utf8)
+        let depth = 256
+        let deeplyNested = Data(
+            (#"{"format":"notification-manager.schedule","version":2,"payload":"#
+                + String(repeating: "[", count: depth)
+                + "0"
+                + String(repeating: "]", count: depth)
+                + "}").utf8
+        )
+
+        #expect(codec.decode(duplicateKeys) == .unsupportedFuture(version: 2, originalData: duplicateKeys))
+        #expect(codec.decode(deeplyNested) == .unsupportedFuture(version: 2, originalData: deeplyNested))
+    }
+
+    @Test func futureVersionProbeStillRejectsAmbiguousHeadersAndMalformedJSON() {
+        let documents = [
+            #"{"format":"notification-manager.schedule","format":"notification-manager.schedule","version":2}"#,
+            #"{"format":"notification-manager.schedule","version":2,"version":3}"#,
+            #"{"format":"notification-manager.schedule","version":2,"payload":[}"#
+        ]
+
+        for document in documents {
+            let data = Data(document.utf8)
+            #expect(codec.decode(data) == .corrupt(originalData: data))
+        }
+    }
+
     @Test func rejectsMalformedOrWrongFormatEnvelope() {
         let inputs = [
             Data(),
@@ -116,10 +144,53 @@ import Testing
         }
     }
 
+    @Test func rejectsMissingNullAndWrongTypedTaggedUnionRequiredFieldsAsCorrupt() {
+        let malformedRules = [
+            #"{"type":"hourly"}"#,
+            #"{"type":"daily","interval":null}"#,
+            #"{"type":"monthly","interval":"1","selector":{"type":"anchorDay"}}"#,
+            #"{"type":"yearly","interval":1.0,"selector":{"type":"anchorMonthDay"}}"#,
+            #"{"type":"weekly","weekdaySetKind":"explicit","weekdays":["monday"]}"#,
+            #"{"type":"weekly","interval":1,"weekdays":["monday"]}"#,
+            #"{"type":"weekly","interval":1,"weekdaySetKind":"explicit"}"#,
+            #"{"type":"weekly","interval":1,"weekdaySetKind":null,"weekdays":["monday"]}"#,
+            #"{"type":"weekly","interval":1,"weekdaySetKind":"explicit","weekdays":{}}"#,
+            #"{"type":"monthly","interval":1}"#,
+            #"{"type":"yearly","interval":1,"selector":null}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"dayOfMonth"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"dayOfMonth","day":null}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"dayOfMonth","day":"1"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalDaySet","daySet":"weekday"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalDaySet","ordinal":1}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalDaySet","ordinal":null,"daySet":"weekday"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalDaySet","ordinal":1,"daySet":false}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalWeekday","weekday":"monday"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalWeekday","ordinal":1}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalWeekday","ordinal":[],"weekday":"monday"}}"#,
+            #"{"type":"monthly","interval":1,"selector":{"type":"ordinalWeekday","ordinal":1,"weekday":null}}"#
+        ]
+        let malformedEnds = [
+            #"{"type":"onDate","month":8,"day":4}"#,
+            #"{"type":"onDate","year":2026,"day":4}"#,
+            #"{"type":"onDate","year":2026,"month":8}"#,
+            #"{"type":"onDate","year":null,"month":8,"day":4}"#,
+            #"{"type":"onDate","year":2026,"month":"8","day":4}"#,
+            #"{"type":"onDate","year":2026,"month":8,"day":false}"#
+        ]
+
+        for rule in malformedRules {
+            let data = payloadData(rule: rule)
+            #expect(codec.decode(data) == .corrupt(originalData: data))
+        }
+        for end in malformedEnds {
+            let data = payloadData(rule: #"{"type":"daily","interval":1}"#, end: end)
+            #expect(codec.decode(data) == .corrupt(originalData: data))
+        }
+    }
+
     @Test func classifiesWhitelistedRuleCombinationViolationsAsDomainInvalid() {
         let documents = [
             #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"none","interval":1},"end":{"type":"never"}},"version":1}"#,
-            #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"weekly","interval":1},"end":{"type":"never"}},"version":1}"#,
             #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"monthly","interval":1,"selector":{"type":"anchorMonthDay"}},"end":{"type":"never"}},"version":1}"#,
             #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"yearly","interval":1,"selector":{"type":"anchorDay"}},"end":{"type":"never"}},"version":1}"#,
             #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"none"},"end":{"type":"onDate","year":2026,"month":8,"day":4}},"version":1}"#
@@ -212,8 +283,8 @@ import Testing
         }
     }
 
-    private func payloadData(rule: String) -> Data {
-        Data(#"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":\#(rule),"end":{"type":"never"}},"version":1}"#.utf8)
+    private func payloadData(rule: String, end: String = #"{"type":"never"}"#) -> Data {
+        Data(#"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":\#(rule),"end":\#(end)},"version":1}"#.utf8)
     }
 }
 

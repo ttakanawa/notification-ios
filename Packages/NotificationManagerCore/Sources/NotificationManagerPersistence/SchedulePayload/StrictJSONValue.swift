@@ -17,6 +17,14 @@ enum StrictJSONValue: Sendable, Equatable {
         return value
     }
 
+    static func probeEnvelope(_ data: Data) throws -> StrictJSONEnvelopeProbe {
+        guard !data.starts(with: [0xEF, 0xBB, 0xBF]) else {
+            throw StrictJSONError.invalidDocument
+        }
+        var parser = StrictJSONParser(bytes: Array(data))
+        return try parser.parseEnvelopeProbe()
+    }
+
     var objectValue: [String: StrictJSONValue]? {
         guard case let .object(value) = self else { return nil }
         return value
@@ -48,6 +56,11 @@ enum StrictJSONError: Error {
     case invalidDocument
 }
 
+struct StrictJSONEnvelopeProbe: Sendable, Equatable {
+    let format: String
+    let version: UInt32
+}
+
 private struct StrictJSONParser {
     private let bytes: [UInt8]
     private var index = 0
@@ -62,6 +75,112 @@ private struct StrictJSONParser {
         skipWhitespace()
         guard index == bytes.count else { throw StrictJSONError.invalidDocument }
         return value
+    }
+
+    mutating func parseEnvelopeProbe() throws -> StrictJSONEnvelopeProbe {
+        skipWhitespace()
+        try consume(0x7B)
+        skipWhitespace()
+        var format: String?
+        var version: UInt32?
+        var foundFormat = false
+        var foundVersion = false
+
+        if !consumeIfPresent(0x7D) {
+            while true {
+                guard current == 0x22 else { throw StrictJSONError.invalidDocument }
+                let key = try parseString()
+                skipWhitespace()
+                try consume(0x3A)
+                skipWhitespace()
+
+                switch key {
+                case "format":
+                    guard !foundFormat, current == 0x22 else {
+                        throw StrictJSONError.invalidDocument
+                    }
+                    foundFormat = true
+                    format = try parseString()
+                case "version":
+                    guard !foundVersion else { throw StrictJSONError.invalidDocument }
+                    foundVersion = true
+                    let lexeme = try parseNumber()
+                    guard lexeme.allSatisfy({ $0.isASCII && $0.isNumber }),
+                          let parsedVersion = UInt32(lexeme)
+                    else {
+                        throw StrictJSONError.invalidDocument
+                    }
+                    version = parsedVersion
+                default:
+                    try skipValue()
+                }
+
+                skipWhitespace()
+                if consumeIfPresent(0x7D) { break }
+                try consume(0x2C)
+                skipWhitespace()
+            }
+        }
+        skipWhitespace()
+        guard index == bytes.count, let format, let version else {
+            throw StrictJSONError.invalidDocument
+        }
+        return StrictJSONEnvelopeProbe(format: format, version: version)
+    }
+
+    private mutating func skipValue() throws {
+        guard let byte = current else { throw StrictJSONError.invalidDocument }
+        switch byte {
+        case 0x7B:
+            try skipObject()
+        case 0x5B:
+            try skipArray()
+        case 0x22:
+            _ = try parseString()
+        case 0x74:
+            try consumeLiteral([0x74, 0x72, 0x75, 0x65])
+        case 0x66:
+            try consumeLiteral([0x66, 0x61, 0x6C, 0x73, 0x65])
+        case 0x6E:
+            try consumeLiteral([0x6E, 0x75, 0x6C, 0x6C])
+        case 0x2D, 0x30 ... 0x39:
+            _ = try parseNumber()
+        default:
+            throw StrictJSONError.invalidDocument
+        }
+    }
+
+    private mutating func skipObject() throws {
+        try consume(0x7B)
+        skipWhitespace()
+        if consumeIfPresent(0x7D) { return }
+
+        while true {
+            guard current == 0x22 else { throw StrictJSONError.invalidDocument }
+            _ = try parseString()
+            skipWhitespace()
+            try consume(0x3A)
+            skipWhitespace()
+            try skipValue()
+            skipWhitespace()
+            if consumeIfPresent(0x7D) { return }
+            try consume(0x2C)
+            skipWhitespace()
+        }
+    }
+
+    private mutating func skipArray() throws {
+        try consume(0x5B)
+        skipWhitespace()
+        if consumeIfPresent(0x5D) { return }
+
+        while true {
+            try skipValue()
+            skipWhitespace()
+            if consumeIfPresent(0x5D) { return }
+            try consume(0x2C)
+            skipWhitespace()
+        }
     }
 
     private mutating func parseValue(depth: Int) throws -> StrictJSONValue {

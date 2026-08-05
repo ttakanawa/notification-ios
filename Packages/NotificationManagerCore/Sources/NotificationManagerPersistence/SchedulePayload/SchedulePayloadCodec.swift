@@ -13,8 +13,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
     public init() {}
 
     public func decode(_ data: Data) -> ScheduleReadState {
-        guard let document = try? StrictJSONValue.parse(data),
-              let probe = EnvelopeProbe(document),
+        guard let probe = try? StrictJSONValue.probeEnvelope(data),
               probe.format == Self.format
         else {
             return .corrupt(originalData: data)
@@ -22,6 +21,9 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         guard probe.version > 0 else { return .corrupt(originalData: data) }
         guard probe.version == Self.currentVersion else {
             return .unsupportedFuture(version: probe.version, originalData: data)
+        }
+        guard let document = try? StrictJSONValue.parse(data) else {
+            return .corrupt(originalData: data)
         }
         return decodeV1(document, originalData: data)
     }
@@ -62,25 +64,6 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         } catch {
             return .corrupt(originalData: originalData)
         }
-    }
-}
-
-private struct EnvelopeProbe {
-    let format: String
-    let version: UInt32
-
-    init?(_ document: StrictJSONValue) {
-        guard let object = document.objectValue,
-              let format = object["format"]?.stringValue,
-              let versionLexeme = object["version"],
-              case let .number(rawVersion) = versionLexeme,
-              rawVersion.allSatisfy({ $0.isASCII && $0.isNumber }),
-              let version = UInt32(rawVersion)
-        else {
-            return nil
-        }
-        self.format = format
-        self.version = version
     }
 }
 
@@ -196,6 +179,16 @@ private struct RawRule {
         guard ["none", "hourly", "daily", "weekly", "monthly", "yearly"].contains(type) else {
             throw PayloadStructureError.invalid
         }
+        switch type {
+        case "hourly", "daily":
+            try object.requireKeys(["interval"])
+        case "weekly":
+            try object.requireKeys(["interval", "weekdaySetKind", "weekdays"])
+        case "monthly", "yearly":
+            try object.requireKeys(["interval", "selector"])
+        default:
+            break
+        }
         interval = try object.optionalInteger("interval")
         if let value = object["weekdaySetKind"] {
             guard let decoded = WeekdaySetKind(rawValue: try value.requireString()) else {
@@ -297,6 +290,16 @@ private struct RawSelector {
         ].contains(type) else {
             throw PayloadStructureError.invalid
         }
+        switch type {
+        case "dayOfMonth":
+            try object.requireKeys(["day"])
+        case "ordinalDaySet":
+            try object.requireKeys(["ordinal", "daySet"])
+        case "ordinalWeekday":
+            try object.requireKeys(["ordinal", "weekday"])
+        default:
+            break
+        }
         day = try object.optionalInteger("day")
         ordinal = try object.optionalInteger("ordinal")
         if let value = object["daySet"] {
@@ -371,6 +374,9 @@ private struct RawEnd {
         guard ["never", "onDate"].contains(type) else {
             throw PayloadStructureError.invalid
         }
+        if type == "onDate" {
+            try object.requireKeys(["year", "month", "day"])
+        }
         year = try object.optionalInteger("year")
         month = try object.optionalInteger("month")
         day = try object.optionalInteger("day")
@@ -417,6 +423,12 @@ private extension StrictJSONValue {
 }
 
 private extension Dictionary where Key == String, Value == StrictJSONValue {
+    func requireKeys(_ keys: Set<String>) throws {
+        guard keys.isSubset(of: Set(self.keys)) else {
+            throw PayloadStructureError.invalid
+        }
+    }
+
     func requireString(_ key: String) throws -> String {
         guard let value = self[key]?.stringValue else { throw PayloadStructureError.invalid }
         return value
