@@ -99,6 +99,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     private var idleWaiters: [CheckedContinuation<Void, Never>] = []
     private var retryTask: Task<Void, Never>?
     private var foregroundTimerTask: Task<Void, Never>?
+    private var retryTimerToken: UInt64 = 0
+    private var foregroundTimerToken: UInt64 = 0
     private var retryAttempt = 0
 
     public init(
@@ -146,8 +148,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         }
         if reason == .foreground {
             isForeground = true
-            retryTask?.cancel()
-            retryTask = nil
+            invalidateRetryTimer()
             retryAttempt = 0
         }
         await stateStore.setReconcileInProgressOrQueued(true)
@@ -156,10 +157,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
     public func enterBackground() {
         isForeground = false
-        retryTask?.cancel()
-        retryTask = nil
-        foregroundTimerTask?.cancel()
-        foregroundTimerTask = nil
+        invalidateRetryTimer()
+        invalidateForegroundTimer()
     }
 
     public func timerState() -> NotificationReconcileTimerState {
@@ -347,11 +346,14 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         if outcomes.values.contains(.unscheduledError) {
             scheduleRetryIfPossible()
         } else {
-            retryTask?.cancel()
-            retryTask = nil
+            invalidateRetryTimer()
             retryAttempt = 0
         }
-        scheduleForegroundReplenishment(for: materialized)
+        if crossedBoundary {
+            invalidateForegroundTimer()
+        } else {
+            scheduleForegroundReplenishment(for: materialized)
+        }
         return crossedBoundary
     }
 
@@ -373,24 +375,33 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         }
         let delay = retryDelays[retryAttempt]
         retryAttempt += 1
+        retryTimerToken &+= 1
+        let token = retryTimerToken
         retryTask = Task { [weak self, clock] in
             do {
                 try await clock.sleep(delay)
             } catch {
                 return
             }
-            await self?.retryTimerFired()
+            guard !Task.isCancelled else { return }
+            await self?.retryTimerFired(token: token)
         }
     }
 
-    private func retryTimerFired() {
+    private func retryTimerFired(token: UInt64) {
+        guard !Task.isCancelled,
+              isForeground,
+              token == retryTimerToken
+        else {
+            return
+        }
+        retryTimerToken &+= 1
         retryTask = nil
         enqueue(.foreground)
     }
 
     private func scheduleForegroundReplenishment(for requests: [MaterializedRequest]) {
-        foregroundTimerTask?.cancel()
-        foregroundTimerTask = nil
+        invalidateForegroundTimer()
         guard isForeground,
               let alertInstant = requests.compactMap(\.logical.oneShotAlertInstant).min()
         else {
@@ -398,19 +409,40 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         }
         let target = alertInstant.addingTimeInterval(1)
         let delay = max(0, target.timeIntervalSince(clock.now()))
+        let token = foregroundTimerToken
         foregroundTimerTask = Task { [weak self, clock] in
             do {
                 try await clock.sleep(delay)
             } catch {
                 return
             }
-            await self?.foregroundTimerFired()
+            guard !Task.isCancelled else { return }
+            await self?.foregroundTimerFired(token: token)
         }
     }
 
-    private func foregroundTimerFired() {
+    private func foregroundTimerFired(token: UInt64) {
+        guard !Task.isCancelled,
+              isForeground,
+              token == foregroundTimerToken
+        else {
+            return
+        }
+        foregroundTimerToken &+= 1
         foregroundTimerTask = nil
         enqueue(.foreground)
+    }
+
+    private func invalidateRetryTimer() {
+        retryTimerToken &+= 1
+        retryTask?.cancel()
+        retryTask = nil
+    }
+
+    private func invalidateForegroundTimer() {
+        foregroundTimerToken &+= 1
+        foregroundTimerTask?.cancel()
+        foregroundTimerTask = nil
     }
 }
 

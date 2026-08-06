@@ -16,7 +16,7 @@ struct NotificationReconcileWorkerTests {
     ) async {
         let center = NotificationCenterClientSpy()
         let worker = NotificationReconcileWorker(
-            snapshotLoader: FailingSchedulingSnapshotLoader(error: .relationshipTraversal),
+            snapshotLoader: FailingSchedulingSnapshotLoader(error: error),
             preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
             authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
             notificationCenter: center,
@@ -73,6 +73,67 @@ struct NotificationReconcileWorkerTests {
         let loaded = try await loader.loadCompleteSnapshot()
 
         #expect(loaded == expected)
+    }
+
+    @Test func concreteWorkerExcludesEveryInvalidScheduleAndCleansOwnedPending() async throws {
+        let reminders = [
+            validReminder(
+                id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+                schedule: .unsupportedFuture(version: 9, originalData: Data([9]))
+            ),
+            validReminder(
+                id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+                schedule: .corrupt(originalData: Data([0xff]))
+            ),
+            validReminder(
+                id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+                schedule: .domainInvalid(
+                    repairSeed: ScheduleRepairSeed(),
+                    originalData: Data([1]),
+                    issues: [.invalidTimeZone]
+                )
+            )
+        ]
+        let identifiers = try reminders.map {
+            try NotificationIdentifierCodec().oneShotIdentifier(
+                reminderID: $0.id,
+                alertInstant: testDate("2040-08-31T13:30:00Z")
+            )
+        }
+        let unrelated = "other-app.notification"
+        let center = NotificationCenterClientSpy(pending: identifiers.map {
+            NotificationInventoryItem(identifier: $0)
+        } + [NotificationInventoryItem(identifier: unrelated)])
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: CompleteSchedulingSnapshotLoader(
+                repository: SnapshotRepositoryStub(snapshot: CompleteReminderSnapshot(
+                    reminders: reminders,
+                    tags: []
+                ))
+            ),
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: center,
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            recurrenceEnvironmentProvider: { .foundation },
+            localeProvider: { Locale(identifier: "en_US") },
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { _ in }
+            ),
+            retryDelays: []
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+
+        #expect(await center.addedIdentifiers().isEmpty)
+        #expect(await center.pendingIdentifiers() == [unrelated])
+        #expect(await center.recordedCalls() == [
+            "pending",
+            "remove-pending:\(identifiers.sorted().joined(separator: ","))"
+        ])
     }
 
     @Test func validEmptySnapshotCleansOnlyAppOwnedPendingWithoutReadingDelivered() async {
@@ -628,6 +689,77 @@ struct NotificationReconcileWorkerTests {
         #expect(await center.addedIdentifiers() == [latest.identifier])
     }
 
+    @Test func crossedBoundaryWithProductionZeroDelayRunsExactlyOneFollowUp() async throws {
+        let reminder = validReminder()
+        let crossed = try oneShotRequest(
+            reminderID: reminder.id,
+            alertInstant: testDate("2040-08-31T13:30:00Z"),
+            baseInstant: testDate("2040-08-31T13:30:00Z")
+        )
+        let latest = try oneShotRequest(
+            reminderID: reminder.id,
+            alertInstant: testDate("2040-09-01T13:30:00Z"),
+            baseInstant: testDate("2040-09-01T13:30:00Z")
+        )
+        let planner = SequenceNotificationPlanner([
+            plan(
+                requests: [crossed],
+                outcomes: crossed.contributingGroupIDs.reduce(into: [:]) {
+                    $0[$1] = .scheduled
+                }
+            ),
+            plan(
+                requests: [latest],
+                outcomes: latest.contributingGroupIDs.reduce(into: [:]) {
+                    $0[$1] = .scheduled
+                }
+            )
+        ])
+        let center = BlockingSecondPendingNotificationCenter()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: FixedSchedulingSnapshotLoader(
+                CompleteReminderSnapshot(reminders: [reminder], tags: [])
+            ),
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: center,
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            planner: planner,
+            materializer: RecordingNotificationMaterializer { logical, _ in
+                notificationRequest(identifier: logical.identifier)
+            },
+            recurrenceEnvironmentProvider: { .foundation },
+            localeProvider: { Locale(identifier: "en_US") },
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-31T13:30:02Z") },
+                sleep: { delay in
+                    guard delay > 0 else { return }
+                    try await Task.sleep(for: .seconds(3_600))
+                }
+            ),
+            retryDelays: [],
+            triggerInspector: { request in
+                NotificationTriggerInspection(
+                    repeats: false,
+                    nextTriggerDate: request.identifier == crossed.identifier
+                        ? testDate("2040-08-31T13:30:00Z")
+                        : testDate("2040-09-01T13:30:00Z")
+                )
+            }
+        )
+
+        await worker.requestReconcile(.foreground)
+        await center.waitUntilSecondPendingStarts()
+        await drainScheduledTasks()
+        await center.releaseSecondPending()
+        await worker.waitUntilIdle()
+
+        #expect(planner.callCount == 2)
+        #expect(await center.addedIdentifiers() == [latest.identifier])
+        await worker.enterBackground()
+    }
+
     @Test func requestsDuringInflightPassCoalesceIntoOneLatestSnapshotFollowUp() async {
         let first = CompleteReminderSnapshot(
             reminders: [validReminder(title: "first")],
@@ -769,6 +901,190 @@ struct NotificationReconcileWorkerTests {
             foregroundReplenishmentScheduled: false,
             retryAttempt: 2
         ))
+    }
+
+    @Test func supersededRetryCallbackCannotReplaceTheCurrentTimer() async {
+        let loader = CountingFailingSnapshotLoader()
+        let sleeper = ManuallyResumedSleeper()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: loader,
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: NotificationCenterClientSpy(),
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { delay in try await sleeper.sleep(delay) }
+            ),
+            retryDelays: [1, 2, 4]
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 1 }
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 2 }
+
+        await sleeper.resume(id: 0)
+        await waitUntil { await sleeper.hasReturned(id: 0) }
+        await drainScheduledTasks()
+
+        #expect(await loader.count == 2)
+        #expect(await sleeper.recordedDelays == [1, 1])
+        #expect(await worker.timerState() == NotificationReconcileTimerState(
+            retryScheduled: true,
+            foregroundReplenishmentScheduled: false,
+            retryAttempt: 1
+        ))
+        await worker.enterBackground()
+        await sleeper.resumeAll()
+        await drainScheduledTasks()
+    }
+
+    @Test func supersededReplenishmentCallbackCannotReplaceTheCurrentTimer() async throws {
+        let reminder = validReminder()
+        let logical = try oneShotRequest(
+            reminderID: reminder.id,
+            alertInstant: testDate("2040-08-31T13:30:00Z"),
+            baseInstant: testDate("2040-08-31T13:30:00Z")
+        )
+        let planner = SequenceNotificationPlanner([plan(
+            requests: [logical],
+            outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                $0[$1] = .scheduled
+            }
+        )])
+        let center = NotificationCenterClientSpy()
+        let sleeper = ManuallyResumedSleeper()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: FixedSchedulingSnapshotLoader(
+                CompleteReminderSnapshot(reminders: [reminder], tags: [])
+            ),
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: center,
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            planner: planner,
+            materializer: RecordingNotificationMaterializer { logical, _ in
+                notificationRequest(identifier: logical.identifier)
+            },
+            recurrenceEnvironmentProvider: { .foundation },
+            localeProvider: { Locale(identifier: "en_US") },
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { delay in try await sleeper.sleep(delay) }
+            ),
+            retryDelays: [],
+            triggerInspector: { _ in NotificationTriggerInspection(
+                repeats: false,
+                nextTriggerDate: testDate("2040-08-31T13:30:00Z")
+            ) }
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 1 }
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 2 }
+
+        await sleeper.resume(id: 0)
+        await waitUntil { await sleeper.hasReturned(id: 0) }
+        await drainScheduledTasks()
+
+        #expect(planner.callCount == 2)
+        #expect(await center.addedIdentifiers() == [logical.identifier, logical.identifier])
+        #expect(await sleeper.recordedDelays.count == 2)
+        #expect(await worker.timerState().foregroundReplenishmentScheduled)
+        await worker.enterBackground()
+        await sleeper.resumeAll()
+        await drainScheduledTasks()
+    }
+
+    @Test func backgroundPreventsResumedCancelledRetryFromReconciling() async {
+        let loader = CountingFailingSnapshotLoader()
+        let sleeper = ManuallyResumedSleeper()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: loader,
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: NotificationCenterClientSpy(),
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { delay in try await sleeper.sleep(delay) }
+            ),
+            retryDelays: [1]
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 1 }
+        await worker.enterBackground()
+        await sleeper.resume(id: 0)
+        await waitUntil { await sleeper.hasReturned(id: 0) }
+        await drainScheduledTasks()
+
+        #expect(await loader.count == 1)
+        #expect(!(await worker.timerState()).retryScheduled)
+    }
+
+    @Test func backgroundPreventsResumedCancelledReplenishmentFromReconciling() async throws {
+        let reminder = validReminder()
+        let logical = try oneShotRequest(
+            reminderID: reminder.id,
+            alertInstant: testDate("2040-08-31T13:30:00Z"),
+            baseInstant: testDate("2040-08-31T13:30:00Z")
+        )
+        let planner = SequenceNotificationPlanner([plan(
+            requests: [logical],
+            outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                $0[$1] = .scheduled
+            }
+        )])
+        let center = NotificationCenterClientSpy()
+        let sleeper = ManuallyResumedSleeper()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: FixedSchedulingSnapshotLoader(
+                CompleteReminderSnapshot(reminders: [reminder], tags: [])
+            ),
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: center,
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            planner: planner,
+            materializer: RecordingNotificationMaterializer { logical, _ in
+                notificationRequest(identifier: logical.identifier)
+            },
+            recurrenceEnvironmentProvider: { .foundation },
+            localeProvider: { Locale(identifier: "en_US") },
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { delay in try await sleeper.sleep(delay) }
+            ),
+            retryDelays: [],
+            triggerInspector: { _ in NotificationTriggerInspection(
+                repeats: false,
+                nextTriggerDate: testDate("2040-08-31T13:30:00Z")
+            ) }
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+        await waitUntil { await sleeper.recordedDelays.count == 1 }
+        await worker.enterBackground()
+        await sleeper.resume(id: 0)
+        await waitUntil { await sleeper.hasReturned(id: 0) }
+        await drainScheduledTasks()
+
+        #expect(planner.callCount == 1)
+        #expect(await center.addedIdentifiers() == [logical.identifier])
+        #expect(!(await worker.timerState()).foregroundReplenishmentScheduled)
     }
 
     @Test func backgroundTransitionCancelsRetryAndForegroundReplenishmentTimers() async throws {
@@ -1034,6 +1350,50 @@ private actor NotificationCenterClientSpy: NotificationCenterClient {
     func deliveredIdentifiers() -> Set<String> { Set(delivered.map(\.identifier)) }
     func addedIdentifiers() -> [String] { addedRequests.map(\.identifier) }
     func addedTitles() -> [String] { addedRequests.map(\.content.title) }
+}
+
+private actor BlockingSecondPendingNotificationCenter: NotificationCenterClient {
+    private var pendingCallCount = 0
+    private var secondPendingStarted = false
+    private var secondPendingStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var secondPendingRelease: CheckedContinuation<Void, Never>?
+    private var added: [String] = []
+
+    func pendingNotificationInventory() async throws -> [NotificationInventoryItem] {
+        pendingCallCount += 1
+        guard pendingCallCount == 2 else { return [] }
+        secondPendingStarted = true
+        let waiters = secondPendingStartWaiters
+        secondPendingStartWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            secondPendingRelease = continuation
+        }
+        return []
+    }
+
+    func deliveredNotificationInventory() async -> [NotificationInventoryItem] { [] }
+
+    func add(_ request: UNNotificationRequest) async throws {
+        added.append(request.identifier)
+    }
+
+    func removePendingNotificationRequests(withIdentifiers identifiers: [String]) async {}
+    func removeDeliveredNotifications(withIdentifiers identifiers: [String]) async {}
+
+    func waitUntilSecondPendingStarts() async {
+        guard !secondPendingStarted else { return }
+        await withCheckedContinuation { continuation in
+            secondPendingStartWaiters.append(continuation)
+        }
+    }
+
+    func releaseSecondPending() {
+        secondPendingRelease?.resume()
+        secondPendingRelease = nil
+    }
+
+    func addedIdentifiers() -> [String] { added }
 }
 
 private struct FixedNotificationPlanner: NotificationPlanning {
@@ -1346,6 +1706,35 @@ private actor SuspendedSleeper {
     }
 }
 
+private actor ManuallyResumedSleeper {
+    private var delays: [TimeInterval] = []
+    private var continuations: [Int: CheckedContinuation<Void, Never>] = [:]
+    private var returnedIDs: Set<Int> = []
+
+    var recordedDelays: [TimeInterval] { delays }
+
+    func sleep(_ delay: TimeInterval) async throws {
+        let id = delays.count
+        delays.append(delay)
+        await withCheckedContinuation { continuation in
+            continuations[id] = continuation
+        }
+        returnedIDs.insert(id)
+    }
+
+    func resume(id: Int) {
+        continuations.removeValue(forKey: id)?.resume()
+    }
+
+    func resumeAll() {
+        let pending = continuations.values
+        continuations.removeAll()
+        pending.forEach { $0.resume() }
+    }
+
+    func hasReturned(id: Int) -> Bool { returnedIDs.contains(id) }
+}
+
 private func plan(
     requests: [LogicalNotificationRequest],
     outcomes: [AlertGroupID: AlertGroupSchedulingOutcome]
@@ -1484,4 +1873,10 @@ private func waitUntil(
         await Task.yield()
     }
     Issue.record("Condition did not become true")
+}
+
+private func drainScheduledTasks() async {
+    for _ in 0..<1_000 {
+        await Task.yield()
+    }
 }
