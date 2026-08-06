@@ -1,0 +1,293 @@
+import Foundation
+import NotificationManagerApplication
+import NotificationManagerDomain
+import SwiftData
+
+public enum PersistenceError: Error, Sendable, Equatable {
+    case diskFull
+    case reminderNotFound(UUID)
+    case tagNotFound(UUID)
+    case duplicateReminderID(UUID)
+    case duplicateTagID(UUID)
+    case duplicateNormalizedTagName(String)
+    case invalidTag(TagValidationIssue)
+    case storeFailure
+}
+
+public enum PersistenceSaveFailure: Sendable {
+    case diskFull
+}
+
+public actor SwiftDataReminderRepository: ReminderRepository {
+    private let container: ModelContainer
+    private let mapper: RecordMapper
+    private let tagNormalizer: TagNameNormalizerV1
+    private let saveFailure: PersistenceSaveFailure?
+
+    public init(
+        container: ModelContainer,
+        scheduleCodec: any SchedulePayloadCoding = SchedulePayloadCodec(),
+        tagNormalizer: TagNameNormalizerV1 = TagNameNormalizerV1(),
+        saveFailure: PersistenceSaveFailure? = nil
+    ) {
+        self.container = container
+        mapper = RecordMapper(scheduleCodec: scheduleCodec)
+        self.tagNormalizer = tagNormalizer
+        self.saveFailure = saveFailure
+    }
+
+    public static func inMemory(
+        saveFailure: PersistenceSaveFailure? = nil
+    ) throws -> SwiftDataReminderRepository {
+        SwiftDataReminderRepository(
+            container: try ModelContainerFactory.inMemory(),
+            saveFailure: saveFailure
+        )
+    }
+
+    public func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+        let context = makeContext()
+        do {
+            let reminderRecords = try context.fetch(FetchDescriptor<ReminderRecordV1>())
+            let tagRecords = try context.fetch(FetchDescriptor<TagRecordV1>())
+            try ensureUniqueReminderIDs(reminderRecords)
+            try ensureUniqueTagIDs(tagRecords)
+            return CompleteReminderSnapshot(
+                reminders: reminderRecords.map(mapper.reminder).sorted(by: Self.reminderSort),
+                tags: tagRecords.map(mapper.tag).sorted(by: Self.tagSort)
+            )
+        } catch let error as PersistenceError {
+            throw error
+        } catch {
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    public func reminder(id: UUID) async throws -> ReminderSnapshot? {
+        let context = makeContext()
+        do {
+            return try fetchReminder(id: id, in: context).map(mapper.reminder)
+        } catch let error as PersistenceError {
+            throw error
+        } catch {
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    public func save(_ mutation: EncodedReminderMutation) async throws -> ReminderSnapshot {
+        let context = makeContext()
+        do {
+            let record = try fetchReminder(id: mutation.id, in: context) ?? ReminderRecordV1(
+                id: mutation.id,
+                title: mutation.title,
+                notes: mutation.notes,
+                urlString: mutation.urlString,
+                enabled: mutation.enabled,
+                scheduleData: mutation.scheduleData,
+                createdAt: mutation.createdAt,
+                updatedAt: mutation.updatedAt
+            )
+            if record.modelContext == nil {
+                context.insert(record)
+            }
+
+            let tags = try resolveTags(ids: mutation.tagIDs, in: context)
+            record.title = mutation.title
+            record.notes = mutation.notes
+            record.urlString = mutation.urlString
+            record.enabled = mutation.enabled
+            record.scheduleData = mutation.scheduleData
+            record.createdAt = mutation.createdAt
+            record.updatedAt = mutation.updatedAt
+            record.tags = tags
+
+            try injectSaveFailureIfNeeded()
+            try context.save()
+            return mapper.reminder(record)
+        } catch let error as PersistenceError {
+            context.rollback()
+            throw error
+        } catch {
+            context.rollback()
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    public func delete(id: UUID) async throws {
+        let context = makeContext()
+        do {
+            guard let record = try fetchReminder(id: id, in: context) else {
+                throw PersistenceError.reminderNotFound(id)
+            }
+            context.delete(record)
+            try injectSaveFailureIfNeeded()
+            try context.save()
+        } catch let error as PersistenceError {
+            context.rollback()
+            throw error
+        } catch {
+            context.rollback()
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    public func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
+        let context = makeContext()
+        do {
+            try validateTag(mutation)
+            let allTags = try context.fetch(FetchDescriptor<TagRecordV1>())
+            try ensureUniqueTagIDs(allTags)
+            if allTags.contains(where: {
+                $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+            }) {
+                throw PersistenceError.duplicateNormalizedTagName(mutation.normalizedName)
+            }
+
+            let matches = allTags.filter { $0.id == mutation.id }
+            guard matches.count <= 1 else { throw PersistenceError.duplicateTagID(mutation.id) }
+            let record = matches.first ?? TagRecordV1(
+                id: mutation.id,
+                name: mutation.name,
+                normalizedName: mutation.normalizedName,
+                normalizationVersion: mutation.normalizationVersion,
+                createdAt: mutation.createdAt,
+                updatedAt: mutation.updatedAt
+            )
+            if record.modelContext == nil {
+                context.insert(record)
+            }
+            record.name = mutation.name
+            record.normalizedName = mutation.normalizedName
+            record.normalizationVersion = mutation.normalizationVersion
+            record.createdAt = mutation.createdAt
+            record.updatedAt = mutation.updatedAt
+
+            try injectSaveFailureIfNeeded()
+            try context.save()
+            return mapper.tag(record)
+        } catch let error as PersistenceError {
+            context.rollback()
+            throw error
+        } catch {
+            context.rollback()
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    public func deleteTag(id: UUID) async throws {
+        let context = makeContext()
+        do {
+            guard let record = try fetchTag(id: id, in: context) else {
+                throw PersistenceError.tagNotFound(id)
+            }
+            context.delete(record)
+            try injectSaveFailureIfNeeded()
+            try context.save()
+        } catch let error as PersistenceError {
+            context.rollback()
+            throw error
+        } catch {
+            context.rollback()
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    private func makeContext() -> ModelContext {
+        let context = ModelContext(container)
+        context.autosaveEnabled = false
+        return context
+    }
+
+    private func fetchReminder(id: UUID, in context: ModelContext) throws -> ReminderRecordV1? {
+        let requestedID = id
+        var descriptor = FetchDescriptor<ReminderRecordV1>(
+            predicate: #Predicate { $0.id == requestedID }
+        )
+        descriptor.fetchLimit = 2
+        let matches = try context.fetch(descriptor)
+        guard matches.count <= 1 else { throw PersistenceError.duplicateReminderID(id) }
+        return matches.first
+    }
+
+    private func fetchTag(id: UUID, in context: ModelContext) throws -> TagRecordV1? {
+        let requestedID = id
+        var descriptor = FetchDescriptor<TagRecordV1>(
+            predicate: #Predicate { $0.id == requestedID }
+        )
+        descriptor.fetchLimit = 2
+        let matches = try context.fetch(descriptor)
+        guard matches.count <= 1 else { throw PersistenceError.duplicateTagID(id) }
+        return matches.first
+    }
+
+    private func resolveTags(ids: Set<UUID>, in context: ModelContext) throws -> [TagRecordV1] {
+        guard !ids.isEmpty else { return [] }
+        let records = try context.fetch(FetchDescriptor<TagRecordV1>())
+        try ensureUniqueTagIDs(records)
+        let byID = Dictionary(uniqueKeysWithValues: records.map { ($0.id, $0) })
+        return try ids.sorted(by: Self.uuidSort).map { id in
+            guard let record = byID[id] else { throw PersistenceError.tagNotFound(id) }
+            return record
+        }
+    }
+
+    private func validateTag(_ mutation: EncodedTagMutation) throws {
+        let normalized: String
+        do {
+            normalized = try tagNormalizer.normalize(mutation.name)
+        } catch let issue as TagValidationIssue {
+            throw PersistenceError.invalidTag(issue)
+        }
+        guard normalized == mutation.normalizedName else {
+            throw PersistenceError.invalidTag(.normalizedNameMismatch)
+        }
+        guard mutation.normalizationVersion == TagLimits.normalizationVersion else {
+            throw PersistenceError.invalidTag(.unsupportedNormalizationVersion)
+        }
+        guard Self.isFiniteIntegralSecond(mutation.createdAt) else {
+            throw PersistenceError.invalidTag(.invalidCreatedAt)
+        }
+        guard Self.isFiniteIntegralSecond(mutation.updatedAt) else {
+            throw PersistenceError.invalidTag(.invalidUpdatedAt)
+        }
+    }
+
+    private func injectSaveFailureIfNeeded() throws {
+        if case .diskFull = saveFailure {
+            throw PersistenceError.diskFull
+        }
+    }
+
+    private func ensureUniqueReminderIDs(_ records: [ReminderRecordV1]) throws {
+        var ids: Set<UUID> = []
+        for record in records where !ids.insert(record.id).inserted {
+            throw PersistenceError.duplicateReminderID(record.id)
+        }
+    }
+
+    private func ensureUniqueTagIDs(_ records: [TagRecordV1]) throws {
+        var ids: Set<UUID> = []
+        for record in records where !ids.insert(record.id).inserted {
+            throw PersistenceError.duplicateTagID(record.id)
+        }
+    }
+
+    private static func reminderSort(_ lhs: ReminderSnapshot, _ rhs: ReminderSnapshot) -> Bool {
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return uuidSort(lhs.id, rhs.id)
+    }
+
+    private static func tagSort(_ lhs: TagSnapshot, _ rhs: TagSnapshot) -> Bool {
+        if lhs.createdAt != rhs.createdAt { return lhs.createdAt < rhs.createdAt }
+        return uuidSort(lhs.id, rhs.id)
+    }
+
+    private static func uuidSort(_ lhs: UUID, _ rhs: UUID) -> Bool {
+        lhs.uuidString < rhs.uuidString
+    }
+
+    private static func isFiniteIntegralSecond(_ date: Date) -> Bool {
+        let seconds = date.timeIntervalSince1970
+        return seconds.isFinite && seconds.rounded(.towardZero) == seconds
+    }
+}
