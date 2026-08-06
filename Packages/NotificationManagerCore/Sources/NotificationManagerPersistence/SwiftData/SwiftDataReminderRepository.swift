@@ -11,6 +11,7 @@ public enum PersistenceError: Error, Sendable, Equatable {
     case duplicateTagID(UUID)
     case duplicateNormalizedTagName(String)
     case invalidTag(TagValidationIssue)
+    case snapshotConsistencyUnavailable(attempts: Int)
     case storeFailure
 }
 
@@ -23,6 +24,9 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     private let mapper: RecordMapper
     private let tagNormalizer: TagNameNormalizerV1
     private let saveFailure: PersistenceSaveFailure?
+    private let snapshotAttemptLimit: Int
+    private let completeSnapshotInterFetchHook: @Sendable (Int) throws -> Void
+    private let storeCoordinator: StoreCoordinator
 
     public init(
         container: ModelContainer,
@@ -34,6 +38,27 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         mapper = RecordMapper(scheduleCodec: scheduleCodec)
         self.tagNormalizer = tagNormalizer
         self.saveFailure = saveFailure
+        snapshotAttemptLimit = 3
+        completeSnapshotInterFetchHook = { _ in }
+        storeCoordinator = StoreCoordinatorRegistry.shared.coordinator(for: container)
+    }
+
+    init(
+        container: ModelContainer,
+        scheduleCodec: any SchedulePayloadCoding = SchedulePayloadCodec(),
+        tagNormalizer: TagNameNormalizerV1 = TagNameNormalizerV1(),
+        saveFailure: PersistenceSaveFailure? = nil,
+        snapshotAttemptLimit: Int,
+        completeSnapshotInterFetchHook: @escaping @Sendable (Int) throws -> Void
+    ) {
+        precondition(snapshotAttemptLimit > 0)
+        self.container = container
+        mapper = RecordMapper(scheduleCodec: scheduleCodec)
+        self.tagNormalizer = tagNormalizer
+        self.saveFailure = saveFailure
+        self.snapshotAttemptLimit = snapshotAttemptLimit
+        self.completeSnapshotInterFetchHook = completeSnapshotInterFetchHook
+        storeCoordinator = StoreCoordinatorRegistry.shared.coordinator(for: container)
     }
 
     public static func inMemory(
@@ -46,16 +71,29 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot {
-        let context = makeContext()
+        try storeCoordinator.withCriticalSection {
+            try fetchCompleteSnapshotCoordinated()
+        }
+    }
+
+    private func fetchCompleteSnapshotCoordinated() throws -> CompleteReminderSnapshot {
         do {
-            let reminderRecords = try context.fetch(FetchDescriptor<ReminderRecordV1>())
-            let tagRecords = try context.fetch(FetchDescriptor<TagRecordV1>())
-            try ensureUniqueReminderIDs(reminderRecords)
-            try ensureUniqueTagIDs(tagRecords)
-            return CompleteReminderSnapshot(
-                reminders: reminderRecords.map(mapper.reminder).sorted(by: Self.reminderSort),
-                tags: tagRecords.map(mapper.tag).sorted(by: Self.tagSort)
-            )
+            for attempt in 1...snapshotAttemptLimit {
+                let generationBefore = try storeGeneration()
+                let context = makeContext()
+                let reminderRecords = try context.fetch(FetchDescriptor<ReminderRecordV1>())
+                try ensureUniqueReminderIDs(reminderRecords)
+                let reminders = reminderRecords.map(mapper.reminder).sorted(by: Self.reminderSort)
+                try completeSnapshotInterFetchHook(attempt)
+                let tagRecords = try context.fetch(FetchDescriptor<TagRecordV1>())
+                try ensureUniqueTagIDs(tagRecords)
+                let tags = tagRecords.map(mapper.tag).sorted(by: Self.tagSort)
+                let generationAfter = try storeGeneration()
+                guard generationBefore != generationAfter else {
+                    return CompleteReminderSnapshot(reminders: reminders, tags: tags)
+                }
+            }
+            throw PersistenceError.snapshotConsistencyUnavailable(attempts: snapshotAttemptLimit)
         } catch let error as PersistenceError {
             throw error
         } catch {
@@ -64,6 +102,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func reminder(id: UUID) async throws -> ReminderSnapshot? {
+        try storeCoordinator.withCriticalSection {
+            try reminderCoordinated(id: id)
+        }
+    }
+
+    private func reminderCoordinated(id: UUID) throws -> ReminderSnapshot? {
         let context = makeContext()
         do {
             return try fetchReminder(id: id, in: context).map(mapper.reminder)
@@ -75,6 +119,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func save(_ mutation: EncodedReminderMutation) async throws -> ReminderSnapshot {
+        try storeCoordinator.withCriticalSection {
+            try saveCoordinated(mutation)
+        }
+    }
+
+    private func saveCoordinated(_ mutation: EncodedReminderMutation) throws -> ReminderSnapshot {
         let context = makeContext()
         do {
             let record = try fetchReminder(id: mutation.id, in: context) ?? ReminderRecordV1(
@@ -114,6 +164,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func delete(id: UUID) async throws {
+        try storeCoordinator.withCriticalSection {
+            try deleteCoordinated(id: id)
+        }
+    }
+
+    private func deleteCoordinated(id: UUID) throws {
         let context = makeContext()
         do {
             guard let record = try fetchReminder(id: id, in: context) else {
@@ -132,6 +188,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
+        try storeCoordinator.withCriticalSection {
+            try saveTagCoordinated(mutation)
+        }
+    }
+
+    private func saveTagCoordinated(_ mutation: EncodedTagMutation) throws -> TagSnapshot {
         let context = makeContext()
         do {
             try validateTag(mutation)
@@ -175,6 +237,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func deleteTag(id: UUID) async throws {
+        try storeCoordinator.withCriticalSection {
+            try deleteTagCoordinated(id: id)
+        }
+    }
+
+    private func deleteTagCoordinated(id: UUID) throws {
         let context = makeContext()
         do {
             guard let record = try fetchTag(id: id, in: context) else {
@@ -196,6 +264,21 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         let context = ModelContext(container)
         context.autosaveEnabled = false
         return context
+    }
+
+    private func storeGeneration() throws -> StoreGeneration {
+        // ModelContext.transaction does not pin fetches to one read generation. Persistent
+        // history advances for every stored attribute or relationship mutation instead.
+        let context = makeContext()
+        let history = try context.fetchHistory(HistoryDescriptor<DefaultHistoryTransaction>())
+        return StoreGeneration(
+            transactions: history.map {
+                StoreTransactionMarker(
+                    storeIdentifier: $0.storeIdentifier,
+                    transactionIdentifier: $0.transactionIdentifier
+                )
+            }.sorted()
+        )
     }
 
     private func fetchReminder(id: UUID, in context: ModelContext) throws -> ReminderRecordV1? {
@@ -289,5 +372,71 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     private static func isFiniteIntegralSecond(_ date: Date) -> Bool {
         let seconds = date.timeIntervalSince1970
         return seconds.isFinite && seconds.rounded(.towardZero) == seconds
+    }
+}
+
+private struct StoreGeneration: Equatable {
+    let transactions: [StoreTransactionMarker]
+}
+
+private struct StoreTransactionMarker: Comparable {
+    let storeIdentifier: String
+    let transactionIdentifier: Int64
+
+    static func < (lhs: StoreTransactionMarker, rhs: StoreTransactionMarker) -> Bool {
+        if lhs.storeIdentifier != rhs.storeIdentifier {
+            return lhs.storeIdentifier < rhs.storeIdentifier
+        }
+        return lhs.transactionIdentifier < rhs.transactionIdentifier
+    }
+}
+
+private enum StoreIdentity: Hashable, Sendable {
+    case inMemory(ObjectIdentifier)
+    case persistent([String])
+
+    init(container: ModelContainer) {
+        let configurations = container.configurations
+        if configurations.contains(where: \.isStoredInMemoryOnly) {
+            self = .inMemory(ObjectIdentifier(container))
+        } else {
+            self = .persistent(
+                configurations.map {
+                    $0.url.standardizedFileURL.resolvingSymlinksInPath().path
+                }.sorted()
+            )
+        }
+    }
+}
+
+private final class StoreCoordinator: @unchecked Sendable {
+    private let lock = NSLock()
+
+    func withCriticalSection<Result: Sendable>(_ operation: () throws -> Result) rethrows -> Result {
+        // This operation is deliberately synchronous. Allowing suspension while locked would
+        // reopen check-then-save races through actor reentrancy.
+        lock.lock()
+        defer { lock.unlock() }
+        return try operation()
+    }
+}
+
+private final class StoreCoordinatorRegistry: @unchecked Sendable {
+    static let shared = StoreCoordinatorRegistry()
+
+    // All process-wide mutable registry state is accessed only while this lock is held.
+    private let lock = NSLock()
+    private var coordinators: [StoreIdentity: StoreCoordinator] = [:]
+
+    func coordinator(for container: ModelContainer) -> StoreCoordinator {
+        let identity = StoreIdentity(container: container)
+        lock.lock()
+        defer { lock.unlock() }
+        if let coordinator = coordinators[identity] {
+            return coordinator
+        }
+        let coordinator = StoreCoordinator()
+        coordinators[identity] = coordinator
+        return coordinator
     }
 }

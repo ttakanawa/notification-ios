@@ -72,6 +72,115 @@ import Testing
         #expect(try await repository.fetchCompleteSnapshot().reminders.count == 1)
     }
 
+    @Test func completeSnapshotRetriesAnExternalRelatedInsertBetweenEntityFetches() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let injections = LockedCounter()
+        let repository = SwiftDataReminderRepository(
+            container: container,
+            snapshotAttemptLimit: 3,
+            completeSnapshotInterFetchHook: { _ in
+                guard injections.increment() == 1 else { return }
+                try insertRelatedReminderAndTag(in: container)
+            }
+        )
+
+        let snapshot = try await repository.fetchCompleteSnapshot()
+
+        #expect(injections.value == 2)
+        #expect(snapshot.reminders.map(\.id) == [TestValues.reminderID])
+        #expect(snapshot.tags.map(\.id) == [TestValues.tagID])
+        #expect(snapshot.reminders.first?.tagIDs == [TestValues.tagID])
+    }
+
+    @Test func completeSnapshotRetriesAnExternalRelationshipUpdate() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        try insertRelatedReminderAndTag(in: container)
+        try insertTag(id: TestValues.otherTagID, name: "Work", normalizedName: "work", in: container)
+        let injections = LockedCounter()
+        let repository = SwiftDataReminderRepository(
+            container: container,
+            snapshotAttemptLimit: 3,
+            completeSnapshotInterFetchHook: { _ in
+                guard injections.increment() == 1 else { return }
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                let reminder = try #require(
+                    context.fetch(FetchDescriptor<ReminderRecordV1>()).first {
+                        $0.id == TestValues.reminderID
+                    }
+                )
+                let replacement = try #require(
+                    context.fetch(FetchDescriptor<TagRecordV1>()).first {
+                        $0.id == TestValues.otherTagID
+                    }
+                )
+                reminder.tags = [replacement]
+                reminder.updatedAt = TestValues.later
+                try context.save()
+            }
+        )
+
+        let snapshot = try await repository.fetchCompleteSnapshot()
+
+        #expect(injections.value == 2)
+        #expect(Set(snapshot.tags.map(\.id)) == [TestValues.tagID, TestValues.otherTagID])
+        #expect(snapshot.reminders.first?.tagIDs == [TestValues.otherTagID])
+        #expect(snapshot.reminders.first?.updatedAt == TestValues.later)
+    }
+
+    @Test func completeSnapshotRetriesAnExternalTagDeleteAndRelationshipNullification() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        try insertRelatedReminderAndTag(in: container)
+        let injections = LockedCounter()
+        let repository = SwiftDataReminderRepository(
+            container: container,
+            snapshotAttemptLimit: 3,
+            completeSnapshotInterFetchHook: { _ in
+                guard injections.increment() == 1 else { return }
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                let tag = try #require(context.fetch(FetchDescriptor<TagRecordV1>()).first)
+                context.delete(tag)
+                try context.save()
+            }
+        )
+
+        let snapshot = try await repository.fetchCompleteSnapshot()
+
+        #expect(injections.value == 2)
+        #expect(snapshot.tags.isEmpty)
+        #expect(snapshot.reminders.map(\.id) == [TestValues.reminderID])
+        #expect(snapshot.reminders.first?.tagIDs.isEmpty == true)
+    }
+
+    @Test func completeSnapshotThrowsPreciseErrorAfterBoundedExternalChurn() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        try insertRelatedReminderAndTag(in: container)
+        let injections = LockedCounter()
+        let repository = SwiftDataReminderRepository(
+            container: container,
+            snapshotAttemptLimit: 3,
+            completeSnapshotInterFetchHook: { attempt in
+                _ = injections.increment()
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                let reminder = try #require(context.fetch(FetchDescriptor<ReminderRecordV1>()).first)
+                reminder.title = "Remote update \(attempt)"
+                reminder.updatedAt = Date(
+                    timeIntervalSince1970: TestValues.latest.timeIntervalSince1970 + Double(attempt)
+                )
+                try context.save()
+            }
+        )
+
+        await #expect(
+            throws: PersistenceError.snapshotConsistencyUnavailable(attempts: 3)
+        ) {
+            try await repository.fetchCompleteSnapshot()
+        }
+        #expect(injections.value == 3)
+    }
+
     @Test func metadataOnlyMappingsPreserveUnsupportedAndCorruptRawBytesExactly() async throws {
         let repository = try SwiftDataReminderRepository.inMemory()
         let unsupported = Data(
@@ -143,6 +252,94 @@ import Testing
         let snapshot = try await repository.fetchCompleteSnapshot()
         #expect(snapshot.tags == [first])
         #expect(snapshot.tags.first?.id == TestValues.tagID)
+    }
+
+    @Test func concurrentRepositoriesForOneContainerAllowExactlyOneNormalizedTagName() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let firstRepository = SwiftDataReminderRepository(container: container)
+        let secondRepository = SwiftDataReminderRepository(container: container)
+        let saveBarrier = TimedSaveBarrier(participants: 2)
+        let observer = installSaveBarrier(saveBarrier, containers: [container])
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        async let first = tagSaveOutcome(
+            .fixture(id: TestValues.tagID, name: "ＴｅＳＴ"),
+            in: firstRepository
+        )
+        async let second = tagSaveOutcome(
+            .fixture(id: TestValues.otherTagID, name: "test"),
+            in: secondRepository
+        )
+        let outcomes = await [first, second]
+
+        #expect(outcomes.filter(\.isSaved).count == 1)
+        #expect(outcomes.filter { $0 == .duplicate("test") }.count == 1)
+        let snapshot = try await firstRepository.fetchCompleteSnapshot()
+        #expect(snapshot.tags.count == 1)
+        #expect(snapshot.tags.first?.normalizedName == "test")
+    }
+
+    @Test func repositoriesForTheSamePersistentStoreURLShareDuplicateCoordination() async throws {
+        let directory = FileManager.default.temporaryDirectory.appending(
+            path: "NotificationManagerPersistenceTests-\(UUID().uuidString)",
+            directoryHint: .isDirectory
+        )
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let storeURL = directory.appending(path: "Shared.store")
+        let configuration = ModelConfiguration(
+            "Shared",
+            schema: ModelContainerFactory.schema,
+            url: storeURL,
+            allowsSave: true,
+            cloudKitDatabase: .none
+        )
+        let firstContainer = try ModelContainerFactory.makeContainer(configuration: configuration)
+        let secondContainer = try ModelContainerFactory.makeContainer(configuration: configuration)
+        let firstRepository = SwiftDataReminderRepository(container: firstContainer)
+        let secondRepository = SwiftDataReminderRepository(container: secondContainer)
+        let saveBarrier = TimedSaveBarrier(participants: 2)
+        let observer = installSaveBarrier(
+            saveBarrier,
+            containers: [firstContainer, secondContainer]
+        )
+        defer { NotificationCenter.default.removeObserver(observer) }
+
+        async let first = tagSaveOutcome(
+            .fixture(id: TestValues.tagID, name: "ＴｅＳＴ"),
+            in: firstRepository
+        )
+        async let second = tagSaveOutcome(
+            .fixture(id: TestValues.otherTagID, name: "test"),
+            in: secondRepository
+        )
+        let outcomes = await [first, second]
+
+        #expect(outcomes.filter(\.isSaved).count == 1)
+        #expect(outcomes.filter { $0 == .duplicate("test") }.count == 1)
+        #expect(try await firstRepository.fetchCompleteSnapshot().tags.count == 1)
+        #expect(try await secondRepository.fetchCompleteSnapshot().tags.count == 1)
+    }
+
+    @Test func concurrentRepositoriesKeepDistinctNormalizedTagNamesIndependent() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let firstRepository = SwiftDataReminderRepository(container: container)
+        let secondRepository = SwiftDataReminderRepository(container: container)
+
+        async let first = tagSaveOutcome(
+            .fixture(id: TestValues.tagID, name: "Travel"),
+            in: firstRepository
+        )
+        async let second = tagSaveOutcome(
+            .fixture(id: TestValues.otherTagID, name: "Work"),
+            in: secondRepository
+        )
+        let outcomes = await [first, second]
+
+        #expect(outcomes.filter(\.isSaved).count == 2)
+        let snapshot = try await firstRepository.fetchCompleteSnapshot()
+        #expect(Set(snapshot.tags.map(\.id)) == [TestValues.tagID, TestValues.otherTagID])
+        #expect(Set(snapshot.tags.map(\.normalizedName)) == ["travel", "work"])
     }
 
     @Test func cloudImportedNormalizedDuplicatesWithDifferentUUIDsRemainSeparate() async throws {
@@ -281,6 +478,128 @@ private extension TagRecordV1 {
             reminders: nil
         )
     }
+}
+
+private final class LockedCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    var value: Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return count
+    }
+
+    func increment() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
+        return count
+    }
+}
+
+private enum TagSaveOutcome: Sendable, Equatable {
+    case saved(UUID)
+    case duplicate(String)
+    case otherPersistenceError(PersistenceError)
+    case unexpectedError
+
+    var isSaved: Bool {
+        if case .saved = self { true } else { false }
+    }
+}
+
+private func tagSaveOutcome(
+    _ mutation: EncodedTagMutation,
+    in repository: SwiftDataReminderRepository
+) async -> TagSaveOutcome {
+    do {
+        return .saved(try await repository.saveTag(mutation).id)
+    } catch let PersistenceError.duplicateNormalizedTagName(name) {
+        return .duplicate(name)
+    } catch let error as PersistenceError {
+        return .otherPersistenceError(error)
+    } catch {
+        return .unexpectedError
+    }
+}
+
+private final class TimedSaveBarrier: @unchecked Sendable {
+    private let condition = NSCondition()
+    private let participants: Int
+    private var arrivals = 0
+
+    init(participants: Int) {
+        self.participants = participants
+    }
+
+    func arriveAndWait() {
+        condition.lock()
+        arrivals += 1
+        if arrivals == participants {
+            condition.broadcast()
+        } else {
+            _ = condition.wait(until: Date().addingTimeInterval(0.5))
+        }
+        condition.unlock()
+    }
+}
+
+private func installSaveBarrier(
+    _ barrier: TimedSaveBarrier,
+    containers: [ModelContainer]
+) -> NSObjectProtocol {
+    NotificationCenter.default.addObserver(
+        forName: ModelContext.willSave,
+        object: nil,
+        queue: nil
+    ) { notification in
+        guard let context = notification.object as? ModelContext,
+              containers.contains(where: { $0 === context.container })
+        else { return }
+        barrier.arriveAndWait()
+    }
+}
+
+private func insertRelatedReminderAndTag(in container: ModelContainer) throws {
+    let context = ModelContext(container)
+    context.autosaveEnabled = false
+    let tag = TagRecordV1.fixture(id: TestValues.tagID, name: "Test")
+    let reminder = ReminderRecordV1(
+        id: TestValues.reminderID,
+        title: "Reminder",
+        notes: "Notes",
+        urlString: "https://example.com/reminder",
+        enabled: true,
+        scheduleData: EncodedReminderMutation.fixture().scheduleData,
+        createdAt: TestValues.created,
+        updatedAt: TestValues.created,
+        tags: [tag]
+    )
+    context.insert(tag)
+    context.insert(reminder)
+    try context.save()
+}
+
+private func insertTag(
+    id: UUID,
+    name: String,
+    normalizedName: String,
+    in container: ModelContainer
+) throws {
+    let context = ModelContext(container)
+    context.autosaveEnabled = false
+    context.insert(
+        TagRecordV1(
+            id: id,
+            name: name,
+            normalizedName: normalizedName,
+            normalizationVersion: TagLimits.normalizationVersion,
+            createdAt: TestValues.created,
+            updatedAt: TestValues.created
+        )
+    )
+    try context.save()
 }
 
 private func rawScheduleData(_ state: ScheduleReadState) -> Data {
