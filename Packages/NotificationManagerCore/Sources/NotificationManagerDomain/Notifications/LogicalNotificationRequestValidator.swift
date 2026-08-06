@@ -139,15 +139,15 @@ public struct LogicalNotificationRequestValidator: Sendable {
             throw LogicalNotificationRequestValidationError.contributorIdentityMismatch
         }
 
-        guard let plan = try? LogicalNotificationPlanner().plan(PlannerInput(
+        let plan = try LogicalNotificationPlanner().plan(PlannerInput(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             evaluationNow: context.evaluationNow,
             deviceNotificationsEnabled: true,
             authorizationAllowsScheduling: true,
             capacity: 60,
             recurrenceEnvironment: context.recurrenceEnvironment
-        )), plan.requests.contains(request)
-        else {
+        ))
+        guard plan.requests.contains(request) else {
             throw LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable
         }
     }

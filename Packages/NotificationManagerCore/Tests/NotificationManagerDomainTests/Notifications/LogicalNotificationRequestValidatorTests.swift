@@ -295,7 +295,7 @@ struct LogicalNotificationRequestValidatorTests {
         }
     }
 
-    @Test func mapsInvalidRepeatingPlanningContextToValidationFailure() throws {
+    @Test func propagatesInvalidEvaluationNowFromRepeatingPlanning() throws {
         let source = repeatingComponents(hour: 9, minute: 30)
         let request = repeatingRequest(
             components: source,
@@ -308,8 +308,27 @@ struct LogicalNotificationRequestValidatorTests {
             evaluationNow: Date(timeIntervalSinceReferenceDate: .infinity)
         )
 
-        #expect(throws: LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable) {
+        #expect(throws: LogicalNotificationPlannerError.invalidEvaluationNow) {
             try invalidContext.validate(request, for: schedule())
+        }
+    }
+
+    @Test func propagatesMissingTimeZoneFromRepeatingPlanning() throws {
+        let source = repeatingComponents(hour: 9, minute: 30)
+        let request = repeatingRequest(
+            components: source,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: source
+            )]
+        )
+        let failingContext = FixedValidationHarness(
+            evaluationNow: date("2040-08-31T13:30:00Z"),
+            recurrenceEnvironment: FailAfterFirstTimeZoneLookupEnvironment()
+        )
+
+        #expect(throws: SourceWallClockResolutionError.unknownTimeZone) {
+            try failingContext.validate(request, for: schedule())
         }
     }
 
@@ -425,6 +444,15 @@ struct LogicalNotificationRequestValidatorTests {
 
 private struct FixedValidationHarness {
     let evaluationNow: Date
+    let recurrenceEnvironment: any RecurrenceEnvironment
+
+    init(
+        evaluationNow: Date,
+        recurrenceEnvironment: any RecurrenceEnvironment = FoundationRecurrenceEnvironment()
+    ) {
+        self.evaluationNow = evaluationNow
+        self.recurrenceEnvironment = recurrenceEnvironment
+    }
 
     func validate(
         _ request: LogicalNotificationRequest,
@@ -446,9 +474,28 @@ private struct FixedValidationHarness {
             for: reminder,
             context: LogicalNotificationRequestValidationContext(
                 evaluationNow: evaluationNow,
-                recurrenceEnvironment: .foundation
+                recurrenceEnvironment: recurrenceEnvironment
             )
         )
+    }
+}
+
+private final class FailAfterFirstTimeZoneLookupEnvironment: RecurrenceEnvironment, @unchecked Sendable {
+    private let lock = NSLock()
+    private var lookupCount = 0
+
+    func timeZone(identifier: String) -> TimeZone? {
+        lock.lock()
+        lookupCount += 1
+        let shouldResolve = lookupCount == 1
+        lock.unlock()
+        return shouldResolve ? TimeZone(identifier: identifier) : nil
+    }
+
+    func gregorianCalendar(in timeZone: TimeZone) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
     }
 }
 

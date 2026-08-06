@@ -602,6 +602,54 @@ struct NotificationRequestMaterializerTests {
         }
     }
 
+    @Test func propagatesRepeatingPlanningOperationalErrorsWithoutPayloadMapping() throws {
+        let components = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
+        let request = repeatingRequest(components: components)
+
+        #expect(throws: LogicalNotificationPlannerError.invalidEvaluationNow) {
+            try testMaterializer().materialize(
+                request,
+                input: MaterializationInput(
+                    reminder: reminder(),
+                    locale: Locale(identifier: "en_US"),
+                    evaluationNow: Date(timeIntervalSinceReferenceDate: .infinity),
+                    recurrenceEnvironment: .foundation
+                )
+            )
+        }
+        #expect(throws: SourceWallClockResolutionError.unknownTimeZone) {
+            try testMaterializer().materialize(
+                request,
+                input: MaterializationInput(
+                    reminder: reminder(),
+                    locale: Locale(identifier: "en_US"),
+                    evaluationNow: date("2040-08-31T13:30:00Z"),
+                    recurrenceEnvironment: FailAfterFirstTimeZoneLookupEnvironment()
+                )
+            )
+        }
+    }
+
+    @Test func oneShotValidationDoesNotInvokeRepeatingPlanningContext() throws {
+        let logical = try oneShotRequest()
+        let materialized = try testMaterializer().materialize(
+            logical,
+            input: MaterializationInput(
+                reminder: reminder(),
+                locale: Locale(identifier: "en_US"),
+                evaluationNow: Date(timeIntervalSinceReferenceDate: .infinity),
+                recurrenceEnvironment: FailAfterFirstTimeZoneLookupEnvironment()
+            )
+        )
+
+        #expect(materialized.identifier == logical.identifier)
+    }
+
     @Test func expiredFixtureUsesInjectedTriggerVerificationInsteadOfWallClock() throws {
         let expired = date("2026-08-07T13:30:00Z")
         let expiredSchedule = ScheduleDefinition(
@@ -863,5 +911,24 @@ private extension MaterializationInput {
             evaluationNow: date("2040-08-31T13:30:00Z"),
             recurrenceEnvironment: .foundation
         )
+    }
+}
+
+private final class FailAfterFirstTimeZoneLookupEnvironment: RecurrenceEnvironment, @unchecked Sendable {
+    private let lock = NSLock()
+    private var lookupCount = 0
+
+    func timeZone(identifier: String) -> TimeZone? {
+        lock.lock()
+        lookupCount += 1
+        let shouldResolve = lookupCount == 1
+        lock.unlock()
+        return shouldResolve ? TimeZone(identifier: identifier) : nil
+    }
+
+    func gregorianCalendar(in timeZone: TimeZone) -> Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
     }
 }
