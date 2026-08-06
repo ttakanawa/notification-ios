@@ -95,6 +95,98 @@ struct LogicalNotificationPlannerTests {
         #expect(cannotFit.scheduledThrough[repeatable.id] == date("2026-08-06T13:00:00Z"))
     }
 
+    @Test func repeatingPreparationFailureKeepsBaselineAndUnrelatedReminder() throws {
+        let failing = weekdayReminder(
+            "00000000-0000-0000-0000-00000000000A",
+            hour: 13
+        )
+        let unrelated = reminder(
+            "00000000-0000-0000-0000-00000000000B",
+            hour: 13,
+            minute: 30,
+            interval: 24
+        )
+        let failingID = failing.id
+        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
+            if point == .repeatingReplacement, reminderID == failingID {
+                throw InjectedPlannerFailure.expected
+            }
+        })
+
+        let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 3))
+
+        #expect(plan.outcomes[group(failing.id, "2026-08-06T13:00:00Z")] == .scheduled)
+        #expect(plan.requests.contains {
+            $0.reminderID == failing.id
+                && !$0.isRepeating
+                && $0.oneShotAlertInstant == date("2026-08-06T13:00:00Z")
+        })
+        #expect(plan.requests.contains { $0.reminderID == unrelated.id })
+        #expect(plan.requests.allSatisfy { !$0.isRepeating })
+        #expect(plan.scheduledThrough[failing.id] == date("2026-08-06T13:00:00Z"))
+    }
+
+    @Test func initialContinuationFailureRetiresOnlyFailingReminder() throws {
+        let failing = reminder(
+            "00000000-0000-0000-0000-00000000000A",
+            hour: 13,
+            interval: 1
+        )
+        let unrelated = reminder(
+            "00000000-0000-0000-0000-00000000000B",
+            hour: 13,
+            minute: 30,
+            interval: 1
+        )
+        let failingID = failing.id
+        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
+            if point == .initialContinuation, reminderID == failingID {
+                throw InjectedPlannerFailure.expected
+            }
+        })
+
+        let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 3))
+
+        #expect(plan.outcomes[group(failing.id, "2026-08-06T13:00:00Z")] == .scheduled)
+        #expect(plan.outcomes[group(unrelated.id, "2026-08-06T14:30:00Z")] == .scheduled)
+        #expect(plan.scheduledThrough[failing.id] == date("2026-08-06T13:00:00Z"))
+        #expect(plan.scheduledThrough[unrelated.id] == date("2026-08-06T14:30:00Z"))
+    }
+
+    @Test func postAcceptanceAdvanceFailureCannotRewriteAcceptedOutcome() throws {
+        let failing = reminder(
+            "00000000-0000-0000-0000-00000000000A",
+            hour: 13,
+            interval: 1
+        )
+        let unrelated = reminder(
+            "00000000-0000-0000-0000-00000000000B",
+            hour: 13,
+            minute: 30,
+            interval: 1
+        )
+        let failingID = failing.id
+        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
+            if point == .acceptedContinuationAdvance, reminderID == failingID {
+                throw InjectedPlannerFailure.expected
+            }
+        })
+        let acceptedID = group(failing.id, "2026-08-06T14:00:00Z")
+
+        let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 5))
+
+        #expect(plan.outcomes[acceptedID] == .scheduled)
+        #expect(plan.selectedGroupIDs.contains(acceptedID))
+        #expect(plan.requests.contains {
+            $0.reminderID == failing.id
+                && $0.oneShotAlertInstant == date("2026-08-06T14:00:00Z")
+        })
+        #expect(plan.scheduledThrough[failing.id] == date("2026-08-06T14:00:00Z"))
+        #expect(plan.outcomes[group(unrelated.id, "2026-08-06T14:30:00Z")] == .scheduled)
+        #expect(plan.outcomes[group(unrelated.id, "2026-08-06T15:30:00Z")] == .scheduled)
+        #expect(plan.outcomes[group(failing.id, "2026-08-06T15:00:00Z")] == nil)
+    }
+
     @Test func rollingOverflowStopsOnlyThatReminderAndOtherCheaperGroupsContinue() throws {
         let expensive = reminder(
             "00000000-0000-0000-0000-00000000000A",
@@ -307,6 +399,10 @@ private struct FixedOffsetEnvironment: RecurrenceEnvironment {
         calendar.timeZone = timeZone
         return calendar
     }
+}
+
+private enum InjectedPlannerFailure: Error {
+    case expected
 }
 
 private func date(_ value: String) -> Date {

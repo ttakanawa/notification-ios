@@ -112,7 +112,15 @@ public struct LogicalPlan: Sendable, Equatable {
 }
 
 public struct LogicalNotificationPlanner: Sendable {
-    public init() {}
+    private let dependencies: LogicalNotificationPlannerDependencies
+
+    public init() {
+        dependencies = .production
+    }
+
+    init(dependencies: LogicalNotificationPlannerDependencies) {
+        self.dependencies = dependencies
+    }
 
     public func plan(_ input: PlannerInput) throws -> LogicalPlan {
         guard (0...60).contains(input.capacity) else {
@@ -200,35 +208,46 @@ public struct LogicalNotificationPlanner: Sendable {
         // Stage 4: replace a baseline with its complete repeating collection only
         // when the prospective collection fits as one atomic unit.
         var repeatingByReminder: [UUID: [RepeatingTriggerCandidate]] = [:]
+        var continuationRetired: Set<UUID> = []
         for index in baselineOrder {
             let state = states[index]
             let reminderID = state.reminder.id
             guard baselineSelected.contains(reminderID) else { continue }
 
-            let preview = try NextNotificationProvider().nextPhysicalNotifications(
-                for: reminderID,
-                schedule: state.schedule,
-                after: input.evaluationNow,
-                limit: 3,
-                environment: input.recurrenceEnvironment
-            ).notifications
-            guard let candidates = RepeatingTriggerPlanner().plan(RepeatingTriggerPlanningInput(
-                schedule: state.schedule,
-                evaluationNow: input.evaluationNow,
-                physicalNotifications: preview,
-                environment: input.recurrenceEnvironment
-            )), !candidates.isEmpty
-            else {
-                continue
-            }
+            do {
+                try dependencies.failureCheck(.repeatingReplacement, reminderID)
+                let preview = try NextNotificationProvider().nextPhysicalNotifications(
+                    for: reminderID,
+                    schedule: state.schedule,
+                    after: input.evaluationNow,
+                    limit: 3,
+                    environment: input.recurrenceEnvironment
+                ).notifications
+                guard let candidates = RepeatingTriggerPlanner().plan(
+                    RepeatingTriggerPlanningInput(
+                        schedule: state.schedule,
+                        evaluationNow: input.evaluationNow,
+                        physicalNotifications: preview,
+                        environment: input.recurrenceEnvironment
+                    )
+                ), !candidates.isEmpty
+                else {
+                    continue
+                }
 
-            var prospective = repeatingByReminder
-            prospective[reminderID] = candidates
-            if try identifierCount(
-                for: selectedGroups,
-                repeatingByReminder: prospective
-            ) <= input.capacity {
-                repeatingByReminder = prospective
+                var prospective = repeatingByReminder
+                prospective[reminderID] = candidates
+                if try identifierCount(
+                    for: selectedGroups,
+                    repeatingByReminder: prospective
+                ) <= input.capacity {
+                    repeatingByReminder = prospective
+                }
+            } catch {
+                // The accepted baseline remains safe. Without a future group identity,
+                // this pass can only retire this reminder's later work.
+                continuationRetired.insert(reminderID)
+                continue
             }
         }
 
@@ -238,11 +257,20 @@ public struct LogicalNotificationPlanner: Sendable {
             let reminderID = states[index].reminder.id
             guard baselineSelected.contains(reminderID),
                   repeatingByReminder[reminderID] == nil,
-                  let next = try states[index].cursor.next()
+                  !continuationRetired.contains(reminderID)
             else {
                 continue
             }
-            heads.append(RollingHead(stateIndex: index, group: next))
+            do {
+                try dependencies.failureCheck(.initialContinuation, reminderID)
+                if let next = try states[index].cursor.next() {
+                    heads.append(RollingHead(stateIndex: index, group: next))
+                }
+            } catch {
+                // No future AlertGroupID is available to classify. Retire only this
+                // cursor and preserve its already accepted baseline.
+                continue
+            }
         }
 
         while let headIndex = heads.indices.min(by: {
@@ -250,21 +278,33 @@ public struct LogicalNotificationPlanner: Sendable {
         }) {
             let head = heads.remove(at: headIndex)
             do {
-                if try identifierCount(
+                guard try identifierCount(
                     for: selectedGroups + [head.group],
                     repeatingByReminder: repeatingByReminder
-                ) <= input.capacity {
-                    selectedGroups.append(head.group)
-                    selectedGroupIDs.append(head.group.id)
-                    outcomes[head.group.id] = .scheduled
-                    if let next = try states[head.stateIndex].cursor.next() {
-                        heads.append(RollingHead(stateIndex: head.stateIndex, group: next))
-                    }
-                } else {
+                ) <= input.capacity else {
                     outcomes[head.group.id] = .unscheduledCapacity
+                    continue
                 }
+                selectedGroups.append(head.group)
+                selectedGroupIDs.append(head.group.id)
+                outcomes[head.group.id] = .scheduled
             } catch {
                 outcomes[head.group.id] = .unscheduledError
+                continue
+            }
+
+            do {
+                try dependencies.failureCheck(
+                    .acceptedContinuationAdvance,
+                    head.group.id.reminderID
+                )
+                if let next = try states[head.stateIndex].cursor.next() {
+                    heads.append(RollingHead(stateIndex: head.stateIndex, group: next))
+                }
+            } catch {
+                // Acceptance is already committed. A later cursor failure cannot
+                // retroactively change that group's outcome or selected requests.
+                continue
             }
         }
 
@@ -303,6 +343,27 @@ public struct LogicalNotificationPlanner: Sendable {
             $0.id.uuidString.lowercased() < $1.id.uuidString.lowercased()
         }
     }
+}
+
+enum LogicalNotificationPlannerFailurePoint: Sendable, Equatable {
+    case repeatingReplacement
+    case initialContinuation
+    case acceptedContinuationAdvance
+}
+
+struct LogicalNotificationPlannerDependencies: Sendable {
+    let failureCheck: @Sendable (LogicalNotificationPlannerFailurePoint, UUID) throws -> Void
+
+    init(
+        failureCheck: @escaping @Sendable (
+            LogicalNotificationPlannerFailurePoint,
+            UUID
+        ) throws -> Void
+    ) {
+        self.failureCheck = failureCheck
+    }
+
+    static let production = LogicalNotificationPlannerDependencies { _, _ in }
 }
 
 private struct ReminderPlanningState {
