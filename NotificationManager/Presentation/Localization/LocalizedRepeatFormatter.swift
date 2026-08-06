@@ -27,31 +27,38 @@ struct LocalizedRepeatFormatter: Sendable {
                     : "\(interval)週間ごとの\(names)に繰り返します。"
             }
             return interval == 1
-                ? "Every week on \(names)."
+                ? "Every \(names)."
                 : "Every \(interval) weeks on \(names)."
         case let .monthly(interval, selector):
-            let selectorText = selectorSummary(selector, japanese: japanese)
+            let selectorText = monthlySelectorSummary(
+                selector,
+                sourceDay: schedule.source.day,
+                japanese: japanese
+            )
             if japanese {
                 return interval == 1
                     ? "毎月\(selectorText)に繰り返します。"
                     : "\(interval)か月ごとの\(selectorText)に繰り返します。"
             }
             return interval == 1
-                ? "Every month \(selectorText)."
-                : "Every \(interval) months \(selectorText)."
+                ? "Every month on \(selectorText)."
+                : "Every \(interval) months on \(selectorText)."
         case let .yearly(interval, month, selector):
-            let monthText = month.map { monthName($0, japanese: japanese) }
-            let selectorText = selectorSummary(selector, japanese: japanese)
+            let selectorText = yearlySelectorSummary(
+                selector,
+                month: month,
+                sourceMonth: schedule.source.month,
+                sourceDay: schedule.source.day,
+                japanese: japanese
+            )
             if japanese {
-                let date = [monthText, selectorText].compactMap { $0 }.joined()
                 return interval == 1
-                    ? "毎年\(date)に繰り返します。"
-                    : "\(interval)年ごとの\(date)に繰り返します。"
+                    ? "毎年\(selectorText)に繰り返します。"
+                    : "\(interval)年ごとの\(selectorText)に繰り返します。"
             }
-            let date = [monthText, selectorText].compactMap { $0 }.joined(separator: " ")
             return interval == 1
-                ? "Every year on \(date)."
-                : "Every \(interval) years on \(date)."
+                ? "Every year on \(selectorText)."
+                : "Every \(interval) years on \(selectorText)."
         }
     }
 
@@ -103,25 +110,75 @@ struct LocalizedRepeatFormatter: Sendable {
         return names[month - 1]
     }
 
-    private func selectorSummary(_ selector: RepeatSelector, japanese: Bool) -> String {
+    private func monthlySelectorSummary(
+        _ selector: RepeatSelector,
+        sourceDay: Int,
+        japanese: Bool
+    ) -> String {
         switch selector {
-        case .anchorDay, .anchorMonthDay:
-            return japanese ? "開始日と同じ日" : "on the anchor date"
+        case .anchorDay:
+            return japanese ? "\(sourceDay)日" : "day \(sourceDay)"
         case let .dayOfMonth(day):
-            return japanese ? "\(day)日" : "on day \(day)"
+            return japanese ? "\(day)日" : "day \(day)"
         case .lastDay:
-            return japanese ? "最終日" : "on the last day"
+            return japanese ? "最終日" : "the last day"
         case let .ordinalDaySet(ordinal, daySet):
             let set = daySet == .weekday
                 ? (japanese ? "平日" : "weekday")
-                : (japanese ? "週末" : "weekend day")
-            return japanese ? "第\(ordinal)\(set)" : "on the \(ordinalText(ordinal)) \(set)"
+                : (japanese ? "週末日" : "weekend day")
+            return japanese ? "第\(ordinal)\(set)" : "the \(ordinalText(ordinal)) \(set)"
         case let .ordinalWeekday(ordinal, weekday):
-            let name = weekdayName(weekday, japanese: japanese)
-            return japanese
-                ? "第\(ordinal)\(name)"
-                : "on the \(ordinalText(ordinal)) \(name)"
+            return ordinalWeekdaySummary(ordinal, weekday: weekday, japanese: japanese)
+        case .anchorMonthDay:
+            return ""
         }
+    }
+
+    private func yearlySelectorSummary(
+        _ selector: RepeatSelector,
+        month: Int?,
+        sourceMonth: Int,
+        sourceDay: Int,
+        japanese: Bool
+    ) -> String {
+        guard let month else {
+            if japanese { return "\(sourceMonth)月\(sourceDay)日" }
+            return "\(monthName(sourceMonth, japanese: false)) \(sourceDay)"
+        }
+        let monthText = monthName(month, japanese: japanese)
+        switch selector {
+        case let .dayOfMonth(day):
+            return japanese ? "\(monthText)\(day)日" : "\(monthText) \(day)"
+        case .lastDay:
+            return japanese ? "\(monthText)の最終日" : "the last day of \(monthText)"
+        case let .ordinalDaySet(ordinal, daySet):
+            let set = daySet == .weekday
+                ? (japanese ? "平日" : "weekday")
+                : (japanese ? "週末日" : "weekend day")
+            if japanese { return "\(monthText)の第\(ordinal)\(set)" }
+            return "the \(ordinalText(ordinal)) \(set) of \(monthText)"
+        case let .ordinalWeekday(ordinal, weekday):
+            let value = ordinalWeekdaySummary(ordinal, weekday: weekday, japanese: japanese)
+            return japanese ? "\(monthText)の\(value)" : "\(value) of \(monthText)"
+        case .anchorDay, .anchorMonthDay:
+            return ""
+        }
+    }
+
+    private func ordinalWeekdaySummary(
+        _ ordinal: Int,
+        weekday: Weekday,
+        japanese: Bool
+    ) -> String {
+        let name = weekdayName(weekday, japanese: japanese)
+        if japanese {
+            if ordinal == -1 { return "最終\(name)" }
+            if ordinal < -1 { return "最後から\(-ordinal)番目の\(name)" }
+            return "第\(ordinal)\(name)"
+        }
+        if ordinal == -1 { return "the last \(name)" }
+        if ordinal < -1 { return "the \(ordinalText(-ordinal)) last \(name)" }
+        return "the \(ordinalText(ordinal)) \(name)"
     }
 
     private func ordinalText(_ value: Int) -> String {

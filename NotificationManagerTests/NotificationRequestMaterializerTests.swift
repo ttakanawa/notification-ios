@@ -2,12 +2,12 @@ import Foundation
 import Testing
 import UserNotifications
 import NotificationManagerDomain
-import NotificationManager
+@testable import NotificationManager
 
 struct NotificationRequestMaterializerTests {
     @Test func localeChangesOnlyLocalizedContent() throws {
         let logical = try oneShotRequest()
-        let materializer = NotificationRequestMaterializer()
+        let materializer = testMaterializer()
 
         let english = try materializer.materialize(
             logical,
@@ -28,8 +28,8 @@ struct NotificationRequestMaterializerTests {
     }
 
     @Test func oneShotUsesFullUTCGregorianComponentsAndExactNextDate() throws {
-        let instant = date("2026-08-07T13:30:45Z")
-        let request = try NotificationRequestMaterializer().materialize(
+        let instant = date("2040-08-31T13:30:45Z")
+        let request = try testMaterializer().materialize(
             oneShotRequest(alertInstant: instant),
             input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
         )
@@ -38,9 +38,9 @@ struct NotificationRequestMaterializerTests {
 
         #expect(components.calendar?.identifier == .gregorian)
         #expect(components.timeZone?.identifier == "GMT")
-        #expect(components.year == 2026)
+        #expect(components.year == 2040)
         #expect(components.month == 8)
-        #expect(components.day == 7)
+        #expect(components.day == 31)
         #expect(components.hour == 13)
         #expect(components.minute == 30)
         #expect(components.second == 45)
@@ -56,7 +56,7 @@ struct NotificationRequestMaterializerTests {
             minute: 30,
             second: 0
         )
-        let request = try NotificationRequestMaterializer().materialize(
+        let request = try testMaterializer().materialize(
             repeatingRequest(components: components),
             input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
         )
@@ -79,14 +79,14 @@ struct NotificationRequestMaterializerTests {
     @Test func identitySoundInterruptionAndRoutingFollowCurrentReminder() throws {
         let logical = try oneShotRequest()
         let reminderWithURL = reminder(urlString: "https://example.com/current")
-        let withURL = try NotificationRequestMaterializer().materialize(
+        let withURL = try testMaterializer().materialize(
             logical,
             input: MaterializationInput(
                 reminder: reminderWithURL,
                 locale: Locale(identifier: "en_US")
             )
         )
-        let withoutURL = try NotificationRequestMaterializer().materialize(
+        let withoutURL = try testMaterializer().materialize(
             logical,
             input: MaterializationInput(
                 reminder: reminder(urlString: nil),
@@ -110,7 +110,7 @@ struct NotificationRequestMaterializerTests {
     @Test func englishAndJapaneseGeneratedTextAreCompleteSentences() throws {
         let logical = try oneShotRequest()
         let source = reminder(notes: nil)
-        let materializer = NotificationRequestMaterializer()
+        let materializer = testMaterializer()
 
         let english = try materializer.materialize(
             logical,
@@ -121,13 +121,13 @@ struct NotificationRequestMaterializerTests {
             input: MaterializationInput(reminder: source, locale: Locale(identifier: "ja_JP"))
         ).content.body
 
-        #expect(english == "Every day.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 7, 2026 at 09:30.")
-        #expect(japanese == "毎日繰り返します。\n基準時刻: 09:30（America/New_York）。\n2026年8月7日09:30の予定時刻です。")
+        #expect(english == "Every day.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 31, 2040 at 09:30.")
+        #expect(japanese == "毎日繰り返します。\n基準時刻: 09:30（America/New_York）。\n2040年8月31日09:30の予定時刻です。")
     }
 
     @Test func notesReplaceRecurrenceSummaryButKeepLocalizedSupplementalText() throws {
         let logical = try oneShotRequest()
-        let materializer = NotificationRequestMaterializer()
+        let materializer = testMaterializer()
 
         let english = try materializer.materialize(
             logical,
@@ -144,70 +144,82 @@ struct NotificationRequestMaterializerTests {
             )
         ).content.body
 
-        #expect(english == "Pack your passport.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 7, 2026 at 09:30.")
-        #expect(japanese == "パスポートを準備する。\n基準時刻: 09:30（America/New_York）。\n2026年8月7日09:30の予定時刻です。")
+        #expect(english == "Pack your passport.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 31, 2040 at 09:30.")
+        #expect(japanese == "パスポートを準備する。\n基準時刻: 09:30（America/New_York）。\n2040年8月31日09:30の予定時刻です。")
     }
 
     @Test func oneShotCollisionUsesMainThenConcreteSecondaryEarlyReasons() throws {
-        let instant = date("2026-08-07T13:30:00Z")
-        let nextBase = occurrence("2026-08-08T13:30:00Z", day: 8)
+        let instant = date("2040-08-31T13:30:00Z")
+        let nextBase = occurrence("2040-09-01T13:30:00Z", month: 9, day: 1)
         let logical = try oneShotRequest(
             alertInstant: instant,
             reasons: [
                 EffectiveAlert(kind: .early, baseOccurrence: nextBase, alertInstant: instant),
                 EffectiveAlert(
                     kind: .main,
-                    baseOccurrence: occurrence("2026-08-07T13:30:00Z", day: 7),
+                    baseOccurrence: occurrence("2040-08-31T13:30:00Z", day: 31),
                     alertInstant: instant
                 )
             ]
         )
 
-        let english = try NotificationRequestMaterializer().materialize(
+        let english = try testMaterializer().materialize(
             logical,
             input: MaterializationInput(reminder: reminder(notes: "Trip."), locale: Locale(identifier: "en_US"))
         ).content.body
-        let japanese = try NotificationRequestMaterializer().materialize(
+        let japanese = try testMaterializer().materialize(
             logical,
             input: MaterializationInput(reminder: reminder(notes: "旅行。"), locale: Locale(identifier: "ja_JP"))
         ).content.body
 
-        #expect(english.hasSuffix("At the scheduled time for August 7, 2026 at 09:30. Also early for August 8, 2026 at 09:30."))
-        #expect(japanese.hasSuffix("2026年8月7日09:30の予定時刻です。 さらに、2026年8月8日09:30の早期通知です。"))
+        #expect(english.hasSuffix("At the scheduled time for August 31, 2040 at 09:30. Also early for September 1, 2040 at 09:30."))
+        #expect(japanese.hasSuffix("2040年8月31日09:30の予定時刻です。 さらに、2040年9月1日09:30の早期通知です。"))
     }
 
     @Test func repeatingContentIsStaticAcrossContributingOccurrenceDates() throws {
-        let components = RepeatingTriggerComponents(
+        let sourceComponents = RepeatingTriggerComponents(
             timeZoneIdentifier: "America/New_York",
             hour: 9,
             minute: 30,
             second: 0
         )
+        let triggerComponents = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 25,
+            second: 0
+        )
+        let contributor = RepeatingTriggerContributor(
+            kind: .early,
+            sourceComponents: sourceComponents
+        )
         let first = repeatingRequest(
-            components: components,
-            contributingBaseInstant: date("2026-08-07T13:30:00Z"),
-            contributors: [
-                RepeatingTriggerContributor(kind: .main, sourceComponents: components),
-                RepeatingTriggerContributor(kind: .early, sourceComponents: components)
-            ]
+            components: triggerComponents,
+            contributingBaseInstant: date("2040-08-31T13:30:00Z"),
+            contributors: [contributor]
         )
         let second = repeatingRequest(
-            components: components,
-            contributingBaseInstant: date("2032-12-30T14:30:00Z"),
-            contributors: [
-                RepeatingTriggerContributor(kind: .main, sourceComponents: components),
-                RepeatingTriggerContributor(kind: .early, sourceComponents: components)
-            ]
+            components: triggerComponents,
+            contributingBaseInstant: date("2041-12-30T14:30:00Z"),
+            contributors: [contributor]
         )
-        let input = MaterializationInput(reminder: reminder(notes: nil), locale: Locale(identifier: "en_US"))
+        let input = MaterializationInput(
+            reminder: reminder(
+                notes: nil,
+                schedule: validScheduleState(
+                    early: EarlyReminder(value: 5, unit: .minutes, mainEnabled: false)
+                )
+            ),
+            locale: Locale(identifier: "en_US")
+        )
 
-        let firstBody = try NotificationRequestMaterializer().materialize(first, input: input).content.body
-        let secondBody = try NotificationRequestMaterializer().materialize(second, input: input).content.body
+        let firstBody = try testMaterializer().materialize(first, input: input).content.body
+        let secondBody = try testMaterializer().materialize(second, input: input).content.body
 
         #expect(firstBody == secondBody)
-        #expect(firstBody == "Every day.\nSource time: 09:30 (America/New_York).\nAt the scheduled time. Also early for the next occurrence.")
-        #expect(!firstBody.contains("2026"))
-        #expect(!firstBody.contains("2032"))
+        #expect(firstBody == "Every day.\nSource time: 09:30 (America/New_York).\nEarly reminder for the next occurrence.")
+        #expect(!firstBody.contains("2040"))
+        #expect(!firstBody.contains("2041"))
     }
 
     @Test func titleAndFinalBodyAreTruncatedWithoutMutatingPersistedStrings() throws {
@@ -215,7 +227,7 @@ struct NotificationRequestMaterializerTests {
         let originalNotes = String(repeating: "👨‍👩‍👧‍👦", count: 300)
         let original = reminder(title: originalTitle, notes: originalNotes)
 
-        let content = try NotificationRequestMaterializer().materialize(
+        let content = try testMaterializer().materialize(
             oneShotRequest(),
             input: MaterializationInput(reminder: original, locale: Locale(identifier: "ja_JP"))
         ).content
@@ -233,14 +245,14 @@ struct NotificationRequestMaterializerTests {
         let validOneShot = try oneShotRequest()
         let differentReminder = reminder(id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
         #expect(throws: NotificationRequestMaterializationError.reminderIDMismatch) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 validOneShot,
                 input: MaterializationInput(reminder: differentReminder, locale: Locale(identifier: "en_US"))
             )
         }
 
         #expect(throws: NotificationRequestMaterializationError.invalidSchedule) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 validOneShot,
                 input: MaterializationInput(
                     reminder: reminder(schedule: .corrupt(originalData: Data([0]))),
@@ -256,7 +268,7 @@ struct NotificationRequestMaterializerTests {
             contributingGroupIDs: validOneShot.contributingGroupIDs
         )
         #expect(throws: NotificationRequestMaterializationError.identifierDoesNotMatchPayload) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 wrongIdentifier,
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
             )
@@ -264,20 +276,20 @@ struct NotificationRequestMaterializerTests {
 
         let fractionalInstant = Date(timeIntervalSince1970: 1.5)
         #expect(throws: NotificationRequestMaterializationError.invalidOneShotAlertInstant) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 LogicalNotificationRequest(
                     identifier: "notification-manager.local.v1.o.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.1",
                     reminderID: reminderID,
                     payload: .oneShot(alertInstant: fractionalInstant, reasons: [
                         EffectiveAlert(
                             kind: .main,
-                            baseOccurrence: occurrence("2026-08-07T13:30:00Z", day: 7),
+                            baseOccurrence: occurrence("2040-08-31T13:30:00Z", day: 31),
                             alertInstant: fractionalInstant
                         )
                     ]),
                     contributingGroupIDs: [AlertGroupID(
                         reminderID: reminderID,
-                        baseOccurrenceInstant: date("2026-08-07T13:30:00Z")
+                        baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
                     )]
                 ),
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
@@ -287,11 +299,11 @@ struct NotificationRequestMaterializerTests {
         let emptyReasons = LogicalNotificationRequest(
             identifier: validOneShot.identifier,
             reminderID: reminderID,
-            payload: .oneShot(alertInstant: date("2026-08-07T13:30:00Z"), reasons: []),
+            payload: .oneShot(alertInstant: date("2040-08-31T13:30:00Z"), reasons: []),
             contributingGroupIDs: validOneShot.contributingGroupIDs
         )
         #expect(throws: NotificationRequestMaterializationError.invalidOneShotReasons) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 emptyReasons,
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
             )
@@ -304,14 +316,14 @@ struct NotificationRequestMaterializerTests {
             second: 0
         )
         #expect(throws: NotificationRequestMaterializationError.invalidRepeatingComponents) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 LogicalNotificationRequest(
                     identifier: "notification-manager.local.v1.r.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa." + String(repeating: "0", count: 64),
                     reminderID: reminderID,
                     payload: .repeating(components: invalidComponents, contributors: []),
                     contributingGroupIDs: [AlertGroupID(
                         reminderID: reminderID,
-                        baseOccurrenceInstant: date("2026-08-07T13:30:00Z")
+                        baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
                     )]
                 ),
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
@@ -333,11 +345,11 @@ struct NotificationRequestMaterializerTests {
             payload: .repeating(components: validComponents, contributors: []),
             contributingGroupIDs: [AlertGroupID(
                 reminderID: reminderID,
-                baseOccurrenceInstant: date("2026-08-07T13:30:00Z")
+                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
             )]
         )
         #expect(throws: NotificationRequestMaterializationError.invalidRepeatingContributors) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 emptyContributors,
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
             )
@@ -350,11 +362,256 @@ struct NotificationRequestMaterializerTests {
             contributingGroupIDs: []
         )
         #expect(throws: NotificationRequestMaterializationError.invalidContributingGroups) {
-            try NotificationRequestMaterializer().materialize(
+            try testMaterializer().materialize(
                 noGroups,
                 input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
             )
         }
+    }
+
+    @Test func rejectsLogicalPayloadAndFanOutNotDerivedFromCurrentSchedule() throws {
+        let base = occurrence("2040-08-31T13:30:00Z", day: 31)
+        let main = EffectiveAlert(kind: .main, baseOccurrence: base, alertInstant: base.instant)
+        let valid = try oneShotRequest(reasons: [main])
+
+        let unrelatedGroups = LogicalNotificationRequest(
+            identifier: valid.identifier,
+            reminderID: reminderID,
+            payload: valid.payload,
+            contributingGroupIDs: valid.contributingGroupIDs.union([
+                AlertGroupID(
+                    reminderID: reminderID,
+                    baseOccurrenceInstant: date("2040-09-01T13:30:00Z")
+                )
+            ])
+        )
+        #expect(throws: NotificationRequestMaterializationError.logicalContributorMismatch) {
+            try testMaterializer().materialize(
+                unrelatedGroups,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let duplicateReasons = LogicalNotificationRequest(
+            identifier: valid.identifier,
+            reminderID: reminderID,
+            payload: .oneShot(alertInstant: base.instant, reasons: [main, main]),
+            contributingGroupIDs: valid.contributingGroupIDs
+        )
+        #expect(throws: NotificationRequestMaterializationError.duplicateLogicalContributors) {
+            try testMaterializer().materialize(
+                duplicateReasons,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let earlyInstant = date("2040-08-31T13:25:00Z")
+        let disallowedEarly = try oneShotRequest(
+            alertInstant: earlyInstant,
+            reasons: [EffectiveAlert(
+                kind: .early,
+                baseOccurrence: base,
+                alertInstant: earlyInstant
+            )]
+        )
+        #expect(throws: NotificationRequestMaterializationError.reasonKindNotAllowed) {
+            try testMaterializer().materialize(
+                disallowedEarly,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let mainDisabled = reminder(schedule: validScheduleState(
+            early: EarlyReminder(value: 5, unit: .minutes, mainEnabled: false)
+        ))
+        #expect(throws: NotificationRequestMaterializationError.reasonKindNotAllowed) {
+            try testMaterializer().materialize(
+                valid,
+                input: MaterializationInput(reminder: mainDisabled, locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let wrongMainInstant = date("2040-08-31T13:31:00Z")
+        let wrongMain = try oneShotRequest(
+            alertInstant: wrongMainInstant,
+            reasons: [EffectiveAlert(
+                kind: .main,
+                baseOccurrence: base,
+                alertInstant: wrongMainInstant
+            )]
+        )
+        #expect(throws: NotificationRequestMaterializationError.oneShotPayloadNotDerivable) {
+            try testMaterializer().materialize(
+                wrongMain,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let source = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
+        let wrongTarget = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 10,
+            minute: 30,
+            second: 0
+        )
+        let staleRepeating = repeatingRequest(
+            components: wrongTarget,
+            contributors: [RepeatingTriggerContributor(kind: .main, sourceComponents: source)]
+        )
+        #expect(throws: NotificationRequestMaterializationError.repeatingPayloadNotDerivable) {
+            try testMaterializer().materialize(
+                staleRepeating,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let duplicateContributor = RepeatingTriggerContributor(
+            kind: .main,
+            sourceComponents: source
+        )
+        #expect(throws: NotificationRequestMaterializationError.duplicateLogicalContributors) {
+            try testMaterializer().materialize(
+                repeatingRequest(
+                    components: source,
+                    contributors: [duplicateContributor, duplicateContributor]
+                ),
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+
+        let extraFanOut = LogicalNotificationRequest(
+            identifier: try NotificationIdentifierCodec().repeatingIdentifier(
+                reminderID: reminderID,
+                components: source
+            ),
+            reminderID: reminderID,
+            payload: .repeating(components: source, contributors: [duplicateContributor]),
+            contributingGroupIDs: [
+                AlertGroupID(
+                    reminderID: reminderID,
+                    baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
+                ),
+                AlertGroupID(
+                    reminderID: reminderID,
+                    baseOccurrenceInstant: date("2040-09-01T13:30:00Z")
+                )
+            ]
+        )
+        #expect(throws: NotificationRequestMaterializationError.logicalContributorMismatch) {
+            try testMaterializer().materialize(
+                extraFanOut,
+                input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            )
+        }
+    }
+
+    @Test func expiredFixtureUsesInjectedTriggerVerificationInsteadOfWallClock() throws {
+        let expired = date("2026-08-07T13:30:00Z")
+        let expiredSchedule = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2026,
+                month: 8,
+                day: 7,
+                hour: 9,
+                minute: 30,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            rule: .none,
+            end: .never,
+            early: nil
+        )
+        var sourceComponents = DateComponents()
+        sourceComponents.calendar = Calendar(identifier: .gregorian)
+        sourceComponents.timeZone = TimeZone(identifier: "America/New_York")!
+        sourceComponents.year = 2026
+        sourceComponents.month = 8
+        sourceComponents.day = 7
+        sourceComponents.hour = 9
+        sourceComponents.minute = 30
+        sourceComponents.second = 0
+        sourceComponents.weekday = sourceComponents.calendar?.component(
+            .weekday,
+            from: expired
+        )
+        let request = try oneShotRequest(
+            alertInstant: expired,
+            reasons: [EffectiveAlert(
+                kind: .main,
+                baseOccurrence: BaseOccurrence(
+                    instant: expired,
+                    sourceComponents: sourceComponents
+                ),
+                alertInstant: expired
+            )]
+        )
+        let input = MaterializationInput(
+            reminder: reminder(schedule: .valid(
+                expiredSchedule,
+                sourceVersion: 1,
+                originalData: Data([1])
+            )),
+            locale: Locale(identifier: "en_US")
+        )
+
+        #expect(throws: NotificationRequestMaterializationError.oneShotTriggerDateMismatch) {
+            try NotificationRequestMaterializer(triggerDateVerifier: { _, _ in false })
+                .materialize(request, input: input)
+        }
+        let accepted = try NotificationRequestMaterializer(
+            triggerDateVerifier: { _, expected in expected == expired }
+        ).materialize(request, input: input)
+        #expect(calendarTrigger(accepted).dateComponents.year == 2026)
+    }
+
+    @Test func productionTriggerVerificationHasOneLiveFutureSmokeCheck() throws {
+        let minute = 60.0
+        let future = Date(
+            timeIntervalSince1970: (Date().timeIntervalSince1970 / minute).rounded(.up) * minute
+                + (7 * 24 * 60 * 60)
+        )
+        let timeZone = TimeZone(identifier: "Etc/UTC")!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let components = calendar.dateComponents(
+            [.year, .month, .day, .hour, .minute, .second, .weekday],
+            from: future
+        )
+        let source = SourceWallClock(
+            year: components.year!,
+            month: components.month!,
+            day: components.day!,
+            hour: components.hour!,
+            minute: components.minute!,
+            timeZoneIdentifier: timeZone.identifier
+        )
+        let schedule = ScheduleDefinition(
+            source: source,
+            rule: .none,
+            end: .never,
+            early: nil
+        )
+        let base = BaseOccurrence(instant: future, sourceComponents: components)
+        let request = try oneShotRequest(
+            alertInstant: future,
+            reasons: [EffectiveAlert(kind: .main, baseOccurrence: base, alertInstant: future)]
+        )
+        let input = MaterializationInput(
+            reminder: reminder(schedule: .valid(
+                schedule,
+                sourceVersion: 1,
+                originalData: Data([1])
+            )),
+            locale: Locale(identifier: "en_US")
+        )
+
+        let materialized = try NotificationRequestMaterializer().materialize(request, input: input)
+
+        #expect(calendarTrigger(materialized).nextTriggerDate() == future)
     }
 
     private let reminderID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
@@ -369,9 +626,9 @@ struct NotificationRequestMaterializerTests {
         let resolvedSchedule = schedule ?? .valid(
             ScheduleDefinition(
                 source: SourceWallClock(
-                    year: 2026,
+                    year: 2040,
                     month: 8,
-                    day: 7,
+                    day: 31,
                     hour: 9,
                     minute: 30,
                     timeZoneIdentifier: "America/New_York"
@@ -391,19 +648,42 @@ struct NotificationRequestMaterializerTests {
             enabled: true,
             schedule: resolvedSchedule,
             tagIDs: [],
-            createdAt: date("2026-08-01T00:00:00Z"),
-            updatedAt: date("2026-08-01T00:00:00Z")
+            createdAt: date("2040-08-01T00:00:00Z"),
+            updatedAt: date("2040-08-01T00:00:00Z")
+        )
+    }
+
+    private func validScheduleState(
+        rule: RepeatRule = .daily(interval: 1),
+        early: EarlyReminder? = nil
+    ) -> ScheduleReadState {
+        .valid(
+            ScheduleDefinition(
+                source: SourceWallClock(
+                    year: 2040,
+                    month: 8,
+                    day: 31,
+                    hour: 9,
+                    minute: 30,
+                    timeZoneIdentifier: "America/New_York"
+                ),
+                rule: rule,
+                end: .never,
+                early: early
+            ),
+            sourceVersion: 1,
+            originalData: Data([1])
         )
     }
 
     private func oneShotRequest(
-        alertInstant: Date = date("2026-08-07T13:30:00Z"),
+        alertInstant: Date = date("2040-08-31T13:30:00Z"),
         reasons: [EffectiveAlert]? = nil
     ) throws -> LogicalNotificationRequest {
         let resolvedReasons = reasons ?? [
             EffectiveAlert(
                 kind: .main,
-                baseOccurrence: occurrence("2026-08-07T13:30:00Z", day: 7),
+                baseOccurrence: occurrence("2040-08-31T13:30:00Z", day: 31),
                 alertInstant: alertInstant
             )
         ]
@@ -414,16 +694,18 @@ struct NotificationRequestMaterializerTests {
             ),
             reminderID: reminderID,
             payload: .oneShot(alertInstant: alertInstant, reasons: resolvedReasons),
-            contributingGroupIDs: [AlertGroupID(
-                reminderID: reminderID,
-                baseOccurrenceInstant: date("2026-08-07T13:30:00Z")
-            )]
+            contributingGroupIDs: Set(resolvedReasons.map {
+                AlertGroupID(
+                    reminderID: reminderID,
+                    baseOccurrenceInstant: $0.baseOccurrence.instant
+                )
+            })
         )
     }
 
     private func repeatingRequest(
         components: RepeatingTriggerComponents,
-        contributingBaseInstant: Date = date("2026-08-07T13:30:00Z"),
+        contributingBaseInstant: Date = date("2040-08-31T13:30:00Z"),
         contributors: [RepeatingTriggerContributor]? = nil
     ) -> LogicalNotificationRequest {
         LogicalNotificationRequest(
@@ -445,17 +727,23 @@ struct NotificationRequestMaterializerTests {
         )
     }
 
-    private func occurrence(_ instant: String, day: Int) -> BaseOccurrence {
+    private func occurrence(_ instant: String, month: Int = 8, day: Int) -> BaseOccurrence {
         var components = DateComponents()
         components.calendar = Calendar(identifier: .gregorian)
         components.timeZone = TimeZone(identifier: "America/New_York")!
-        components.year = 2026
-        components.month = 8
+        components.year = 2040
+        components.month = month
         components.day = day
         components.hour = 9
         components.minute = 30
         components.second = 0
-        return BaseOccurrence(instant: date(instant), sourceComponents: components)
+        let resolvedInstant = date(instant)
+        components.weekday = components.calendar?.component(.weekday, from: resolvedInstant)
+        return BaseOccurrence(instant: resolvedInstant, sourceComponents: components)
+    }
+
+    private func testMaterializer() -> NotificationRequestMaterializer {
+        NotificationRequestMaterializer(triggerDateVerifier: { _, _ in true })
     }
 
     private func calendarTrigger(_ request: UNNotificationRequest) -> UNCalendarNotificationTrigger {

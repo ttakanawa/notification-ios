@@ -3,6 +3,38 @@ import Foundation
 public struct RepeatingTriggerPlanner: Sendable {
     public init() {}
 
+    public func isStructurallyValid(
+        _ candidate: RepeatingTriggerCandidate,
+        for schedule: ScheduleDefinition
+    ) -> Bool {
+        guard ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty,
+              case .never = schedule.end,
+              let plan = whitelistedRulePlan(for: schedule),
+              (try? candidate.components.validated()) != nil,
+              candidate.contributors.count == 1,
+              let contributor = candidate.contributors.first,
+              plan.baseComponents.contains(contributor.sourceComponents)
+        else {
+            return false
+        }
+
+        let expected: RepeatingTriggerComponents?
+        switch contributor.kind {
+        case .main:
+            guard schedule.early?.mainEnabled != false else { return false }
+            expected = contributor.sourceComponents
+        case .early:
+            guard let early = schedule.early else { return false }
+            expected = structuralEarlyComponents(
+                from: contributor.sourceComponents,
+                cadence: plan.cadence,
+                early: early,
+                schedule: schedule
+            )
+        }
+        return candidate.components == expected
+    }
+
     public func plan(
         _ input: RepeatingTriggerPlanningInput
     ) -> [RepeatingTriggerCandidate]? {
@@ -165,8 +197,34 @@ public struct RepeatingTriggerPlanner: Sendable {
         timeZone: TimeZone,
         calendar: Calendar
     ) -> RepeatingTriggerComponents? {
-        var structuralCalendar = Calendar(identifier: .gregorian)
-        structuralCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        guard let result = structuralEarlyComponents(
+            from: base,
+            cadence: cadence,
+            early: early,
+            schedule: schedule
+        ), futureTransitionsPreserve(
+            result,
+            from: base,
+            cadence: cadence,
+            early: early,
+            schedule: schedule,
+            evaluationNow: evaluationNow,
+            timeZone: timeZone,
+            calendar: calendar
+        ) else {
+            return nil
+        }
+        return result
+    }
+
+    private func structuralEarlyComponents(
+        from base: RepeatingTriggerComponents,
+        cadence: Cadence,
+        early: EarlyReminder,
+        schedule: ScheduleDefinition
+    ) -> RepeatingTriggerComponents? {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
         var result: RepeatingTriggerComponents?
         for source in gregorianStructuralSources(
             cadence: cadence,
@@ -175,36 +233,22 @@ public struct RepeatingTriggerPlanner: Sendable {
         ) {
             guard let baseInstant = try? SourceWallClockResolver().resolve(
                 source,
-                calendar: structuralCalendar
+                calendar: calendar
             ), let alertInstant = try? earlyAlertInstant(
                 for: baseInstant,
                 early: early,
                 rule: schedule.rule,
-                calendar: structuralCalendar
+                calendar: calendar
             ), let components = normalizedComponents(
                 of: alertInstant,
                 cadence: cadence,
                 timeZoneIdentifier: base.timeZoneIdentifier,
-                calendar: structuralCalendar
+                calendar: calendar
             ) else {
                 return nil
             }
             if let result, result != components { return nil }
             result = components
-        }
-        guard let result,
-              futureTransitionsPreserve(
-                  result,
-                  from: base,
-                  cadence: cadence,
-                  early: early,
-                  schedule: schedule,
-                  evaluationNow: evaluationNow,
-                  timeZone: timeZone,
-                  calendar: calendar
-              )
-        else {
-            return nil
         }
         return result
     }

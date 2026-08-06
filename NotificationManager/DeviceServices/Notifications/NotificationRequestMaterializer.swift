@@ -21,6 +21,11 @@ public enum NotificationRequestMaterializationError: Error, Sendable, Equatable 
     case invalidOneShotReasons
     case invalidRepeatingComponents
     case invalidRepeatingContributors
+    case logicalContributorMismatch
+    case duplicateLogicalContributors
+    case reasonKindNotAllowed
+    case oneShotPayloadNotDerivable
+    case repeatingPayloadNotDerivable
     case identifierDoesNotMatchPayload
     case oneShotTriggerDateMismatch
     case repeatingTriggerHasNoNextDate
@@ -32,15 +37,30 @@ public struct NotificationRequestMaterializer: Sendable {
 
     private let formatter: any LocalizedNotificationTextFormatting
     private let truncator: NotificationContentTruncator
+    private let triggerDateVerifier: @Sendable (UNCalendarNotificationTrigger, Date) -> Bool
 
     public init() {
         formatter = LocalizedNotificationTextFormatter()
         truncator = NotificationContentTruncator()
+        triggerDateVerifier = { trigger, expectedDate in
+            trigger.nextTriggerDate() == expectedDate
+        }
     }
 
     public init(formatter: any LocalizedNotificationTextFormatting) {
         self.formatter = formatter
         truncator = NotificationContentTruncator()
+        triggerDateVerifier = { trigger, expectedDate in
+            trigger.nextTriggerDate() == expectedDate
+        }
+    }
+
+    init(
+        triggerDateVerifier: @escaping @Sendable (UNCalendarNotificationTrigger, Date) -> Bool
+    ) {
+        formatter = LocalizedNotificationTextFormatter()
+        truncator = NotificationContentTruncator()
+        self.triggerDateVerifier = triggerDateVerifier
     }
 
     public func materialize(
@@ -50,18 +70,16 @@ public struct NotificationRequestMaterializer: Sendable {
         guard request.reminderID == input.reminder.id else {
             throw NotificationRequestMaterializationError.reminderIDMismatch
         }
-        guard !request.contributingGroupIDs.isEmpty,
-              request.contributingGroupIDs.allSatisfy({
-                  $0.reminderID == request.reminderID
-                      && isFiniteIntegralSecond($0.baseOccurrenceInstant)
-              })
-        else {
-            throw NotificationRequestMaterializationError.invalidContributingGroups
-        }
         guard case let .valid(schedule, _, _) = input.reminder.schedule,
               ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty
         else {
             throw NotificationRequestMaterializationError.invalidSchedule
+        }
+        try validatePayloadShape(request.payload, schedule: schedule)
+        do {
+            try LogicalNotificationRequestValidator().validate(request, for: schedule)
+        } catch let error as LogicalNotificationRequestValidationError {
+            throw materializationError(for: error)
         }
 
         let trigger = try notificationTrigger(
@@ -118,6 +136,41 @@ public struct NotificationRequestMaterializer: Sendable {
         }
     }
 
+    private func validatePayloadShape(
+        _ payload: LogicalNotificationPayload,
+        schedule: ScheduleDefinition
+    ) throws {
+        switch payload {
+        case let .oneShot(alertInstant, reasons):
+            guard isFiniteIntegralSecond(alertInstant) else {
+                throw NotificationRequestMaterializationError.invalidOneShotAlertInstant
+            }
+            guard !reasons.isEmpty,
+                  reasons.allSatisfy({
+                      $0.alertInstant == alertInstant
+                          && isFiniteIntegralSecond($0.baseOccurrence.instant)
+                  })
+            else {
+                throw NotificationRequestMaterializationError.invalidOneShotReasons
+            }
+        case let .repeating(components, contributors):
+            guard (try? components.validated()) != nil,
+                  components.timeZoneIdentifier == schedule.source.timeZoneIdentifier
+            else {
+                throw NotificationRequestMaterializationError.invalidRepeatingComponents
+            }
+            guard !contributors.isEmpty,
+                  contributors.allSatisfy({
+                      (try? $0.sourceComponents.validated()) != nil
+                          && $0.sourceComponents.timeZoneIdentifier
+                              == schedule.source.timeZoneIdentifier
+                  })
+            else {
+                throw NotificationRequestMaterializationError.invalidRepeatingContributors
+            }
+        }
+    }
+
     private func oneShotTrigger(
         request: LogicalNotificationRequest,
         alertInstant: Date,
@@ -157,7 +210,7 @@ public struct NotificationRequestMaterializer: Sendable {
             dateMatching: components,
             repeats: false
         )
-        guard trigger.nextTriggerDate() == alertInstant else {
+        guard triggerDateVerifier(trigger, alertInstant) else {
             throw NotificationRequestMaterializationError.oneShotTriggerDateMismatch
         }
         return trigger
@@ -214,6 +267,25 @@ public struct NotificationRequestMaterializer: Sendable {
     private func isFiniteIntegralSecond(_ date: Date) -> Bool {
         let seconds = date.timeIntervalSince1970
         return seconds.isFinite && seconds.rounded(.towardZero) == seconds
+    }
+
+    private func materializationError(
+        for error: LogicalNotificationRequestValidationError
+    ) -> NotificationRequestMaterializationError {
+        switch error {
+        case .invalidContributingGroups:
+            .invalidContributingGroups
+        case .contributorIdentityMismatch:
+            .logicalContributorMismatch
+        case .duplicateContributors:
+            .duplicateLogicalContributors
+        case .reasonKindNotAllowed:
+            .reasonKindNotAllowed
+        case .oneShotAlertNotDerivable:
+            .oneShotPayloadNotDerivable
+        case .repeatingPayloadNotDerivable:
+            .repeatingPayloadNotDerivable
+        }
     }
 }
 
