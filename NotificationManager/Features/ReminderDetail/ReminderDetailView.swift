@@ -7,6 +7,9 @@ struct ReminderDetailView: View {
     @Bindable var actions: ReminderActionCoordinator
 
     @Environment(\.openURL) private var openURL
+    @Environment(\.locale) private var locale
+
+    private let sourceFormatter = SourceDateTimePresentationFormatter()
 
     var body: some View {
         List {
@@ -46,13 +49,18 @@ struct ReminderDetailView: View {
             Section("reminder.detail.section.schedule") {
                 if let source = model.item.sourceWallClock {
                     LabeledContent("reminder.field.source-time") {
-                        Text(verbatim: source.presentationValue)
+                        Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
                     }
                 }
                 if let sourceTime = model.sourceTime {
                     LabeledContent("reminder.field.source-instant") {
-                        Text(sourceTime, format: .dateTime)
-                            .environment(\.timeZone, sourceTimeZone ?? .current)
+                        Text(
+                            verbatim: sourceFormatter.instant(
+                                sourceTime,
+                                timeZoneIdentifier: sourceTimeZoneIdentifier,
+                                locale: locale
+                            )
+                        )
                     }
                 }
                 if let currentDeviceTime = model.currentDeviceTime {
@@ -125,7 +133,7 @@ struct ReminderDetailView: View {
                 }
             }
         }
-        .navigationTitle(model.item.title)
+        .navigationTitle(Text(verbatim: model.item.title))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 Button("reminder.action.edit") {
@@ -159,6 +167,7 @@ struct ReminderDetailView: View {
         } message: {
             Text("reminder.form.delete-confirmation.message")
         }
+        .announcesAccessibilityErrors(actionAccessibilityErrors)
         .accessibilityIdentifier("reminder-detail.root")
     }
 
@@ -186,10 +195,15 @@ struct ReminderDetailView: View {
         )
     }
 
-    private var sourceTimeZone: TimeZone? {
-        model.item.sourceWallClock.flatMap {
-            TimeZone(identifier: $0.timeZoneIdentifier)
+    private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {
+        guard case let .failed(id, failure) = actions.state, id == model.id else {
+            return []
         }
+        return [failure.accessibilityIdentity]
+    }
+
+    private var sourceTimeZoneIdentifier: String {
+        model.item.sourceWallClock?.timeZoneIdentifier ?? TimeZone.current.identifier
     }
 }
 

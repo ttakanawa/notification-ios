@@ -2,7 +2,11 @@ import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
 
-public struct NotificationCleanupService: NotificationCleanup {
+protocol PendingAppNotificationCleaning: Sendable {
+    func removeAllPendingAppNotificationsReportingFailure() async throws
+}
+
+public struct NotificationCleanupService: NotificationCleanup, PendingAppNotificationCleaning {
     private let notificationCenter: any NotificationCenterClient
     private let identifierCodec: NotificationIdentifierCodec
 
@@ -34,7 +38,11 @@ public struct NotificationCleanupService: NotificationCleanup {
     }
 
     public func removeAllPendingAppNotifications() async {
-        let pending = (try? await notificationCenter.pendingNotificationInventory()) ?? []
+        try? await removeAllPendingAppNotificationsReportingFailure()
+    }
+
+    func removeAllPendingAppNotificationsReportingFailure() async throws {
+        let pending = try await notificationCenter.pendingNotificationInventory()
         let identifiers = pending
             .filter { $0.identifier.hasPrefix(NotificationIdentifierCodec.root) }
             .map(\.identifier)

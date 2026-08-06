@@ -37,6 +37,14 @@ struct ReminderListView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("reminder.list.title")
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                Button {
+                    router.showSettings()
+                } label: {
+                    Label("settings.title", systemImage: "gear")
+                }
+                .accessibilityIdentifier("reminder-list.settings")
+            }
             ToolbarItem(placement: .primaryAction) {
                 Button {
                     router.showCreate()
@@ -46,6 +54,7 @@ struct ReminderListView: View {
                 .accessibilityIdentifier("reminder-list.add")
             }
         }
+        .announcesAccessibilityErrors(actionAccessibilityErrors)
         .accessibilityIdentifier("reminder-list.root")
     }
 
@@ -57,24 +66,35 @@ struct ReminderListView: View {
     ) -> some View {
         Section(title) {
             ForEach(items) { item in
-                HStack(alignment: .center, spacing: 12) {
-                    Button {
-                        router.showReminder(item.id)
-                    } label: {
-                        ReminderRowView(item: item)
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
-                    .accessibilityAddTraits(
-                        router.selectedReminderID == item.id ? .isSelected : []
-                    )
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Button {
+                            router.showReminder(item.id)
+                        } label: {
+                            ReminderRowView(item: item)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
+                        .accessibilityAddTraits(
+                            router.selectedReminderID == item.id ? .isSelected : []
+                        )
 
-                    if item.lifecycleStatus == .active || item.lifecycleStatus == .disabled {
-                        Toggle("reminder.field.enabled", isOn: enabledBinding(for: item))
-                            .labelsHidden()
-                            .disabled(actions.isWorking(item.id))
+                        if item.lifecycleStatus == .active || item.lifecycleStatus == .disabled {
+                            Toggle("reminder.field.enabled", isOn: enabledBinding(for: item))
+                                .labelsHidden()
+                                .disabled(actions.isWorking(item.id))
+                                .accessibilityIdentifier(
+                                    "reminder-row.enabled.\(item.id.uuidString.lowercased())"
+                                )
+                        }
+                    }
+
+                    if let failure = actionFailure(for: item.id) {
+                        Label(failure.semanticKey, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier(
-                                "reminder-row.enabled.\(item.id.uuidString.lowercased())"
+                                "reminder-row.action-error.\(item.id.uuidString.lowercased())"
                             )
                     }
                 }
@@ -92,5 +112,33 @@ struct ReminderListView: View {
                 }
             }
         )
+    }
+
+    private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {
+        guard case let .failed(_, failure) = actions.state else { return [] }
+        return [failure.accessibilityIdentity]
+    }
+
+    private func actionFailure(for reminderID: UUID) -> ReminderActionFailure? {
+        guard case let .failed(id, failure) = actions.state, id == reminderID else {
+            return nil
+        }
+        return failure
+    }
+}
+
+extension ReminderActionFailure {
+    var semanticKey: LocalizedStringKey {
+        switch self {
+        case .enabledChange: "reminder.action.enabled-change-failed"
+        case .delete: "reminder.action.delete-failed"
+        }
+    }
+
+    var accessibilityIdentity: AccessibilityErrorIdentity {
+        switch self {
+        case .enabledChange: .reminderEnabledChangeFailed
+        case .delete: .reminderDeleteFailed
+        }
     }
 }

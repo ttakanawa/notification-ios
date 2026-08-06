@@ -187,7 +187,7 @@
 			compatibilityVersion = "Xcode 16.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
-			knownRegions = (en, Base);
+			knownRegions = (en, ja, Base);
 			mainGroup = A60000000000000000000001;
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (A20000000000000000000000 /* XCLocalSwiftPackageReference "NotificationManagerCore" */);

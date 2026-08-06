@@ -19,7 +19,19 @@ struct AppRouterDestinationView: View {
                 }
             case let .reminderEdit(id), let .reminderCreate(id):
                 if let model = router.formModel(for: id) {
-                    ReminderFormView(model: model, router: router)
+                    ReminderFormView(
+                        model: model,
+                        router: router,
+                        tagModel: router.tagManagementModel
+                    )
+                } else {
+                    unavailable
+                }
+            case .settings:
+                if let settings = router.notificationSettingsModel,
+                   let tags = router.tagManagementModel
+                {
+                    SettingsView(model: settings, tagModel: tags)
                 } else {
                     unavailable
                 }

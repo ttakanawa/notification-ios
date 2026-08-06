@@ -312,6 +312,7 @@ public struct NotificationRequestMaterializer: Sendable {
 private struct LocalizedNotificationTextFormatter: LocalizedNotificationTextFormatting {
     private let repeatFormatter = LocalizedRepeatFormatter()
     private let reasonFormatter = LocalizedReasonFormatter()
+    private let localizer = LocalizedTextProvider.live
 
     func content(for input: NotificationTextInput, locale: Locale) -> NotificationText {
         let primary = input.notes ?? repeatFormatter.summary(for: input.schedule, locale: locale)
@@ -321,9 +322,14 @@ private struct LocalizedNotificationTextFormatter: LocalizedNotificationTextForm
             sourceTimeZoneIdentifier: input.schedule.source.timeZoneIdentifier,
             locale: locale
         )
+        let body = String(
+            format: localizer.value(for: "localization.notification.body", locale: locale),
+            locale: locale,
+            arguments: [primary, source, reasons]
+        )
         return NotificationText(
             title: input.title,
-            body: [primary, source, reasons].joined(separator: "\n"),
+            body: body,
             ellipsis: "…"
         )
     }

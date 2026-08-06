@@ -451,7 +451,7 @@ private extension ReconcileReason {
         switch self {
         case .reminderSaved, .reminderDeleted, .modelChanged:
             true
-        case .foreground:
+        case .deviceSettingsChanged, .foreground:
             false
         }
     }

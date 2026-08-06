@@ -2,6 +2,12 @@ import Foundation
 import NotificationManagerDomain
 
 struct LocalizedReasonFormatter: Sendable {
+    private let localizer: LocalizedTextProvider
+
+    init(localizer: LocalizedTextProvider = .live) {
+        self.localizer = localizer
+    }
+
     func reasons(
         for payload: LogicalNotificationPayload,
         sourceTimeZoneIdentifier: String,
@@ -50,39 +56,21 @@ struct LocalizedReasonFormatter: Sendable {
         sourceTimeZoneIdentifier: String,
         locale: Locale
     ) -> String {
-        let components = sourceComponents(
-            for: reason.baseOccurrence.instant,
-            timeZoneIdentifier: sourceTimeZoneIdentifier
-        )
-        let year = components.year!
-        let month = components.month!
-        let day = components.day!
-        let hour = components.hour!
-        let minute = components.minute!
-        if locale.isJapanese {
-            let value = String(format: "%d年%d月%d日%02d:%02d", year, month, day, hour, minute)
-            switch (reason.kind, isPrimary) {
-            case (.main, true): return "\(value)の予定時刻です。"
-            case (.main, false): return "さらに、\(value)の予定時刻です。"
-            case (.early, true): return "\(value)の早期通知です。"
-            case (.early, false): return "さらに、\(value)の早期通知です。"
-            }
+        let key = switch (reason.kind, isPrimary) {
+        case (.main, true): "localization.reason.one-shot.main.primary"
+        case (.main, false): "localization.reason.one-shot.main.secondary"
+        case (.early, true): "localization.reason.one-shot.early.primary"
+        case (.early, false): "localization.reason.one-shot.early.secondary"
         }
-
-        let monthNames = [
-            "January", "February", "March", "April", "May", "June",
-            "July", "August", "September", "October", "November", "December"
-        ]
-        let value = String(
-            format: "%@ %d, %d at %02d:%02d",
-            monthNames[month - 1], day, year, hour, minute
+        return format(
+            key,
+            locale: locale,
+            localizedSourceDate(
+                reason.baseOccurrence.instant,
+                sourceTimeZoneIdentifier: sourceTimeZoneIdentifier,
+                locale: locale
+            )
         )
-        switch (reason.kind, isPrimary) {
-        case (.main, true): return "At the scheduled time for \(value)."
-        case (.main, false): return "Also at the scheduled time for \(value)."
-        case (.early, true): return "Early reminder for \(value)."
-        case (.early, false): return "Also early for \(value)."
-        }
     }
 
     private func repeatingReasons(
@@ -91,28 +79,35 @@ struct LocalizedReasonFormatter: Sendable {
     ) -> String {
         let hasMain = contributors.contains { $0.kind == .main }
         let hasEarly = contributors.contains { $0.kind == .early }
-        if locale.isJapanese {
-            switch (hasMain, hasEarly) {
-            case (true, true): return "予定時刻の通知です。 次回の予定に対する早期通知でもあります。"
-            case (true, false): return "予定時刻の通知です。"
-            case (false, true): return "次回の予定に対する早期通知です。"
-            case (false, false): return ""
-            }
+        guard hasMain || hasEarly else { return "" }
+        let key = switch (hasMain, hasEarly) {
+        case (true, true): "localization.reason.repeating.main-and-early"
+        case (true, false): "localization.reason.repeating.main"
+        case (false, true): "localization.reason.repeating.early"
+        case (false, false): preconditionFailure("Handled by the empty contributor guard")
         }
-        switch (hasMain, hasEarly) {
-        case (true, true): return "At the scheduled time. Also early for the next occurrence."
-        case (true, false): return "At the scheduled time."
-        case (false, true): return "Early reminder for the next occurrence."
-        case (false, false): return ""
-        }
+        return localizer.value(for: key, locale: locale)
     }
 
-    private func sourceComponents(
-        for instant: Date,
-        timeZoneIdentifier: String
-    ) -> DateComponents {
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: timeZoneIdentifier)!
-        return calendar.dateComponents([.year, .month, .day, .hour, .minute], from: instant)
+    private func localizedSourceDate(
+        _ instant: Date,
+        sourceTimeZoneIdentifier: String,
+        locale: Locale
+    ) -> String {
+        let formatter = DateFormatter()
+        formatter.locale = locale
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(identifier: sourceTimeZoneIdentifier) ?? .gmt
+        formatter.dateStyle = .long
+        formatter.timeStyle = .short
+        return formatter.string(from: instant)
+    }
+
+    private func format(_ key: String, locale: Locale, _ arguments: CVarArg...) -> String {
+        String(
+            format: localizer.value(for: key, locale: locale),
+            locale: locale,
+            arguments: arguments
+        )
     }
 }

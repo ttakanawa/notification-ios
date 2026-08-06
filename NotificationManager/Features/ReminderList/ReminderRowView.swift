@@ -2,12 +2,15 @@ import NotificationManagerDomain
 import SwiftUI
 
 struct ReminderRowView: View {
+    @Environment(\.locale) private var locale
     let item: ReminderListItemPresentation
+
+    private let sourceFormatter = SourceDateTimePresentationFormatter()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .firstTextBaseline) {
-                Text(item.title)
+                Text(verbatim: item.title)
                     .font(.headline)
                     .multilineTextAlignment(.leading)
                 Spacer(minLength: 12)
@@ -19,23 +22,29 @@ struct ReminderRowView: View {
             nextAlert
 
             if let source = item.sourceWallClock {
-                Text(source.presentationValue)
+                Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityLabel("reminder.row.source-time")
-                    .accessibilityValue(source.presentationValue)
+                    .accessibilityValue(
+                        Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
+                    )
             }
 
             if let summary = item.localizedRepeatSummary {
-                Text(summary)
+                Text(verbatim: summary)
                     .font(.subheadline)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-row.repeat-summary")
             }
 
             if !item.tags.isEmpty {
-                Label(item.tags.map(\.name).joined(separator: ", "), systemImage: "tag")
+                Label {
+                    Text(verbatim: item.tags.map(\.name).joined(separator: ", "))
+                } icon: {
+                    Image(systemName: "tag")
+                }
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -93,7 +102,15 @@ struct ReminderRowView: View {
                     LabeledContent(reason.role.semanticKey) {
                         VStack(alignment: .trailing, spacing: 2) {
                             Label(reason.kind.semanticKey, systemImage: "bell")
-                            Text(reason.baseOccurrenceInstant, format: .dateTime)
+                            Text(
+                                verbatim: sourceFormatter.instant(
+                                    reason.baseOccurrenceInstant,
+                                    timeZoneIdentifier: notification
+                                        .sourceTimeZoneIdentifier
+                                        ?? TimeZone.current.identifier,
+                                    locale: locale
+                                )
+                            )
                         }
                     }
                     .font(.caption)
@@ -113,20 +130,6 @@ struct ReminderRowView: View {
             .labelStyle(.titleAndIcon)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier("reminder-row.lifecycle-status")
-    }
-}
-
-extension SourceWallClock {
-    var presentationValue: String {
-        String(
-            format: "%04d-%02d-%02d %02d:%02d · %@",
-            year,
-            month,
-            day,
-            hour,
-            minute,
-            timeZoneIdentifier
-        )
     }
 }
 

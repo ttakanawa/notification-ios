@@ -132,8 +132,11 @@ struct RepeatSection: View {
 }
 
 struct PhysicalNotificationPreviewView: View {
+    @Environment(\.locale) private var locale
     let notification: PhysicalNotification
     let sourceTimeZoneIdentifier: String?
+
+    private let sourceFormatter = SourceDateTimePresentationFormatter()
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -148,8 +151,13 @@ struct PhysicalNotificationPreviewView: View {
                 LabeledContent {
                     VStack(alignment: .trailing, spacing: 2) {
                         Label(reason.kind.semanticKey, systemImage: "bell")
-                        Text(reason.baseOccurrence.instant, format: .dateTime)
-                            .environment(\.timeZone, sourceTimeZone ?? .current)
+                        Text(
+                            verbatim: sourceFormatter.instant(
+                                reason.baseOccurrence.instant,
+                                timeZoneIdentifier: effectiveSourceTimeZoneIdentifier,
+                                locale: locale
+                            )
+                        )
                     }
                 } label: {
                     if index == 0 {
@@ -168,8 +176,13 @@ struct PhysicalNotificationPreviewView: View {
 
             if let sourceTimeZone {
                 LabeledContent("reminder.next.source-time") {
-                    Text(notification.alertInstant, format: .dateTime)
-                        .environment(\.timeZone, sourceTimeZone)
+                    Text(
+                        verbatim: sourceFormatter.instant(
+                            notification.alertInstant,
+                            timeZoneIdentifier: sourceTimeZone.identifier,
+                            locale: locale
+                        )
+                    )
                 }
                 Text(verbatim: sourceTimeZoneIdentifier ?? "")
                     .font(.caption2)
@@ -188,6 +201,10 @@ struct PhysicalNotificationPreviewView: View {
 
     private var sourceTimeZone: TimeZone? {
         sourceTimeZoneIdentifier.flatMap(TimeZone.init(identifier:))
+    }
+
+    private var effectiveSourceTimeZoneIdentifier: String {
+        sourceTimeZoneIdentifier ?? TimeZone.current.identifier
     }
 }
 

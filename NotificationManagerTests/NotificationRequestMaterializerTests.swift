@@ -111,17 +111,27 @@ struct NotificationRequestMaterializerTests {
         let source = reminder(notes: nil)
         let materializer = testMaterializer()
 
-        let english = try materializer.materialize(
+        let englishRequest = try materializer.materialize(
             logical,
             input: MaterializationInput(reminder: source, locale: Locale(identifier: "en_US"))
-        ).content.body
-        let japanese = try materializer.materialize(
+        )
+        let japaneseRequest = try materializer.materialize(
             logical,
             input: MaterializationInput(reminder: source, locale: Locale(identifier: "ja_JP"))
-        ).content.body
+        )
+        let englishTrigger = try #require(
+            englishRequest.trigger as? UNCalendarNotificationTrigger
+        )
+        let japaneseTrigger = try #require(
+            japaneseRequest.trigger as? UNCalendarNotificationTrigger
+        )
 
-        #expect(english == "Every day.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 31, 2040 at 09:30.")
-        #expect(japanese == "毎日繰り返します。\n基準時刻: 09:30（America/New_York）。\n2040年8月31日09:30の予定時刻です。")
+        #expect(englishRequest.identifier == logical.identifier)
+        #expect(japaneseRequest.identifier == logical.identifier)
+        #expect(englishTrigger.dateComponents == japaneseTrigger.dateComponents)
+        #expect(englishTrigger.repeats == japaneseTrigger.repeats)
+        #expect(englishRequest.content.body == "Every day.\nSource time: 9:30\u{202F}AM (\u{2066}America/New_York\u{2069}).\nAt the scheduled time for August 31, 2040 at 9:30\u{202F}AM.")
+        #expect(japaneseRequest.content.body == "毎日繰り返します。\n基準時刻：9:30（\u{2066}America/New_York\u{2069}）。\n2040年8月31日 9:30の予定時刻です。")
     }
 
     @Test func notesReplaceRecurrenceSummaryButKeepLocalizedSupplementalText() throws {
@@ -143,8 +153,8 @@ struct NotificationRequestMaterializerTests {
             )
         ).content.body
 
-        #expect(english == "Pack your passport.\nSource time: 09:30 (America/New_York).\nAt the scheduled time for August 31, 2040 at 09:30.")
-        #expect(japanese == "パスポートを準備する。\n基準時刻: 09:30（America/New_York）。\n2040年8月31日09:30の予定時刻です。")
+        #expect(english == "Pack your passport.\nSource time: 9:30\u{202F}AM (\u{2066}America/New_York\u{2069}).\nAt the scheduled time for August 31, 2040 at 9:30\u{202F}AM.")
+        #expect(japanese == "パスポートを準備する。\n基準時刻：9:30（\u{2066}America/New_York\u{2069}）。\n2040年8月31日 9:30の予定時刻です。")
     }
 
     @Test func oneShotCollisionUsesMainThenConcreteSecondaryEarlyReasons() throws {
@@ -171,8 +181,8 @@ struct NotificationRequestMaterializerTests {
             input: MaterializationInput(reminder: reminder(notes: "旅行。"), locale: Locale(identifier: "ja_JP"))
         ).content.body
 
-        #expect(english.hasSuffix("At the scheduled time for August 31, 2040 at 09:30. Also early for September 1, 2040 at 09:30."))
-        #expect(japanese.hasSuffix("2040年8月31日09:30の予定時刻です。 さらに、2040年9月1日09:30の早期通知です。"))
+        #expect(english.hasSuffix("At the scheduled time for August 31, 2040 at 9:30\u{202F}AM. Also early for September 1, 2040 at 9:30\u{202F}AM."))
+        #expect(japanese.hasSuffix("2040年8月31日 9:30の予定時刻です。 さらに、2040年9月1日 9:30の早期通知です。"))
     }
 
     @Test func repeatingContentIsStaticAcrossContributingOccurrenceDates() throws {
@@ -238,7 +248,7 @@ struct NotificationRequestMaterializerTests {
         let secondBody = try testMaterializer().materialize(second, input: secondInput).content.body
 
         #expect(firstBody == secondBody)
-        #expect(firstBody == "Every day.\nSource time: 09:30 (America/New_York).\nEarly reminder for the next occurrence.")
+        #expect(firstBody == "Every day.\nSource time: 9:30\u{202F}AM (\u{2066}America/New_York\u{2069}).\nEarly reminder for the next occurrence.")
         #expect(!firstBody.contains("2040"))
         #expect(!firstBody.contains("2041"))
     }

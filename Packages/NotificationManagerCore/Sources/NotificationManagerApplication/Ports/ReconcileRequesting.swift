@@ -4,6 +4,7 @@ public enum ReconcileReason: Sendable, Equatable, Hashable {
     case reminderSaved(UUID)
     case reminderDeleted(UUID)
     case modelChanged
+    case deviceSettingsChanged
     case foreground
 }
 

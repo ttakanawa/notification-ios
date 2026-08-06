@@ -18,7 +18,7 @@ struct LocalizedRepeatFormatterTests {
                     weekdays: [.monday, .wednesday, .friday]
                 ),
                 "Every Monday, Wednesday, and Friday.",
-                "毎週月曜日・水曜日・金曜日に繰り返します。"
+                "毎週月曜日、水曜日、金曜日に繰り返します。"
             ),
             (
                 .weekly(
@@ -27,7 +27,7 @@ struct LocalizedRepeatFormatterTests {
                     weekdays: [.monday, .friday]
                 ),
                 "Every 9999 weeks on Monday and Friday.",
-                "9999週間ごとの月曜日・金曜日に繰り返します。"
+                "9999週間ごとの月曜日、金曜日に繰り返します。"
             ),
             (
                 .weekly(

@@ -2,8 +2,11 @@ import Foundation
 import SwiftUI
 
 struct NextNotificationsView: View {
+    @Environment(\.locale) private var locale
     let directOSFire: (authoritative: Date, foundationPreview: Date?)?
     let notifications: [PhysicalNotificationPresentation]
+
+    private let sourceFormatter = SourceDateTimePresentationFormatter()
 
     var body: some View {
         if let directOSFire {
@@ -38,17 +41,24 @@ struct NextNotificationsView: View {
                         LabeledContent(reason.role.semanticKey) {
                             VStack(alignment: .trailing, spacing: 2) {
                                 Label(reason.kind.semanticKey, systemImage: "bell")
-                                Text(reason.baseOccurrenceInstant, format: .dateTime)
-                                    .environment(
-                                        \.timeZone,
-                                        sourceTimeZone(for: value) ?? .current
+                                Text(
+                                    verbatim: sourceFormatter.instant(
+                                        reason.baseOccurrenceInstant,
+                                        timeZoneIdentifier: sourceTimeZoneIdentifier(for: value),
+                                        locale: locale
                                     )
+                                )
                             }
                         }
                     }
                     LabeledContent("reminder.next.source-time") {
-                        Text(value.sourceTime, format: .dateTime)
-                            .environment(\.timeZone, sourceTimeZone(for: value) ?? .current)
+                        Text(
+                            verbatim: sourceFormatter.instant(
+                                value.sourceTime,
+                                timeZoneIdentifier: sourceTimeZoneIdentifier(for: value),
+                                locale: locale
+                            )
+                        )
                     }
                     LabeledContent("reminder.next.device-time") {
                         Text(value.deviceLocalTime, format: .dateTime)
@@ -61,7 +71,9 @@ struct NextNotificationsView: View {
         }
     }
 
-    private func sourceTimeZone(for value: PhysicalNotificationPresentation) -> TimeZone? {
-        value.sourceTimeZoneIdentifier.flatMap(TimeZone.init(identifier:))
+    private func sourceTimeZoneIdentifier(
+        for value: PhysicalNotificationPresentation
+    ) -> String {
+        value.sourceTimeZoneIdentifier ?? TimeZone.current.identifier
     }
 }

@@ -26,7 +26,11 @@ struct TagFilterView: View {
                     .accessibilityIdentifier("reminder.tag-filter.\(tag.id.uuidString.lowercased())")
                 }
             } label: {
-                Label(selectedTagName, systemImage: "line.3.horizontal.decrease.circle")
+                Label {
+                    Text(verbatim: selectedTagName)
+                } icon: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
+                }
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityIdentifier("reminder.tag-filter.menu")

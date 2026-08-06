@@ -10,12 +10,15 @@ enum AppRouterDestination: Sendable, Hashable {
     case reminderDetail(UUID)
     case reminderEdit(UUID)
     case reminderCreate(UUID)
+    case settings
 }
 
 @MainActor
 @Observable
 final class AppRouter {
     let actions: ReminderActionCoordinator
+    let notificationSettingsModel: NotificationSettingsModel?
+    let tagManagementModel: TagManagementModel?
     var compactPath: [AppRouterDestination] = []
     var regularDestination: AppRouterDestination?
     var selectedReminderID: UUID?
@@ -27,9 +30,13 @@ final class AppRouter {
 
     init(
         actions: ReminderActionCoordinator,
+        notificationSettingsModel: NotificationSettingsModel? = nil,
+        tagManagementModel: TagManagementModel? = nil,
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil }
     ) {
         self.actions = actions
+        self.notificationSettingsModel = notificationSettingsModel
+        self.tagManagementModel = tagManagementModel
         self.createForm = createForm
     }
 
@@ -62,6 +69,10 @@ final class AppRouter {
         guard let form = createForm() else { return }
         register(form: form)
         route(to: .reminderCreate(form.detachedDraft.id))
+    }
+
+    func showSettings() {
+        route(to: .settings)
     }
 
     func setCompactPathFromSystem(_ path: [AppRouterDestination]) {
@@ -133,10 +144,12 @@ final class AppRouter {
 }
 
 private extension AppRouterDestination {
-    var reminderID: UUID {
+    var reminderID: UUID? {
         switch self {
         case let .reminderDetail(id), let .reminderEdit(id), let .reminderCreate(id):
             id
+        case .settings:
+            nil
         }
     }
 
@@ -146,6 +159,8 @@ private extension AppRouterDestination {
             nil
         case let .reminderEdit(id), let .reminderCreate(id):
             id
+        case .settings:
+            nil
         }
     }
 
