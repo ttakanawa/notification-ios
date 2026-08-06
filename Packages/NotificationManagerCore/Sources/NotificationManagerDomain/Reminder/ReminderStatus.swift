@@ -26,7 +26,7 @@ public struct ReminderStatusCalculator: Sendable {
         enabled: Bool,
         after evaluationNow: Date,
         environment: any RecurrenceEnvironment
-    ) -> ReminderStatus {
+    ) throws -> ReminderStatus {
         var statuses: [LifecycleStatus] = []
         let hasFutureAlert: Bool
 
@@ -47,9 +47,16 @@ public struct ReminderStatusCalculator: Sendable {
                     environment: environment
                 )
                 hasFutureAlert = !result.notifications.isEmpty
+            } catch let error as NextNotificationProviderError {
+                switch error {
+                case .invalidSchedule:
+                    statuses.append(.invalidSchedule)
+                    hasFutureAlert = false
+                case .invalidEvaluationNow, .arithmeticOverflow:
+                    throw error
+                }
             } catch {
-                statuses.append(.invalidSchedule)
-                hasFutureAlert = false
+                throw error
             }
         }
 

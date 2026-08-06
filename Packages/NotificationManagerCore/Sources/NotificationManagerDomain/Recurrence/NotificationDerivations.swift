@@ -51,7 +51,7 @@ public struct AlertGroupCursor {
 
         var alerts: [EffectiveAlert] = []
         if let early = schedule.early {
-            let instant = try earlyInstant(
+            let instant = try earlyAlertInstant(
                 for: occurrence.instant,
                 early: early,
                 rule: schedule.rule,
@@ -72,56 +72,56 @@ public struct AlertGroupCursor {
         }
         return AlertGroup(baseOccurrence: occurrence, alerts: alerts)
     }
+}
 
-    private func earlyInstant(
-        for baseInstant: Date,
-        early: EarlyReminder,
-        rule: RepeatRule,
-        calendar: Calendar
-    ) throws -> Date {
-        if usesCalendarOffset(early.unit, rule: rule) {
-            let component: Calendar.Component = switch early.unit {
-            case .days: .day
-            case .weeks: .weekOfYear
-            case .minutes, .hours:
-                preconditionFailure("Fixed-duration unit reached calendar offset")
-            }
-            guard let result = calendar.date(
-                byAdding: component,
-                value: -early.value,
-                to: baseInstant
-            ) else {
-                throw NotificationDerivationError.arithmeticOverflow
-            }
-            return result
+func earlyAlertInstant(
+    for baseInstant: Date,
+    early: EarlyReminder,
+    rule: RepeatRule,
+    calendar: Calendar
+) throws -> Date {
+    if usesCalendarOffset(early.unit, rule: rule) {
+        let component: Calendar.Component = switch early.unit {
+        case .days: .day
+        case .weeks: .weekOfYear
+        case .minutes, .hours:
+            preconditionFailure("Fixed-duration unit reached calendar offset")
         }
-
-        let secondsPerUnit: Int64 = switch early.unit {
-        case .minutes: 60
-        case .hours: 3_600
-        case .days: 86_400
-        case .weeks: 604_800
-        }
-        let (seconds, overflow) = Int64(early.value).multipliedReportingOverflow(
-            by: secondsPerUnit
-        )
-        guard !overflow else { throw NotificationDerivationError.arithmeticOverflow }
-        let result = baseInstant.addingTimeInterval(-Double(seconds))
-        guard result.timeIntervalSinceReferenceDate.isFinite else {
+        guard let result = calendar.date(
+            byAdding: component,
+            value: -early.value,
+            to: baseInstant
+        ) else {
             throw NotificationDerivationError.arithmeticOverflow
         }
         return result
     }
 
-    private func usesCalendarOffset(_ unit: EarlyReminderUnit, rule: RepeatRule) -> Bool {
-        switch (unit, rule) {
-        case (.days, .hourly), (.weeks, .hourly):
-            false
-        case (.days, _), (.weeks, _):
-            true
-        case (.minutes, _), (.hours, _):
-            false
-        }
+    let secondsPerUnit: Int64 = switch early.unit {
+    case .minutes: 60
+    case .hours: 3_600
+    case .days: 86_400
+    case .weeks: 604_800
+    }
+    let (seconds, overflow) = Int64(early.value).multipliedReportingOverflow(
+        by: secondsPerUnit
+    )
+    guard !overflow else { throw NotificationDerivationError.arithmeticOverflow }
+    let result = baseInstant.addingTimeInterval(-Double(seconds))
+    guard result.timeIntervalSinceReferenceDate.isFinite else {
+        throw NotificationDerivationError.arithmeticOverflow
+    }
+    return result
+}
+
+private func usesCalendarOffset(_ unit: EarlyReminderUnit, rule: RepeatRule) -> Bool {
+    switch (unit, rule) {
+    case (.days, .hourly), (.weeks, .hourly):
+        false
+    case (.days, _), (.weeks, _):
+        true
+    case (.minutes, _), (.hours, _):
+        false
     }
 }
 

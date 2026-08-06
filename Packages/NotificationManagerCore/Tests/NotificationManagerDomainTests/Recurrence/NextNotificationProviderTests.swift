@@ -270,6 +270,26 @@ struct NextNotificationProviderTests {
         #expect(result.notifications[0].contributingBaseOccurrences.map(\.instant) == [
             date("2026-08-04T09:30:00Z"), date("2026-08-05T09:30:00Z")
         ])
+        #expect(result.observedFoundationResultCount <= 1_024)
+    }
+
+    @Test(.timeLimit(.minutes(1)))
+    func maximumHourlyEarlyOffsetWithMainUsesBoundedStreams() throws {
+        let result = try notifications(
+            schedule(
+                source: source(hour: 9, minute: 30),
+                rule: .hourly(interval: 1),
+                early: .init(value: 9_999, unit: .weeks)
+            ),
+            after: date("2026-08-04T09:00:00Z"),
+            limit: 1
+        )
+
+        #expect(result.notifications.count == 1)
+        #expect(result.notifications[0].alertInstant == date("2026-08-04T09:30:00Z"))
+        #expect(result.notifications[0].reasons.map(\.kind) == [.main, .early])
+        #expect(result.observedFoundationResultCount > 0)
+        #expect(result.observedFoundationResultCount <= 1_024)
     }
 
     @Test func earlyOnlyCollisionUsesFirstBaseOccurrenceAsPrimary() throws {
