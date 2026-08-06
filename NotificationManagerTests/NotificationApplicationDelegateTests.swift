@@ -59,6 +59,7 @@ struct NotificationApplicationDelegateTests {
         let lifecycle = AppLifecycleCoordinator(
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             requestReconcile: { await reconciles.record($0) },
+            requestForegroundReconcile: { _ in await reconciles.record(.foreground) },
             enterBackground: { await Task.yield() }
         )
         await lifecycle.handle(.foreground)
@@ -713,6 +714,7 @@ struct NotificationApplicationDelegateTests {
         let lifecycle = AppLifecycleCoordinator(
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             requestReconcile: { await reconciles.record($0) },
+            requestForegroundReconcile: { _ in await reconciles.record(.foreground) },
             enterBackground: {}
         )
         await lifecycle.handle(.foreground)

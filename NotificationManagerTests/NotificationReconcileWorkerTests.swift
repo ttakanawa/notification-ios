@@ -1078,6 +1078,34 @@ struct NotificationReconcileWorkerTests {
         #expect(!(await worker.timerState()).retryScheduled)
     }
 
+    @Test func backgroundAfterValidPermittedIngressWinsBeforeFailureRetry() async {
+        let loader = BlockingFailingSnapshotLoader()
+        let authority = ForegroundReconcilePermitAuthority()
+        let permit = authority.beginForegroundEpoch()
+        let worker = NotificationReconcileWorker(
+            snapshotLoader: loader,
+            preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
+            authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
+            notificationCenter: NotificationCenterClientSpy(),
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            clock: NotificationReconcileClock(
+                now: { testDate("2040-08-01T00:00:00Z") },
+                sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            ),
+            retryDelays: [1]
+        )
+
+        await worker.requestForegroundReconcile(ifValid: permit)
+        await loader.waitUntilLoadStarts()
+        await worker.enterBackground()
+        await loader.release()
+        await worker.waitUntilIdle()
+
+        #expect(await loader.callCount == 1)
+        #expect(!(await worker.timerState()).retryScheduled)
+    }
+
     @Test func backgroundPreventsResumedCancelledReplenishmentFromReconciling() async throws {
         let reminder = validReminder()
         let logical = try oneShotRequest(
@@ -1728,6 +1756,33 @@ private actor CountingFailingSnapshotLoader: CompleteSchedulingSnapshotLoading {
     func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
         count += 1
         throw CompleteSchedulingSnapshotLoadError.fetch
+    }
+}
+
+private actor BlockingFailingSnapshotLoader: CompleteSchedulingSnapshotLoading {
+    private var didStart = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+    private(set) var callCount = 0
+
+    func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+        callCount += 1
+        didStart = true
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { releaseContinuation = $0 }
+        throw CompleteSchedulingSnapshotLoadError.fetch
+    }
+
+    func waitUntilLoadStarts() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { startWaiters.append($0) }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }
 

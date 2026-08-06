@@ -143,16 +143,26 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     }
 
     public func requestReconcile(_ reason: ReconcileReason) async {
-        if reason.observesModelChange {
-            eligibilityIndexStore.markStale()
-        }
         if reason == .foreground {
             isForeground = true
-            invalidateRetryTimer()
-            retryAttempt = 0
+            finishForegroundReconcileLinearization()
+        } else {
+            if reason.observesModelChange {
+                eligibilityIndexStore.markStale()
+            }
+            enqueue(reason)
         }
         await stateStore.setReconcileInProgressOrQueued(true)
-        enqueue(reason)
+    }
+
+    func requestForegroundReconcile(
+        ifValid permit: ForegroundReconcilePermit
+    ) async {
+        // Keep validation, foreground mutation, and enqueue in one actor turn.
+        guard permit.isValidAtWorkerIngress() else { return }
+        isForeground = true
+        finishForegroundReconcileLinearization()
+        await stateStore.setReconcileInProgressOrQueued(true)
     }
 
     public func enterBackground() {
@@ -183,6 +193,12 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         Task { [weak self] in
             await self?.runLoop()
         }
+    }
+
+    private func finishForegroundReconcileLinearization() {
+        invalidateRetryTimer()
+        retryAttempt = 0
+        enqueue(.foreground)
     }
 
     private func runLoop() async {

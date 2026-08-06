@@ -34,6 +34,9 @@ struct AppLifecycleReconcileTests {
             requestReconcile: { reason in
                 await trace.record(.reconcile(reason))
             },
+            requestForegroundReconcile: { _ in
+                await trace.record(.reconcile(.foreground))
+            },
             enterBackground: {
                 await trace.record(.backgroundEntered)
             },
@@ -54,6 +57,125 @@ struct AppLifecycleReconcileTests {
         await foreground.value
 
         #expect(await trace.events == [.backgroundEntered])
+    }
+
+    @MainActor
+    @Test func backgroundInvalidatesForegroundWaitingAtWorkerIngress() async {
+        let ingressGate = LifecycleForegroundIngressGate()
+        let snapshotLoader = LifecycleCountingSnapshotLoader()
+        let stateStore = DeviceSchedulingStateStore()
+        let worker = makeEmptyWorker(
+            snapshotLoader: snapshotLoader,
+            stateStore: stateStore
+        )
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await ingressGate.wait()
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: {
+                await worker.enterBackground()
+            }
+        )
+        let foreground = Task { @MainActor in
+            await coordinator.handle(.foreground)
+        }
+        await ingressGate.waitUntilEntered()
+
+        await coordinator.handle(.background)
+        await ingressGate.release()
+        await foreground.value
+        await worker.waitUntilIdle()
+
+        #expect(await snapshotLoader.callCount == 0)
+        #expect(await stateStore.snapshot().reconcileInProgressOrQueued == false)
+        #expect(await worker.timerState() == NotificationReconcileTimerState(
+            retryScheduled: false,
+            foregroundReplenishmentScheduled: false,
+            retryAttempt: 0
+        ))
+    }
+
+    @MainActor
+    @Test func newerForegroundEpochInvalidatesOlderRequestWaitingAtWorkerIngress() async {
+        let firstIngressGate = LifecycleForegroundIngressGate()
+        let snapshotLoader = LifecycleCountingSnapshotLoader()
+        let worker = makeEmptyWorker(
+            snapshotLoader: snapshotLoader,
+            stateStore: DeviceSchedulingStateStore()
+        )
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await firstIngressGate.wait()
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: {
+                await worker.enterBackground()
+            }
+        )
+        let olderForeground = Task { @MainActor in
+            await coordinator.handle(.foreground)
+        }
+        await firstIngressGate.waitUntilEntered()
+
+        await coordinator.handle(.foreground)
+        await firstIngressGate.release()
+        await olderForeground.value
+        await worker.waitUntilIdle()
+
+        #expect(await snapshotLoader.callCount == 1)
+    }
+
+    @MainActor
+    @Test(arguments: [
+        AppLifecycleTrigger.notificationPresentationCompleted,
+        .notificationResponseCompleted
+    ])
+    func backgroundInvalidatesNotificationCompletionWaitingAtWorkerIngress(
+        trigger: AppLifecycleTrigger
+    ) async {
+        let secondIngressGate = LifecycleForegroundIngressGate(blockedCall: 2)
+        let snapshotLoader = LifecycleCountingSnapshotLoader()
+        let worker = makeEmptyWorker(
+            snapshotLoader: snapshotLoader,
+            stateStore: DeviceSchedulingStateStore()
+        )
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await secondIngressGate.wait()
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: {
+                await worker.enterBackground()
+            }
+        )
+        await coordinator.handle(.foreground)
+        await worker.waitUntilIdle()
+        let completion = Task { @MainActor in
+            await coordinator.handle(trigger)
+        }
+        await secondIngressGate.waitUntilEntered()
+
+        await coordinator.handle(.background)
+        await secondIngressGate.release()
+        await completion.value
+        await worker.waitUntilIdle()
+
+        #expect(await snapshotLoader.callCount == 1)
+        #expect(!(await worker.timerState()).retryScheduled)
+        #expect(!(await worker.timerState()).foregroundReplenishmentScheduled)
     }
 
     @MainActor
@@ -118,6 +240,9 @@ struct AppLifecycleReconcileTests {
             requestReconcile: { reason in
                 await trace.record(.reconcile(reason))
             },
+            requestForegroundReconcile: { _ in
+                await trace.record(.reconcile(.foreground))
+            },
             enterBackground: {},
             refreshDeviceState: {
                 await gate.refresh()
@@ -161,6 +286,7 @@ struct AppLifecycleReconcileTests {
             let coordinator = AppLifecycleCoordinator(
                 eligibilityIndexStore: index,
                 requestReconcile: { _ in },
+                requestForegroundReconcile: { _ in },
                 enterBackground: {},
                 refreshDeviceState: {},
                 refreshModelSnapshot: {
@@ -265,6 +391,7 @@ struct AppLifecycleReconcileTests {
             notificationCenter: center,
             notificationNames: names,
             requestReconcile: { _ in },
+            requestForegroundReconcile: { _ in },
             enterBackground: {}
         )
         coordinator.startObservingSystemChanges()
@@ -352,14 +479,14 @@ struct AppLifecycleReconcileTests {
         await gate.waitForPendingCount(2)
 
         await gate.resolve(attempt: 1, value: "Saved current value")
-        await newerStateRefresh.value
+        _ = await newerStateRefresh.value
         #expect(recorder.projections == [
             PresentationProjection(snapshot: "Saved current value", state: 2)
         ])
         #expect(recorder.router.formModel(for: reminderID)?.title == "Saved current value")
 
         await gate.resolve(attempt: 0, value: "Stale pre-import value")
-        await saveHookRefresh.value
+        _ = await saveHookRefresh.value
 
         #expect(recorder.projections == [
             PresentationProjection(snapshot: "Saved current value", state: 2)
@@ -518,6 +645,9 @@ struct AppLifecycleReconcileTests {
             requestReconcile: { reason in
                 await trace.record(.reconcile(reason))
             },
+            requestForegroundReconcile: { _ in
+                await trace.record(.reconcile(.foreground))
+            },
             enterBackground: {
                 await trace.record(.backgroundEntered)
             },
@@ -527,6 +657,28 @@ struct AppLifecycleReconcileTests {
             refreshModelSnapshot: {
                 await trace.record(.modelSnapshotRefreshed)
             }
+        )
+    }
+
+    private func makeEmptyWorker(
+        snapshotLoader: any CompleteSchedulingSnapshotLoading,
+        stateStore: DeviceSchedulingStateStore
+    ) -> NotificationReconcileWorker {
+        NotificationReconcileWorker(
+            snapshotLoader: snapshotLoader,
+            preferenceStore: LifecyclePreferenceStore(),
+            authorizationProvider: LifecycleAuthorizationProvider(),
+            notificationCenter: LifecycleNotificationCenter(),
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: stateStore,
+            planner: LifecycleNotificationPlanner(plan: LogicalPlan(
+                requests: [],
+                outcomes: [:],
+                selectedGroupIDs: [],
+                scheduledThrough: [:],
+                reminderStatuses: [:]
+            )),
+            retryDelays: []
         )
     }
 
@@ -614,6 +766,43 @@ private actor FirstLifecycleDeviceRefreshGate {
     func releaseFirstRefresh() {
         firstRelease?.resume()
         firstRelease = nil
+    }
+}
+
+private actor LifecycleForegroundIngressGate {
+    private let blockedCall: Int
+    private var callCount = 0
+    private var entered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    init(blockedCall: Int = 1) {
+        precondition(blockedCall > 0)
+        self.blockedCall = blockedCall
+    }
+
+    func wait() async {
+        callCount += 1
+        guard callCount == blockedCall else { return }
+        entered = true
+        let waiters = entryWaiters
+        entryWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { continuation in
+            entryWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }
 
@@ -741,6 +930,15 @@ private struct LifecycleSnapshotLoader: CompleteSchedulingSnapshotLoading {
 
     func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
         snapshot
+    }
+}
+
+private actor LifecycleCountingSnapshotLoader: CompleteSchedulingSnapshotLoading {
+    private(set) var callCount = 0
+
+    func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+        callCount += 1
+        return CompleteReminderSnapshot(reminders: [], tags: [])
     }
 }
 

@@ -230,6 +230,9 @@ final class AppEnvironment {
             requestReconcile: { reason in
                 await worker.requestReconcile(reason)
             },
+            requestForegroundReconcile: { permit in
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
             enterBackground: {
                 await worker.enterBackground()
             },

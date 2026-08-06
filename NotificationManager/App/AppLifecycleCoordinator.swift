@@ -44,15 +44,18 @@ struct AppLifecycleNotificationNames: Sendable {
 @MainActor
 final class AppLifecycleCoordinator {
     typealias Reconcile = @Sendable (ReconcileReason) async -> Void
+    typealias ForegroundReconcile = @Sendable (ForegroundReconcilePermit) async -> Void
     typealias AsyncAction = @Sendable () async -> Void
 
     private let eligibilityIndexStore: ForegroundEligibilityIndexStore
     private let notificationCenter: NotificationCenter
     private let notificationNames: AppLifecycleNotificationNames
     private let requestReconcile: Reconcile
+    private let requestForegroundReconcile: ForegroundReconcile
     private let enterBackgroundAction: AsyncAction
     private let refreshDeviceState: AsyncAction
     private let refreshModelSnapshot: AsyncAction
+    private let foregroundPermitAuthority = ForegroundReconcilePermitAuthority()
     private var observerTokens: [NSObjectProtocol] = []
     private var sceneGeneration: UInt64 = 0
     private var sceneIsForeground = false
@@ -62,6 +65,7 @@ final class AppLifecycleCoordinator {
         notificationCenter: NotificationCenter = .default,
         notificationNames: AppLifecycleNotificationNames = .system,
         requestReconcile: @escaping Reconcile,
+        requestForegroundReconcile: @escaping ForegroundReconcile,
         enterBackground: @escaping AsyncAction,
         refreshDeviceState: @escaping AsyncAction = {},
         refreshModelSnapshot: @escaping AsyncAction = {}
@@ -70,6 +74,7 @@ final class AppLifecycleCoordinator {
         self.notificationCenter = notificationCenter
         self.notificationNames = notificationNames
         self.requestReconcile = requestReconcile
+        self.requestForegroundReconcile = requestForegroundReconcile
         enterBackgroundAction = enterBackground
         self.refreshDeviceState = refreshDeviceState
         self.refreshModelSnapshot = refreshModelSnapshot
@@ -79,19 +84,22 @@ final class AppLifecycleCoordinator {
         switch trigger {
         case .launch, .foreground:
             sceneIsForeground = true
+            let permit = foregroundPermitAuthority.beginForegroundEpoch()
             let generation = beginSceneTransition()
             eligibilityIndexStore.markStale()
             await refreshDeviceState()
             guard generation == sceneGeneration else { return }
             await refreshModelSnapshot()
             guard generation == sceneGeneration else { return }
-            await requestReconcile(.foreground)
+            await requestForegroundReconcile(permit)
         case .background:
             sceneIsForeground = false
+            foregroundPermitAuthority.invalidateForegroundEpoch()
             _ = beginSceneTransition()
             await enterBackgroundAction()
         case .backgroundRefresh:
             sceneIsForeground = false
+            foregroundPermitAuthority.invalidateForegroundEpoch()
             let generation = beginSceneTransition()
             await enterBackgroundAction()
             guard generation == sceneGeneration else { return }
@@ -100,8 +108,12 @@ final class AppLifecycleCoordinator {
             guard generation == sceneGeneration else { return }
             await requestReconcile(.modelChanged)
         case .notificationPresentationCompleted, .notificationResponseCompleted:
-            guard sceneIsForeground else { return }
-            await requestReconcile(.foreground)
+            guard sceneIsForeground,
+                  let permit = foregroundPermitAuthority.currentPermit()
+            else {
+                return
+            }
+            await requestForegroundReconcile(permit)
         case .modelSnapshotChanged, .significantTimeChanged, .timeZoneChanged,
              .localeChanged:
             eligibilityIndexStore.markStale()
