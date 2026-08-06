@@ -72,8 +72,10 @@ import Testing
         #expect(try await repository.fetchCompleteSnapshot().reminders.count == 1)
     }
 
-    @Test func completeSnapshotRetriesAnExternalRelatedInsertBetweenEntityFetches() async throws {
+    @Test func completeSnapshotRejectsTornInsertWhenExternalContextPrunesHistory() async throws {
         let container = try ModelContainerFactory.inMemory()
+        try prunePersistentHistory(in: container)
+        #expect(try persistentHistoryCount(in: container) == 0)
         let injections = LockedCounter()
         let repository = SwiftDataReminderRepository(
             container: container,
@@ -81,12 +83,14 @@ import Testing
             completeSnapshotInterFetchHook: { _ in
                 guard injections.increment() == 1 else { return }
                 try insertRelatedReminderAndTag(in: container)
+                try prunePersistentHistory(in: container)
             }
         )
 
         let snapshot = try await repository.fetchCompleteSnapshot()
 
-        #expect(injections.value == 2)
+        #expect(injections.value == 3)
+        #expect(try persistentHistoryCount(in: container) == 0)
         #expect(snapshot.reminders.map(\.id) == [TestValues.reminderID])
         #expect(snapshot.tags.map(\.id) == [TestValues.tagID])
         #expect(snapshot.reminders.first?.tagIDs == [TestValues.tagID])
@@ -96,6 +100,7 @@ import Testing
         let container = try ModelContainerFactory.inMemory()
         try insertRelatedReminderAndTag(in: container)
         try insertTag(id: TestValues.otherTagID, name: "Work", normalizedName: "work", in: container)
+        try prunePersistentHistory(in: container)
         let injections = LockedCounter()
         let repository = SwiftDataReminderRepository(
             container: container,
@@ -117,12 +122,14 @@ import Testing
                 reminder.tags = [replacement]
                 reminder.updatedAt = TestValues.later
                 try context.save()
+                try prunePersistentHistory(in: container)
             }
         )
 
         let snapshot = try await repository.fetchCompleteSnapshot()
 
-        #expect(injections.value == 2)
+        #expect(injections.value == 3)
+        #expect(try persistentHistoryCount(in: container) == 0)
         #expect(Set(snapshot.tags.map(\.id)) == [TestValues.tagID, TestValues.otherTagID])
         #expect(snapshot.reminders.first?.tagIDs == [TestValues.otherTagID])
         #expect(snapshot.reminders.first?.updatedAt == TestValues.later)
@@ -131,6 +138,7 @@ import Testing
     @Test func completeSnapshotRetriesAnExternalTagDeleteAndRelationshipNullification() async throws {
         let container = try ModelContainerFactory.inMemory()
         try insertRelatedReminderAndTag(in: container)
+        try prunePersistentHistory(in: container)
         let injections = LockedCounter()
         let repository = SwiftDataReminderRepository(
             container: container,
@@ -142,20 +150,26 @@ import Testing
                 let tag = try #require(context.fetch(FetchDescriptor<TagRecordV1>()).first)
                 context.delete(tag)
                 try context.save()
+                try prunePersistentHistory(in: container)
             }
         )
 
         let snapshot = try await repository.fetchCompleteSnapshot()
 
-        #expect(injections.value == 2)
+        #expect(injections.value == 3)
+        #expect(try persistentHistoryCount(in: container) == 0)
         #expect(snapshot.tags.isEmpty)
         #expect(snapshot.reminders.map(\.id) == [TestValues.reminderID])
         #expect(snapshot.reminders.first?.tagIDs.isEmpty == true)
     }
 
-    @Test func completeSnapshotThrowsPreciseErrorAfterBoundedExternalChurn() async throws {
+    @Test(arguments: ReminderPersistedField.allCases)
+    func completeSnapshotDetectsEachReminderFieldChangingAcrossPrunedCollections(
+        field: ReminderPersistedField
+    ) async throws {
         let container = try ModelContainerFactory.inMemory()
         try insertRelatedReminderAndTag(in: container)
+        try prunePersistentHistory(in: container)
         let injections = LockedCounter()
         let repository = SwiftDataReminderRepository(
             container: container,
@@ -165,11 +179,9 @@ import Testing
                 let context = ModelContext(container)
                 context.autosaveEnabled = false
                 let reminder = try #require(context.fetch(FetchDescriptor<ReminderRecordV1>()).first)
-                reminder.title = "Remote update \(attempt)"
-                reminder.updatedAt = Date(
-                    timeIntervalSince1970: TestValues.latest.timeIntervalSince1970 + Double(attempt)
-                )
+                field.mutate(reminder, attempt: attempt)
                 try context.save()
+                try prunePersistentHistory(in: container)
             }
         )
 
@@ -179,6 +191,38 @@ import Testing
             try await repository.fetchCompleteSnapshot()
         }
         #expect(injections.value == 3)
+        #expect(try persistentHistoryCount(in: container) == 0)
+    }
+
+    @Test(arguments: TagPersistedField.allCases)
+    func completeSnapshotDetectsEachTagFieldChangingAcrossPrunedCollections(
+        field: TagPersistedField
+    ) async throws {
+        let container = try ModelContainerFactory.inMemory()
+        try insertRelatedReminderAndTag(in: container)
+        try prunePersistentHistory(in: container)
+        let injections = LockedCounter()
+        let repository = SwiftDataReminderRepository(
+            container: container,
+            snapshotAttemptLimit: 3,
+            completeSnapshotInterFetchHook: { attempt in
+                _ = injections.increment()
+                let context = ModelContext(container)
+                context.autosaveEnabled = false
+                let tag = try #require(context.fetch(FetchDescriptor<TagRecordV1>()).first)
+                field.mutate(tag, attempt: attempt)
+                try context.save()
+                try prunePersistentHistory(in: container)
+            }
+        )
+
+        await #expect(
+            throws: PersistenceError.snapshotConsistencyUnavailable(attempts: 3)
+        ) {
+            try await repository.fetchCompleteSnapshot()
+        }
+        #expect(injections.value == 3)
+        #expect(try persistentHistoryCount(in: container) == 0)
     }
 
     @Test func metadataOnlyMappingsPreserveUnsupportedAndCorruptRawBytesExactly() async throws {
@@ -429,6 +473,75 @@ private enum TestValues {
     )
 }
 
+enum ReminderPersistedField: CaseIterable, Sendable {
+    case id
+    case title
+    case notes
+    case urlString
+    case enabled
+    case scheduleData
+    case createdAt
+    case updatedAt
+
+    func mutate(_ reminder: ReminderRecordV1, attempt: Int) {
+        switch self {
+        case .id:
+            reminder.id = mutationUUID(attempt: attempt, prefix: "44444444")
+        case .title:
+            reminder.title = "Remote title \(attempt)"
+        case .notes:
+            reminder.notes = "Remote notes \(attempt)"
+        case .urlString:
+            reminder.urlString = "https://example.com/remote/\(attempt)"
+        case .enabled:
+            reminder.enabled = attempt.isMultiple(of: 2)
+        case .scheduleData:
+            reminder.scheduleData = Data([0xFF, UInt8(attempt)])
+        case .createdAt:
+            reminder.createdAt = mutationDate(attempt: attempt, multiplier: 10)
+        case .updatedAt:
+            reminder.updatedAt = mutationDate(attempt: attempt, multiplier: 1)
+        }
+    }
+}
+
+enum TagPersistedField: CaseIterable, Sendable {
+    case id
+    case name
+    case normalizedName
+    case normalizationVersion
+    case createdAt
+    case updatedAt
+
+    func mutate(_ tag: TagRecordV1, attempt: Int) {
+        switch self {
+        case .id:
+            tag.id = mutationUUID(attempt: attempt, prefix: "55555555")
+        case .name:
+            tag.name = "Remote tag \(attempt)"
+        case .normalizedName:
+            tag.normalizedName = "remote-tag-\(attempt)"
+        case .normalizationVersion:
+            tag.normalizationVersion = "remote-version-\(attempt)"
+        case .createdAt:
+            tag.createdAt = mutationDate(attempt: attempt, multiplier: 10)
+        case .updatedAt:
+            tag.updatedAt = mutationDate(attempt: attempt, multiplier: 1)
+        }
+    }
+}
+
+private func mutationUUID(attempt: Int, prefix: String) -> UUID {
+    UUID(uuidString: "\(prefix)-4444-4444-8444-00000000000\(attempt)")!
+}
+
+private func mutationDate(attempt: Int, multiplier: Int) -> Date {
+    Date(
+        timeIntervalSince1970: TestValues.latest.timeIntervalSince1970
+            + Double(attempt * multiplier)
+    )
+}
+
 private extension EncodedReminderMutation {
     static func fixture(
         title: String = "Reminder",
@@ -600,6 +713,16 @@ private func insertTag(
         )
     )
     try context.save()
+}
+
+private func prunePersistentHistory(in container: ModelContainer) throws {
+    let context = ModelContext(container)
+    try context.deleteHistory(HistoryDescriptor<DefaultHistoryTransaction>())
+}
+
+private func persistentHistoryCount(in container: ModelContainer) throws -> Int {
+    let context = ModelContext(container)
+    return try context.fetchHistory(HistoryDescriptor<DefaultHistoryTransaction>()).count
 }
 
 private func rawScheduleData(_ state: ScheduleReadState) -> Data {

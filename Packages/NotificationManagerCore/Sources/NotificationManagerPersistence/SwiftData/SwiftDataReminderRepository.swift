@@ -51,7 +51,7 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         snapshotAttemptLimit: Int,
         completeSnapshotInterFetchHook: @escaping @Sendable (Int) throws -> Void
     ) {
-        precondition(snapshotAttemptLimit > 0)
+        precondition(snapshotAttemptLimit >= 2)
         self.container = container
         mapper = RecordMapper(scheduleCodec: scheduleCodec)
         self.tagNormalizer = tagNormalizer
@@ -78,20 +78,16 @@ public actor SwiftDataReminderRepository: ReminderRepository {
 
     private func fetchCompleteSnapshotCoordinated() throws -> CompleteReminderSnapshot {
         do {
+            var previousCandidate: CompleteReminderSnapshot?
             for attempt in 1...snapshotAttemptLimit {
-                let generationBefore = try storeGeneration()
-                let context = makeContext()
-                let reminderRecords = try context.fetch(FetchDescriptor<ReminderRecordV1>())
-                try ensureUniqueReminderIDs(reminderRecords)
-                let reminders = reminderRecords.map(mapper.reminder).sorted(by: Self.reminderSort)
-                try completeSnapshotInterFetchHook(attempt)
-                let tagRecords = try context.fetch(FetchDescriptor<TagRecordV1>())
-                try ensureUniqueTagIDs(tagRecords)
-                let tags = tagRecords.map(mapper.tag).sorted(by: Self.tagSort)
-                let generationAfter = try storeGeneration()
-                guard generationBefore != generationAfter else {
-                    return CompleteReminderSnapshot(reminders: reminders, tags: tags)
+                guard let candidate = try collectStableCompleteSnapshotCandidate(attempt: attempt) else {
+                    previousCandidate = nil
+                    continue
                 }
+                if let previousCandidate, previousCandidate == candidate {
+                    return candidate
+                }
+                previousCandidate = candidate
             }
             throw PersistenceError.snapshotConsistencyUnavailable(attempts: snapshotAttemptLimit)
         } catch let error as PersistenceError {
@@ -99,6 +95,39 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         } catch {
             throw PersistenceError.storeFailure
         }
+    }
+
+    private func collectStableCompleteSnapshotCandidate(
+        attempt: Int
+    ) throws -> CompleteReminderSnapshot? {
+        // SwiftData has no public API that pins several fetches to one query generation. This is
+        // therefore an optimistic, bounded stability check rather than transaction isolation:
+        // bracket both entity collections with fresh reads, then require the whole immutable
+        // candidate to repeat on the next attempt before publishing it. Changes visible between
+        // observations force a retry; persistent churn exhausts the configured attempt limit.
+        // An adversarial ABA cycle that restores every value before each observation can evade
+        // detection, and a commit after the final observation is not promised to be included.
+        let remindersBefore = try readReminderSnapshots()
+        try completeSnapshotInterFetchHook(attempt)
+        let tagsBefore = try readTagSnapshots()
+        let remindersAfter = try readReminderSnapshots()
+        let tagsAfter = try readTagSnapshots()
+        guard remindersBefore == remindersAfter, tagsBefore == tagsAfter else { return nil }
+        return CompleteReminderSnapshot(reminders: remindersAfter, tags: tagsAfter)
+    }
+
+    private func readReminderSnapshots() throws -> [ReminderSnapshot] {
+        let context = makeContext()
+        let records = try context.fetch(FetchDescriptor<ReminderRecordV1>())
+        try ensureUniqueReminderIDs(records)
+        return records.map(mapper.reminder).sorted(by: Self.reminderSort)
+    }
+
+    private func readTagSnapshots() throws -> [TagSnapshot] {
+        let context = makeContext()
+        let records = try context.fetch(FetchDescriptor<TagRecordV1>())
+        try ensureUniqueTagIDs(records)
+        return records.map(mapper.tag).sorted(by: Self.tagSort)
     }
 
     public func reminder(id: UUID) async throws -> ReminderSnapshot? {
@@ -266,21 +295,6 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         return context
     }
 
-    private func storeGeneration() throws -> StoreGeneration {
-        // ModelContext.transaction does not pin fetches to one read generation. Persistent
-        // history advances for every stored attribute or relationship mutation instead.
-        let context = makeContext()
-        let history = try context.fetchHistory(HistoryDescriptor<DefaultHistoryTransaction>())
-        return StoreGeneration(
-            transactions: history.map {
-                StoreTransactionMarker(
-                    storeIdentifier: $0.storeIdentifier,
-                    transactionIdentifier: $0.transactionIdentifier
-                )
-            }.sorted()
-        )
-    }
-
     private func fetchReminder(id: UUID, in context: ModelContext) throws -> ReminderRecordV1? {
         let requestedID = id
         var descriptor = FetchDescriptor<ReminderRecordV1>(
@@ -372,22 +386,6 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     private static func isFiniteIntegralSecond(_ date: Date) -> Bool {
         let seconds = date.timeIntervalSince1970
         return seconds.isFinite && seconds.rounded(.towardZero) == seconds
-    }
-}
-
-private struct StoreGeneration: Equatable {
-    let transactions: [StoreTransactionMarker]
-}
-
-private struct StoreTransactionMarker: Comparable {
-    let storeIdentifier: String
-    let transactionIdentifier: Int64
-
-    static func < (lhs: StoreTransactionMarker, rhs: StoreTransactionMarker) -> Bool {
-        if lhs.storeIdentifier != rhs.storeIdentifier {
-            return lhs.storeIdentifier < rhs.storeIdentifier
-        }
-        return lhs.transactionIdentifier < rhs.transactionIdentifier
     }
 }
 
