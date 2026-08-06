@@ -248,6 +248,18 @@ struct FoundationRecurrenceEngineTests {
         #expect(anchorMonthDayValues == expected)
     }
 
+    @Test func fixedYearlyValidityFilterRejectsSpilledMatchingAnchor() throws {
+        let values = try instants(
+            schedule(
+                source: source(year: 2027, month: 3, day: 1),
+                rule: .yearly(interval: 1, month: 2, selector: .dayOfMonth(29))
+            ),
+            in: isoDate("2027-01-01T00:00:00Z")..<isoDate("2029-01-01T00:00:00Z")
+        )
+
+        #expect(values == [isoDate("2028-02-29T09:30:00Z")])
+    }
+
     @Test func yearlyOrdinalSelectorMapsMonthAndReverseWeekday() throws {
         let values = try instants(
             schedule(
@@ -371,46 +383,91 @@ struct FoundationRecurrenceEngineTests {
         ])
     }
 
-    @Test func farPastHourlySearchCalculatesLargeInitialIndexOnce() throws {
-        let environment = CountingUTCEnvironment()
+    @Test func inclusiveEndUsesFollowingCivilDayStartAfterMidnightGap() throws {
         let schedule = schedule(
-            source: source(year: 1, month: 1, day: 1, hour: 0, minute: 0),
-            rule: .hourly(interval: 9_999)
-        )
-        let range: Range<Date> = utcDate(year: 9_999, month: 12, day: 1)..<utcDate(
-            year: 9_999,
-            month: 12,
-            day: 31
+            source: source(
+                year: 2026,
+                month: 9,
+                day: 5,
+                hour: 0,
+                minute: 30,
+                timeZoneIdentifier: "America/Santiago"
+            ),
+            rule: .daily(interval: 1),
+            end: .onDate(SourceDate(year: 2026, month: 9, day: 6))
         )
 
         let values = try engine.baseOccurrences(
             for: schedule,
-            in: range,
-            environment: environment
-        ).prefix(3)
+            in: isoDate("2026-09-05T00:00:00Z")..<isoDate("2026-09-08T00:00:00Z"),
+            environment: FoundationRecurrenceEnvironment()
+        ).map {
+            ($0.sourceComponents.day, $0.sourceComponents.hour, $0.sourceComponents.minute)
+        }
 
-        #expect(values.allSatisfy { range.contains($0.instant) })
-        #expect(environment.timeZoneLookupCount == 1)
-        #expect(environment.calendarCreationCount == 1)
+        #expect(values.map(\.0) == [5, 6])
+        #expect(values.map(\.1) == [0, 1])
+        #expect(values.map(\.2) == [30, 30])
     }
 
-    @Test func farPastCalendarSearchPassesFiniteRangeToFoundation() throws {
-        let environment = CountingUTCEnvironment()
+    @Test func farPastHourlyQueryJumpsToLargeInitialIndexAndObservesOnlyConsumedCandidates() throws {
+        let recorder = RecurrenceObservationRecorder()
+        let instrumentedEngine = FoundationRecurrenceEngine(observe: recorder.record)
         let schedule = schedule(
-            source: source(year: 1900, month: 1, day: 1),
-            rule: .daily(interval: 9_999)
+            source: source(year: 1, month: 1, day: 1, hour: 0, minute: 0),
+            rule: .hourly(interval: 1)
         )
-        let range = isoDate("2026-01-01T00:00:00Z")..<isoDate("2026-02-01T00:00:00Z")
+        let lowerBound = utcDate(year: 9_000, month: 1, day: 1)
+        let range = lowerBound..<lowerBound.addingTimeInterval(4 * 3_600)
 
-        let values = try engine.baseOccurrences(
+        let values = try instrumentedEngine.baseOccurrences(
             for: schedule,
             in: range,
-            environment: environment
-        ).prefix(3)
+            environment: UTCRecurrenceEnvironment()
+        ).prefix(3).map(\.instant)
 
-        #expect(values.allSatisfy { range.contains($0.instant) })
-        #expect(environment.timeZoneLookupCount == 1)
-        #expect(environment.calendarCreationCount == 1)
+        let plan = try #require(recorder.hourlyQueryPlans.first)
+        #expect(recorder.hourlyQueryPlans.count == 1)
+        #expect(plan.range == range)
+        #expect(plan.stepSeconds == 3_600)
+        #expect(plan.firstIndex > 1_000_000)
+        #expect(plan.firstInstant == lowerBound)
+        #expect(values == [
+            lowerBound,
+            lowerBound.addingTimeInterval(3_600),
+            lowerBound.addingTimeInterval(2 * 3_600)
+        ])
+        #expect(recorder.candidates == values)
+        #expect(recorder.candidates.count <= 1_024)
+    }
+
+    @Test func farPastCalendarQueryStartsAtRequestedLowerBoundAndObservesOnlyConsumedCandidates() throws {
+        let recorder = RecurrenceObservationRecorder()
+        let instrumentedEngine = FoundationRecurrenceEngine(observe: recorder.record)
+        let schedule = schedule(
+            source: source(year: 1900, month: 1, day: 1),
+            rule: .daily(interval: 1)
+        )
+        let lowerBound = utcDate(year: 2_500, month: 1, day: 1)
+        let range = lowerBound..<lowerBound.addingTimeInterval(10 * 24 * 3_600)
+
+        let values = try instrumentedEngine.baseOccurrences(
+            for: schedule,
+            in: range,
+            environment: UTCRecurrenceEnvironment()
+        ).prefix(3).map(\.instant)
+
+        let plan = try #require(recorder.calendarQueryPlans.first)
+        #expect(recorder.calendarQueryPlans.count == 1)
+        #expect(plan.anchor == utcDate(year: 1_900, month: 1, day: 1).addingTimeInterval(9.5 * 3_600))
+        #expect(plan.range == range)
+        #expect(values == [
+            lowerBound.addingTimeInterval(9.5 * 3_600),
+            lowerBound.addingTimeInterval((24 + 9.5) * 3_600),
+            lowerBound.addingTimeInterval((48 + 9.5) * 3_600)
+        ])
+        #expect(recorder.candidates == values)
+        #expect(recorder.candidates.count <= 1_024)
     }
 
     @Test func rejectsUnvalidatedIntervals() {
@@ -503,38 +560,41 @@ private struct UTCRecurrenceEnvironment: RecurrenceEnvironment {
     }
 }
 
-private final class CountingUTCEnvironment: RecurrenceEnvironment, @unchecked Sendable {
+private final class RecurrenceObservationRecorder: @unchecked Sendable {
     private let lock = NSLock()
-    private var timeZoneLookups = 0
-    private var calendarCreations = 0
+    private var recordedCalendarQueryPlans: [CalendarRecurrenceQueryPlan] = []
+    private var recordedHourlyQueryPlans: [HourlyRecurrenceQueryPlan] = []
+    private var recordedCandidates: [Date] = []
 
-    var timeZoneLookupCount: Int {
+    var calendarQueryPlans: [CalendarRecurrenceQueryPlan] {
         lock.lock()
         defer { lock.unlock() }
-        return timeZoneLookups
+        return recordedCalendarQueryPlans
     }
 
-    var calendarCreationCount: Int {
+    var hourlyQueryPlans: [HourlyRecurrenceQueryPlan] {
         lock.lock()
         defer { lock.unlock() }
-        return calendarCreations
+        return recordedHourlyQueryPlans
     }
 
-    func timeZone(identifier: String) -> TimeZone? {
+    var candidates: [Date] {
         lock.lock()
-        timeZoneLookups += 1
-        lock.unlock()
-        guard identifier == "UTC" else { return nil }
-        return TimeZone(secondsFromGMT: 0)
+        defer { lock.unlock() }
+        return recordedCandidates
     }
 
-    func gregorianCalendar(in timeZone: TimeZone) -> Calendar {
+    func record(_ observation: FoundationRecurrenceObservation) {
         lock.lock()
-        calendarCreations += 1
-        lock.unlock()
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        return calendar
+        defer { lock.unlock() }
+        switch observation {
+        case let .calendarQuery(plan):
+            recordedCalendarQueryPlans.append(plan)
+        case let .hourlyQuery(plan):
+            recordedHourlyQueryPlans.append(plan)
+        case let .candidate(date):
+            recordedCandidates.append(date)
+        }
     }
 }
 

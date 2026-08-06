@@ -16,8 +16,35 @@ public enum FoundationRecurrenceError: Error, Sendable, Equatable {
     case arithmeticOverflow
 }
 
+struct CalendarRecurrenceQueryPlan: Sendable, Equatable {
+    let anchor: Date
+    let range: Range<Date>
+}
+
+struct HourlyRecurrenceQueryPlan: Sendable, Equatable {
+    let anchor: Date
+    let range: Range<Date>
+    let stepSeconds: Int64
+    let firstIndex: Int64
+    let firstInstant: Date
+}
+
+enum FoundationRecurrenceObservation: Sendable, Equatable {
+    case calendarQuery(CalendarRecurrenceQueryPlan)
+    case hourlyQuery(HourlyRecurrenceQueryPlan)
+    case candidate(Date)
+}
+
 public struct FoundationRecurrenceEngine: Sendable {
-    public init() {}
+    private let observe: (@Sendable (FoundationRecurrenceObservation) -> Void)?
+
+    public init() {
+        observe = nil
+    }
+
+    init(observe: @escaping @Sendable (FoundationRecurrenceObservation) -> Void) {
+        self.observe = observe
+    }
 
     public func baseOccurrences(
         for schedule: ScheduleDefinition,
@@ -58,6 +85,7 @@ public struct FoundationRecurrenceEngine: Sendable {
         case .daily, .weekly, .monthly, .yearly:
             let mapping = try recurrenceMapping(for: schedule, calendar: calendar)
             let includesAnchor = effectiveRange.contains(anchor)
+                && candidateIsValid(anchor, mapping: mapping, calendar: calendar)
                 && anchorMatches(mapping.rule, anchor: anchor, calendar: calendar)
             let recurrenceLowerBound = includesAnchor
                 ? max(effectiveRange.lowerBound, anchor.addingTimeInterval(1))
@@ -71,17 +99,18 @@ public struct FoundationRecurrenceEngine: Sendable {
                 return emptySequence()
             }
             let recurrenceRange = recurrenceLowerBound..<effectiveRange.upperBound
+            observe?(.calendarQuery(CalendarRecurrenceQueryPlan(
+                anchor: anchor,
+                range: recurrenceRange
+            )))
             let values = mapping.rule.recurrences(of: anchor, in: recurrenceRange)
                 .lazy
+                .map { date in
+                    observe?(.candidate(date))
+                    return date
+                }
                 .filter { date in
-                    let year = calendar.component(.year, from: date)
-                    guard (1...9_999).contains(year) else { return false }
-                    guard let fixedDate = mapping.fixedYearlyDate else { return true }
-                    return SourceWallClockResolver.isValidGregorianDate(
-                        year: year,
-                        month: fixedDate.month,
-                        day: fixedDate.day
-                    )
+                    candidateIsValid(date, mapping: mapping, calendar: calendar)
                 }
                 .map { date in
                     occurrence(at: date, calendar: calendar, timeZone: timeZone)
@@ -136,7 +165,7 @@ public struct FoundationRecurrenceEngine: Sendable {
                 timeZoneIdentifier: schedule.source.timeZoneIdentifier
             )
             let endStart = try SourceWallClockResolver().resolve(endSource, calendar: calendar)
-            guard let endExclusive = calendar.date(byAdding: .day, value: 1, to: endStart) else {
+            guard let endExclusive = calendar.dateInterval(of: .day, for: endStart)?.end else {
                 throw FoundationRecurrenceError.arithmeticOverflow
             }
             upperBound = min(min(requested.upperBound, endExclusive), supportedUpperBound)
@@ -181,6 +210,14 @@ public struct FoundationRecurrenceEngine: Sendable {
         guard !offsetOverflow, !firstOverflow else {
             throw FoundationRecurrenceError.arithmeticOverflow
         }
+        let firstInstant = Date(timeIntervalSince1970: Double(firstSeconds))
+        observe?(.hourlyQuery(HourlyRecurrenceQueryPlan(
+            anchor: anchor,
+            range: range,
+            stepSeconds: step,
+            firstIndex: firstIndex,
+            firstInstant: firstInstant
+        )))
 
         return AnySequence {
             var nextSeconds: Int64? = firstSeconds
@@ -195,6 +232,7 @@ public struct FoundationRecurrenceEngine: Sendable {
                     nextSeconds = nil
                     return nil
                 }
+                observe?(.candidate(date))
                 let (following, overflow) = seconds.addingReportingOverflow(step)
                 nextSeconds = overflow ? nil : following
                 return occurrence(at: date, calendar: calendar, timeZone: timeZone)
@@ -345,6 +383,21 @@ public struct FoundationRecurrenceEngine: Sendable {
         case .saturday: .saturday
         case .sunday: .sunday
         }
+    }
+
+    private func candidateIsValid(
+        _ date: Date,
+        mapping: RecurrenceMapping,
+        calendar: Calendar
+    ) -> Bool {
+        let year = calendar.component(.year, from: date)
+        guard (1...9_999).contains(year) else { return false }
+        guard let fixedDate = mapping.fixedYearlyDate else { return true }
+        return SourceWallClockResolver.isValidGregorianDate(
+            year: year,
+            month: fixedDate.month,
+            day: fixedDate.day
+        )
     }
 
     private func anchorMatches(
