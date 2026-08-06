@@ -1,6 +1,8 @@
 import Foundation
 
 public enum LogicalNotificationRequestValidationError: Error, Sendable, Equatable {
+    case reminderIDMismatch
+    case invalidSchedule
     case invalidContributingGroups
     case contributorIdentityMismatch
     case duplicateContributors
@@ -30,10 +32,11 @@ public struct LogicalNotificationRequestValidator: Sendable {
         for reminder: ReminderSnapshot,
         context: LogicalNotificationRequestValidationContext
     ) throws {
-        guard request.reminderID == reminder.id,
-              case let .valid(schedule, _, _) = reminder.schedule
-        else {
-            throw LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable
+        guard request.reminderID == reminder.id else {
+            throw LogicalNotificationRequestValidationError.reminderIDMismatch
+        }
+        guard case let .valid(schedule, _, _) = reminder.schedule else {
+            throw LogicalNotificationRequestValidationError.invalidSchedule
         }
         guard !request.contributingGroupIDs.isEmpty,
               request.contributingGroupIDs.allSatisfy({

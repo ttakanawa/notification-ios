@@ -289,6 +289,10 @@ public struct NotificationRequestMaterializer: Sendable {
         for error: LogicalNotificationRequestValidationError
     ) -> NotificationRequestMaterializationError {
         switch error {
+        case .reminderIDMismatch:
+            .reminderIDMismatch
+        case .invalidSchedule:
+            .invalidSchedule
         case .invalidContributingGroups:
             .invalidContributingGroups
         case .contributorIdentityMismatch:

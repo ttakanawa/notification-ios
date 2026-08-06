@@ -262,25 +262,70 @@ struct NotificationRequestMaterializerTests {
         #expect(original.notes == originalNotes)
     }
 
+    @Test func mapsMismatchedReminderIDForOneShotAndRepeatingRequests() throws {
+        let source = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
+        let requests = [
+            try oneShotRequest(),
+            repeatingRequest(components: source)
+        ]
+        let differentReminder = reminder(id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+
+        for request in requests {
+            #expect(throws: NotificationRequestMaterializationError.reminderIDMismatch) {
+                try testMaterializer().materialize(
+                    request,
+                    input: MaterializationInput(
+                        reminder: differentReminder,
+                        locale: Locale(identifier: "en_US")
+                    )
+                )
+            }
+        }
+    }
+
+    @Test func mapsInvalidScheduleStatesForOneShotAndRepeatingRequests() throws {
+        let source = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
+        let requests = [
+            try oneShotRequest(),
+            repeatingRequest(components: source)
+        ]
+        let invalidSchedules: [ScheduleReadState] = [
+            .unsupportedFuture(version: 2, originalData: Data([2])),
+            .corrupt(originalData: Data([0])),
+            .domainInvalid(
+                repairSeed: ScheduleRepairSeed(),
+                originalData: Data([1]),
+                issues: [.invalidTimeZone]
+            )
+        ]
+
+        for request in requests {
+            for invalidSchedule in invalidSchedules {
+                #expect(throws: NotificationRequestMaterializationError.invalidSchedule) {
+                    try testMaterializer().materialize(
+                        request,
+                        input: MaterializationInput(
+                            reminder: reminder(schedule: invalidSchedule),
+                            locale: Locale(identifier: "en_US")
+                        )
+                    )
+                }
+            }
+        }
+    }
+
     @Test func invalidInputsHavePreciseMaterializationErrors() throws {
         let validOneShot = try oneShotRequest()
-        let differentReminder = reminder(id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
-        #expect(throws: NotificationRequestMaterializationError.reminderIDMismatch) {
-            try testMaterializer().materialize(
-                validOneShot,
-                input: MaterializationInput(reminder: differentReminder, locale: Locale(identifier: "en_US"))
-            )
-        }
-
-        #expect(throws: NotificationRequestMaterializationError.invalidSchedule) {
-            try testMaterializer().materialize(
-                validOneShot,
-                input: MaterializationInput(
-                    reminder: reminder(schedule: .corrupt(originalData: Data([0]))),
-                    locale: Locale(identifier: "en_US")
-                )
-            )
-        }
 
         let wrongIdentifier = LogicalNotificationRequest(
             identifier: "notification-manager.local.v1.o.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa.0",

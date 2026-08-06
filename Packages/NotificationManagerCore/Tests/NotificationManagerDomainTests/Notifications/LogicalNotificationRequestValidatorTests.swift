@@ -4,6 +4,63 @@ import Testing
 
 @Suite("Notifications.LogicalNotificationRequestValidator")
 struct LogicalNotificationRequestValidatorTests {
+    @Test func rejectsMismatchedReminderIDForOneShotAndRepeatingRequests() throws {
+        let source = repeatingComponents(hour: 9, minute: 30)
+        let requests = [
+            oneShotRequest(),
+            repeatingRequest(
+                components: source,
+                contributors: [RepeatingTriggerContributor(
+                    kind: .main,
+                    sourceComponents: source
+                )]
+            )
+        ]
+        let differentReminder = reminder(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        )
+
+        for request in requests {
+            #expect(throws: LogicalNotificationRequestValidationError.reminderIDMismatch) {
+                try validator.validate(request, for: differentReminder)
+            }
+        }
+    }
+
+    @Test func rejectsInvalidScheduleStatesForOneShotAndRepeatingRequests() throws {
+        let source = repeatingComponents(hour: 9, minute: 30)
+        let requests = [
+            oneShotRequest(),
+            repeatingRequest(
+                components: source,
+                contributors: [RepeatingTriggerContributor(
+                    kind: .main,
+                    sourceComponents: source
+                )]
+            )
+        ]
+        let invalidSchedules: [ScheduleReadState] = [
+            .unsupportedFuture(version: 2, originalData: Data([2])),
+            .corrupt(originalData: Data([0])),
+            .domainInvalid(
+                repairSeed: ScheduleRepairSeed(),
+                originalData: Data([1]),
+                issues: [.invalidTimeZone]
+            )
+        ]
+
+        for request in requests {
+            for invalidSchedule in invalidSchedules {
+                #expect(throws: LogicalNotificationRequestValidationError.invalidSchedule) {
+                    try validator.validate(
+                        request,
+                        for: reminder(schedule: invalidSchedule)
+                    )
+                }
+            }
+        }
+    }
+
     @Test func acceptsExactOneShotReasonAndContributorIdentities() throws {
         try validator.validate(oneShotRequest(), for: schedule())
 
@@ -364,6 +421,27 @@ struct LogicalNotificationRequestValidatorTests {
         ))
     }
 
+    private func reminder(
+        id: UUID? = nil,
+        schedule scheduleState: ScheduleReadState? = nil
+    ) -> ReminderSnapshot {
+        ReminderSnapshot(
+            id: id ?? reminderID,
+            title: "Validation fixture",
+            notes: nil,
+            urlString: nil,
+            enabled: true,
+            schedule: scheduleState ?? .valid(
+                schedule(),
+                sourceVersion: 1,
+                originalData: Data([1])
+            ),
+            tagIDs: [],
+            createdAt: date("2040-08-31T13:30:00Z"),
+            updatedAt: date("2040-08-31T13:30:00Z")
+        )
+    }
+
     private func mainReason() -> EffectiveAlert {
         let base = baseOccurrence("2040-08-31T13:30:00Z", day: 31)
         return EffectiveAlert(kind: .main, baseOccurrence: base, alertInstant: base.instant)
@@ -469,6 +547,20 @@ private struct FixedValidationHarness {
             createdAt: evaluationNow,
             updatedAt: evaluationNow
         )
+        try LogicalNotificationRequestValidator().validate(
+            request,
+            for: reminder,
+            context: LogicalNotificationRequestValidationContext(
+                evaluationNow: evaluationNow,
+                recurrenceEnvironment: recurrenceEnvironment
+            )
+        )
+    }
+
+    func validate(
+        _ request: LogicalNotificationRequest,
+        for reminder: ReminderSnapshot
+    ) throws {
         try LogicalNotificationRequestValidator().validate(
             request,
             for: reminder,
