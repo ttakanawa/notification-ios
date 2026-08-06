@@ -321,6 +321,145 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
+    @Test func failedSecondToggleCannotRestorePriorOverrideInvalidatedByPublication() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let action = SequentialEnabledFailureAction()
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in try await action.execute(command) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        #expect(await coordinator.setEnabled(
+            true,
+            for: id,
+            fallback: model.items[0].enabled
+        ))
+        let secondToggle = Task { @MainActor in
+            await coordinator.setEnabled(false, for: id, fallback: model.items[0].enabled)
+        }
+        await action.waitUntilSecondCall()
+
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+
+        await action.failSecondCall()
+
+        #expect(!(await secondToggle.value))
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+        #expect(coordinator.state == .failed(id, .enabledChange))
+    }
+
+    @MainActor
+    @Test func cancelledSecondToggleCannotRestorePriorOverrideInvalidatedByPublication() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let warning = CapacityWarning(
+            reminderID: id,
+            earliestGroupID: AlertGroupID(
+                reminderID: id,
+                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
+            ),
+            planningCapacity: 60
+        )
+        let recorder = EnabledOutcomeRecorder(outcomes: [
+            .saved(id),
+            .requiresCapacityConfirmation(warning)
+        ])
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in try await recorder.execute(command) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        #expect(await coordinator.setEnabled(
+            true,
+            for: id,
+            fallback: model.items[0].enabled
+        ))
+        #expect(!(await coordinator.setEnabled(
+            false,
+            for: id,
+            fallback: model.items[0].enabled
+        )))
+        #expect(coordinator.state == .requiresCapacityConfirmation(id, false, warning))
+
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
+        coordinator.cancelEnabledCapacityChange(id)
+
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+        #expect(coordinator.state == .idle)
+    }
+
+    @MainActor
+    @Test func failedSecondToggleRestoresPriorOverrideWithoutNewerPublication() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let recorder = EnabledOutcomeRecorder(outcomes: [.saved(id)])
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in try await recorder.execute(command) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        #expect(await coordinator.setEnabled(
+            true,
+            for: id,
+            fallback: model.items[0].enabled
+        ))
+        #expect(!(await coordinator.setEnabled(
+            false,
+            for: id,
+            fallback: model.items[0].enabled
+        )))
+
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+        #expect(coordinator.state == .failed(id, .enabledChange))
+    }
+
+    @MainActor
     @Test func newerEqualValuedPublicationClearsCompletedOptimisticOverride() async {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let authoritativeDisabled = ReminderListItemPresentation.fixture(
@@ -989,6 +1128,40 @@ private actor SuspendedEnabledOutcomeAction {
     func resolve(_ outcome: SaveReminderOutcome) {
         resultContinuation?.resume(returning: outcome)
         resultContinuation = nil
+    }
+}
+
+private actor SequentialEnabledFailureAction {
+    private var commands: [SetReminderEnabledCommand] = []
+    private var secondCallStarted = false
+    private var secondCallWaiters: [CheckedContinuation<Void, Never>] = []
+    private var failureContinuation: CheckedContinuation<Void, Never>?
+
+    func execute(_ command: SetReminderEnabledCommand) async throws -> SaveReminderOutcome {
+        commands.append(command)
+        if commands.count == 1 {
+            return .saved(command.reminderID)
+        }
+        secondCallStarted = true
+        let waiters = secondCallWaiters
+        secondCallWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            failureContinuation = continuation
+        }
+        throw ReminderManagementActionProbeError.failed
+    }
+
+    func waitUntilSecondCall() async {
+        guard !secondCallStarted else { return }
+        await withCheckedContinuation { continuation in
+            secondCallWaiters.append(continuation)
+        }
+    }
+
+    func failSecondCall() {
+        failureContinuation?.resume()
+        failureContinuation = nil
     }
 }
 

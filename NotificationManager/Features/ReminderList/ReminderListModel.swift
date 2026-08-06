@@ -250,7 +250,20 @@ final class ReminderActionCoordinator {
         previousOverride: EnabledOverride?
     ) {
         guard enabledOverrides[id]?.generation == generation else { return }
-        enabledOverrides[id] = previousOverride
+        enabledOverrides[id] = restorablePreviousOverride(previousOverride)
+    }
+
+    private func restorablePreviousOverride(
+        _ previousOverride: EnabledOverride?
+    ) -> EnabledOverride? {
+        guard let previousOverride else { return nil }
+        guard previousOverride.isCompleted, let latestSnapshotGeneration else {
+            return previousOverride
+        }
+        guard let completionGeneration = previousOverride.completionSnapshotGeneration else {
+            return nil
+        }
+        return latestSnapshotGeneration > completionGeneration ? nil : previousOverride
     }
 
     private var isBusy: Bool {
