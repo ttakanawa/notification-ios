@@ -1,3 +1,5 @@
+import Foundation
+
 public enum LifecycleStatus: Sendable, Equatable {
     case updateRequired
     case invalidSchedule
@@ -22,17 +24,33 @@ public struct ReminderStatusCalculator: Sendable {
     public func status(
         schedule: ScheduleReadState,
         enabled: Bool,
-        hasFutureAlert: Bool
+        after evaluationNow: Date,
+        environment: any RecurrenceEnvironment
     ) -> ReminderStatus {
         var statuses: [LifecycleStatus] = []
+        let hasFutureAlert: Bool
 
         switch schedule {
         case .unsupportedFuture:
             statuses.append(.updateRequired)
+            hasFutureAlert = false
         case .corrupt, .domainInvalid:
             statuses.append(.invalidSchedule)
-        case .valid:
-            break
+            hasFutureAlert = false
+        case let .valid(definition, _, _):
+            do {
+                let result = try NextNotificationProvider().nextPhysicalNotifications(
+                    for: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),
+                    schedule: definition,
+                    after: evaluationNow,
+                    limit: 1,
+                    environment: environment
+                )
+                hasFutureAlert = !result.notifications.isEmpty
+            } catch {
+                statuses.append(.invalidSchedule)
+                hasFutureAlert = false
+            }
         }
 
         if !enabled {
