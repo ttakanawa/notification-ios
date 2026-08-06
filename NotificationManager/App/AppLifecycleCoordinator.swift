@@ -1,0 +1,156 @@
+import CoreData
+import Foundation
+import NotificationManagerApplication
+#if canImport(UIKit)
+import UIKit
+#endif
+
+enum AppLifecycleTrigger: Sendable, Equatable {
+    case launch
+    case foreground
+    case background
+    case backgroundRefresh
+    case notificationPresentationCompleted
+    case notificationResponseCompleted
+    case modelSnapshotChanged
+    case significantTimeChanged
+    case timeZoneChanged
+    case localeChanged
+    case authorizationOrPreferenceChanged
+}
+
+struct AppLifecycleNotificationNames: Sendable {
+    let significantTimeChanged: Notification.Name
+    let timeZoneChanged: Notification.Name
+    let localeChanged: Notification.Name
+    let modelImported: Notification.Name
+
+    static let system = AppLifecycleNotificationNames(
+        significantTimeChanged: platformSignificantTimeChangeNotification,
+        timeZoneChanged: .NSSystemTimeZoneDidChange,
+        localeChanged: NSLocale.currentLocaleDidChangeNotification,
+        modelImported: .NSPersistentStoreRemoteChange
+    )
+
+    private static var platformSignificantTimeChangeNotification: Notification.Name {
+        #if canImport(UIKit)
+        UIApplication.significantTimeChangeNotification
+        #else
+        Notification.Name("notification-manager.significant-time-change")
+        #endif
+    }
+}
+
+@MainActor
+final class AppLifecycleCoordinator {
+    typealias Reconcile = @Sendable (ReconcileReason) async -> Void
+    typealias AsyncAction = @Sendable () async -> Void
+
+    private let eligibilityIndexStore: ForegroundEligibilityIndexStore
+    private let notificationCenter: NotificationCenter
+    private let notificationNames: AppLifecycleNotificationNames
+    private let requestReconcile: Reconcile
+    private let enterBackgroundAction: AsyncAction
+    private let refreshDeviceState: AsyncAction
+    private let refreshModelSnapshot: AsyncAction
+    private var observerTokens: [NSObjectProtocol] = []
+
+    init(
+        eligibilityIndexStore: ForegroundEligibilityIndexStore,
+        notificationCenter: NotificationCenter = .default,
+        notificationNames: AppLifecycleNotificationNames = .system,
+        requestReconcile: @escaping Reconcile,
+        enterBackground: @escaping AsyncAction,
+        refreshDeviceState: @escaping AsyncAction = {},
+        refreshModelSnapshot: @escaping AsyncAction = {}
+    ) {
+        self.eligibilityIndexStore = eligibilityIndexStore
+        self.notificationCenter = notificationCenter
+        self.notificationNames = notificationNames
+        self.requestReconcile = requestReconcile
+        enterBackgroundAction = enterBackground
+        self.refreshDeviceState = refreshDeviceState
+        self.refreshModelSnapshot = refreshModelSnapshot
+    }
+
+    func handle(_ trigger: AppLifecycleTrigger) async {
+        switch trigger {
+        case .launch, .foreground:
+            eligibilityIndexStore.markStale()
+            await refreshDeviceState()
+            await refreshModelSnapshot()
+            await requestReconcile(.foreground)
+        case .background:
+            await enterBackgroundAction()
+        case .backgroundRefresh:
+            await enterBackgroundAction()
+            eligibilityIndexStore.markStale()
+            await refreshModelSnapshot()
+            await requestReconcile(.modelChanged)
+        case .notificationPresentationCompleted, .notificationResponseCompleted:
+            await requestReconcile(.foreground)
+        case .modelSnapshotChanged, .significantTimeChanged, .timeZoneChanged,
+             .localeChanged:
+            eligibilityIndexStore.markStale()
+            await refreshModelSnapshot()
+            await requestReconcile(.modelChanged)
+        case .authorizationOrPreferenceChanged:
+            eligibilityIndexStore.markStale()
+            await refreshDeviceState()
+            await refreshModelSnapshot()
+            await requestReconcile(.deviceSettingsChanged)
+        }
+    }
+
+    /// Executes reconciliation when the operating system has already granted background time.
+    /// This entry point does not schedule work or promise that iOS will launch the process.
+    func backgroundRefresh() async {
+        await handle(.backgroundRefresh)
+    }
+
+    func startObservingSystemChanges() {
+        guard observerTokens.isEmpty else { return }
+        observe(notificationNames.significantTimeChanged, trigger: .significantTimeChanged)
+        observe(notificationNames.timeZoneChanged, trigger: .timeZoneChanged)
+        observe(notificationNames.localeChanged, trigger: .localeChanged)
+        observe(notificationNames.modelImported, trigger: .modelSnapshotChanged)
+    }
+
+    func stopObservingSystemChanges() {
+        observerTokens.forEach(notificationCenter.removeObserver)
+        observerTokens.removeAll()
+    }
+
+    private func observe(
+        _ name: Notification.Name,
+        trigger: AppLifecycleTrigger
+    ) {
+        observerTokens.append(notificationCenter.addObserver(
+            forName: name,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                await self?.handle(trigger)
+            }
+        })
+    }
+}
+
+@MainActor
+final class ModelImportChangeObserver<Fingerprint: Equatable & Sendable> {
+    typealias ChangeHandler = @MainActor @Sendable () async -> Void
+
+    private let changeHandler: ChangeHandler
+    private var previousFingerprint: Fingerprint?
+
+    init(changeHandler: @escaping ChangeHandler) {
+        self.changeHandler = changeHandler
+    }
+
+    func observe(_ fingerprint: Fingerprint) async {
+        guard previousFingerprint != fingerprint else { return }
+        previousFingerprint = fingerprint
+        await changeHandler()
+    }
+}

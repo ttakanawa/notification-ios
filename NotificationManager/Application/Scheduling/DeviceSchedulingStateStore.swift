@@ -21,6 +21,7 @@ public struct DeviceSchedulingStateSnapshot: Sendable, Equatable {
     public let outcomes: [AlertGroupID: AlertGroupSchedulingOutcome]
     public let scheduledThrough: [UUID: Date]
     public let materializedKinds: [String: MaterializedNotificationKind]
+    public let nextTriggerDates: [String: Date]
     public let pendingOrAddedIdentifiers: Set<String>
 
     public init(
@@ -32,6 +33,7 @@ public struct DeviceSchedulingStateSnapshot: Sendable, Equatable {
         outcomes: [AlertGroupID: AlertGroupSchedulingOutcome],
         scheduledThrough: [UUID: Date],
         materializedKinds: [String: MaterializedNotificationKind],
+        nextTriggerDates: [String: Date] = [:],
         pendingOrAddedIdentifiers: Set<String>
     ) {
         self.generation = generation
@@ -42,6 +44,7 @@ public struct DeviceSchedulingStateSnapshot: Sendable, Equatable {
         self.outcomes = outcomes
         self.scheduledThrough = scheduledThrough
         self.materializedKinds = materializedKinds
+        self.nextTriggerDates = nextTriggerDates
         self.pendingOrAddedIdentifiers = pendingOrAddedIdentifiers
     }
 }
@@ -59,12 +62,28 @@ public actor DeviceSchedulingStateStore {
         outcomes: [:],
         scheduledThrough: [:],
         materializedKinds: [:],
+        nextTriggerDates: [:],
         pendingOrAddedIdentifiers: []
     )
+    private var updateContinuations: [
+        UUID: AsyncStream<DeviceSchedulingStateSnapshot>.Continuation
+    ] = [:]
 
     public init() {}
 
     public func snapshot() -> DeviceSchedulingStateSnapshot { current }
+
+    public func updates() -> AsyncStream<DeviceSchedulingStateSnapshot> {
+        let identifier = UUID()
+        let initial = current
+        return AsyncStream(bufferingPolicy: .bufferingNewest(1)) { continuation in
+            updateContinuations[identifier] = continuation
+            continuation.yield(initial)
+            continuation.onTermination = { @Sendable [weak self] _ in
+                Task { await self?.removeUpdateContinuation(identifier) }
+            }
+        }
+    }
 
     public func outcome(for groupID: AlertGroupID) -> AlertGroupSchedulingOutcome? {
         current.outcomes[groupID]
@@ -80,8 +99,10 @@ public actor DeviceSchedulingStateStore {
             outcomes: current.outcomes,
             scheduledThrough: current.scheduledThrough,
             materializedKinds: current.materializedKinds,
+            nextTriggerDates: current.nextTriggerDates,
             pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers
         )
+        publishUpdate()
     }
 
     func publishFailure(_ failure: SchedulingGlobalFailure) {
@@ -94,8 +115,10 @@ public actor DeviceSchedulingStateStore {
             outcomes: current.outcomes,
             scheduledThrough: current.scheduledThrough,
             materializedKinds: current.materializedKinds,
+            nextTriggerDates: current.nextTriggerDates,
             pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers
         )
+        publishUpdate()
     }
 
     func publish(
@@ -104,6 +127,7 @@ public actor DeviceSchedulingStateStore {
         outcomes: [AlertGroupID: AlertGroupSchedulingOutcome],
         scheduledThrough: [UUID: Date],
         materializedKinds: [String: MaterializedNotificationKind],
+        nextTriggerDates: [String: Date],
         pendingOrAddedIdentifiers: Set<String>
     ) {
         current = DeviceSchedulingStateSnapshot(
@@ -115,8 +139,19 @@ public actor DeviceSchedulingStateStore {
             outcomes: outcomes,
             scheduledThrough: scheduledThrough,
             materializedKinds: materializedKinds,
+            nextTriggerDates: nextTriggerDates,
             pendingOrAddedIdentifiers: pendingOrAddedIdentifiers
         )
+        publishUpdate()
     }
 
+    private func publishUpdate() {
+        for continuation in updateContinuations.values {
+            continuation.yield(current)
+        }
+    }
+
+    private func removeUpdateContinuation(_ identifier: UUID) {
+        updateContinuations.removeValue(forKey: identifier)
+    }
 }

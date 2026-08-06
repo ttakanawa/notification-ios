@@ -301,6 +301,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
         var crossedBoundary = false
         var successfulAdds: Set<String> = []
+        var inspectedNextTriggerDates: [String: Date] = [:]
         for value in materialized {
             let dispatchNow = clock.now()
             guard let inspection = triggerInspector(value.request) else {
@@ -318,11 +319,13 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
                     markError(value.logical.contributingGroupIDs, outcomes: &outcomes)
                     continue
                 }
+                inspectedNextTriggerDates[value.logical.identifier] = alertInstant
             case .repeating:
-                guard inspection.repeats, inspection.nextTriggerDate != nil else {
+                guard inspection.repeats, let nextTriggerDate = inspection.nextTriggerDate else {
                     markError(value.logical.contributingGroupIDs, outcomes: &outcomes)
                     continue
                 }
+                inspectedNextTriggerDates[value.logical.identifier] = nextTriggerDate
             }
 
             do {
@@ -334,12 +337,16 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         }
 
         let pendingDesired = Set(pending.map(\.identifier)).intersection(desiredIdentifiers)
+        let publishedNextTriggerDates = inspectedNextTriggerDates.filter {
+            successfulAdds.contains($0.key)
+        }
         await stateStore.publish(
             deviceNotificationsEnabled: deviceEnabled,
             authorization: authorization,
             outcomes: outcomes,
             scheduledThrough: logicalPlan.scheduledThrough,
             materializedKinds: materializedKinds,
+            nextTriggerDates: publishedNextTriggerDates,
             pendingOrAddedIdentifiers: pendingDesired.union(successfulAdds)
         )
 

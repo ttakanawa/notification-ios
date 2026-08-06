@@ -11,6 +11,7 @@ enum AppRouterDestination: Sendable, Hashable {
     case reminderEdit(UUID)
     case reminderCreate(UUID)
     case settings
+    case notificationUnavailable
 }
 
 @MainActor
@@ -27,17 +28,20 @@ final class AppRouter {
     private var detailsByID: [UUID: ReminderDetailModel] = [:]
     private var formsByID: [UUID: ReminderFormModel] = [:]
     @ObservationIgnored private let createForm: @MainActor () -> ReminderFormModel?
+    @ObservationIgnored private let reminderSaved: @MainActor @Sendable (UUID) async -> Void
 
     init(
         actions: ReminderActionCoordinator,
         notificationSettingsModel: NotificationSettingsModel? = nil,
         tagManagementModel: TagManagementModel? = nil,
-        createForm: @escaping @MainActor () -> ReminderFormModel? = { nil }
+        createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
+        reminderSaved: @escaping @MainActor @Sendable (UUID) async -> Void = { _ in }
     ) {
         self.actions = actions
         self.notificationSettingsModel = notificationSettingsModel
         self.tagManagementModel = tagManagementModel
         self.createForm = createForm
+        self.reminderSaved = reminderSaved
     }
 
     func register(detail: ReminderDetailModel) {
@@ -46,6 +50,11 @@ final class AppRouter {
 
     func register(form: ReminderFormModel) {
         formsByID[form.detachedDraft.id] = form
+    }
+
+    func registerFormIfAbsent(_ form: ReminderFormModel) {
+        guard formsByID[form.detachedDraft.id] == nil else { return }
+        register(form: form)
     }
 
     func detailModel(for reminderID: UUID) -> ReminderDetailModel? {
@@ -72,7 +81,13 @@ final class AppRouter {
     }
 
     func showSettings() {
+        selectedReminderID = nil
         route(to: .settings)
+    }
+
+    func showNotificationUnavailable() {
+        selectedReminderID = nil
+        route(to: .notificationUnavailable)
     }
 
     func setCompactPathFromSystem(_ path: [AppRouterDestination]) {
@@ -107,6 +122,7 @@ final class AppRouter {
     ) async -> Bool {
         guard await operation() else { return false }
         reminderFormWasSaved(reminderID)
+        await reminderSaved(reminderID)
         return true
     }
 
@@ -148,7 +164,7 @@ private extension AppRouterDestination {
         switch self {
         case let .reminderDetail(id), let .reminderEdit(id), let .reminderCreate(id):
             id
-        case .settings:
+        case .settings, .notificationUnavailable:
             nil
         }
     }
@@ -159,7 +175,7 @@ private extension AppRouterDestination {
             nil
         case let .reminderEdit(id), let .reminderCreate(id):
             id
-        case .settings:
+        case .settings, .notificationUnavailable:
             nil
         }
     }

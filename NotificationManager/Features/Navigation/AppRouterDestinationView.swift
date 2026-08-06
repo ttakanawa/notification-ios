@@ -35,6 +35,8 @@ struct AppRouterDestinationView: View {
                 } else {
                     unavailable
                 }
+            case .notificationUnavailable:
+                NotificationNoLongerAvailableView()
             case nil:
                 ContentUnavailableView(
                     "reminder.navigation.select.title",
