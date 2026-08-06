@@ -33,6 +33,7 @@ public struct ResolvedCustomRepeat: Sendable, Equatable {
 
 public enum CustomRepeatResolution: Sendable, Equatable {
     case resolved(ResolvedCustomRepeat)
+    case suggested(String)
     case failed(CustomRepeatResolutionError)
 
     public var isValid: Bool {
@@ -70,8 +71,10 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
         switch EnglishRepeatParser().parse(input) {
         case let .success(candidate):
             return validate(candidate, route: .deterministicEnglish)
-        case .failure:
-            break
+        case let .failure(failure):
+            if let suggestion = failure.suggestion {
+                return .suggested(suggestion)
+            }
         }
 
         switch await assistedInterpreter.availability() {

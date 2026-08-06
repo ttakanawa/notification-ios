@@ -25,6 +25,31 @@ struct CustomRepeatInputResolverTests {
         #expect(await assisted.events.isEmpty)
     }
 
+    @Test func deterministicEnglishSuggestionWaitsForExplicitSelection() async throws {
+        let assisted = AssistedRepeatInterpreterSpy(
+            availability: .available,
+            candidate: .daily
+        )
+        let resolver = makeResolver(assisted: assisted)
+
+        let resolution = await resolver.resolve("Every Tuseday")
+
+        #expect(resolution == .suggested("Every Tuesday"))
+        #expect(await assisted.events.isEmpty)
+
+        let session = CustomRepeatSession(
+            resolver: resolver,
+            reminderID: UUID(uuidString: "13131313-1313-1313-1313-131313131313")!,
+            now: { Self.previewNow },
+            recurrenceEnvironment: FoundationRecurrenceEnvironment()
+        )
+
+        let outcome = try await session.submit("Every Tuseday")
+
+        #expect(outcome == .applied(.awaitingSuggestion("Every Tuesday")))
+        #expect(await session.confirm() == nil)
+    }
+
     @Test func parserFailureChecksAvailabilityBeforeInterpretation() async {
         let assisted = AssistedRepeatInterpreterSpy(
             availability: .available,

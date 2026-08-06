@@ -23,6 +23,7 @@ public struct CustomRepeatPreview: Sendable, Equatable {
 public enum CustomRepeatSessionState: Sendable, Equatable {
     case idle
     case failed(CustomRepeatResolutionError)
+    case awaitingSuggestion(String)
     case awaitingConfirmation(CustomRepeatPreview)
     case confirmed(CustomRepeatPreview)
 }
@@ -72,6 +73,8 @@ public actor CustomRepeatSession {
         switch resolution {
         case let .failed(error):
             state = .failed(error)
+        case let .suggested(suggestion):
+            state = .awaitingSuggestion(suggestion)
         case let .resolved(resolved):
             do {
                 let nextNotifications = try NextNotificationProvider().nextPhysicalNotifications(
