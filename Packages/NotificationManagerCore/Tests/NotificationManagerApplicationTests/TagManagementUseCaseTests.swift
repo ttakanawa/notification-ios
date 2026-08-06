@@ -24,6 +24,7 @@ struct TagManagementUseCaseTests {
         #expect(tag.normalizationVersion == TagLimits.normalizationVersion)
         #expect(tag.createdAt == testDate("2026-08-06T12:00:00Z"))
         #expect(tag.updatedAt == testDate("2026-08-06T12:00:00Z"))
+        #expect(await repository.savedTagMutations.map(\.command) == [.create])
     }
 
     @Test func createRejectsANameWhoseNormalizedIdentityIsEmpty() async throws {
@@ -83,6 +84,7 @@ struct TagManagementUseCaseTests {
         #expect(renamed.updatedAt == testDate("2026-08-06T12:30:00Z"))
         #expect(renamed.name == "Trips")
         #expect(renamed.normalizedName == "trips")
+        #expect(await repository.savedTagMutations.map(\.command) == [.update])
     }
 
     @Test func renameRejectsADuplicateThroughTheRepositoryCriticalSection() async throws {
@@ -125,6 +127,30 @@ struct TagManagementUseCaseTests {
         #expect(await repository.savedTagMutations.isEmpty)
     }
 
+    @Test func renameDoesNotResurrectATagDeletedAfterItsFreshFetch() async throws {
+        let existing = tagSnapshot(
+            id: TestApplicationValues.tagID,
+            name: "Travel",
+            normalizedName: "travel"
+        )
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(reminders: [], tags: [existing]),
+            deleteTagBeforeNextSaveID: existing.id
+        )
+        let useCase = TagManagementUseCase(
+            repository: repository,
+            normalizer: FixedTagNormalizer(result: .success("trips")),
+            now: { testDate("2026-08-06T12:30:00Z") }
+        )
+
+        await #expect(throws: RepositoryTestError.tagNotFound(existing.id)) {
+            try await useCase.rename(tagID: existing.id, name: "Trips")
+        }
+
+        #expect(await repository.storedTag(id: existing.id) == nil)
+        #expect(await repository.savedTagMutations.isEmpty)
+    }
+
     @Test func deleteRemovesOnlyTheTagAggregate() async throws {
         let existing = tagSnapshot(
             id: TestApplicationValues.tagID,
@@ -133,7 +159,8 @@ struct TagManagementUseCaseTests {
         )
         let reminder = reminderSnapshot(
             id: TestApplicationValues.reminderID,
-            schedule: oneShotSchedule("2026-08-07T12:00:00Z")
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
+            tagIDs: [existing.id]
         )
         let repository = InMemoryReminderRepository(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: [existing])
@@ -147,7 +174,11 @@ struct TagManagementUseCaseTests {
         try await useCase.delete(tagID: existing.id)
 
         #expect(await repository.storedTag(id: existing.id) == nil)
-        #expect(try await repository.reminder(id: reminder.id) == reminder)
+        let updatedReminder = try #require(await repository.reminder(id: reminder.id))
+        #expect(updatedReminder.id == reminder.id)
+        #expect(updatedReminder.title == reminder.title)
+        #expect(updatedReminder.schedule == reminder.schedule)
+        #expect(updatedReminder.tagIDs.isEmpty)
     }
 }
 

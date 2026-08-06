@@ -1,16 +1,22 @@
 import Foundation
 import NotificationManagerDomain
 
+public enum ReminderMutationCommand: Sendable, Equatable {
+    case create(scheduleData: Data)
+    case updateMetadataPreservingCurrentSchedule
+    case replaceSchedule(scheduleData: Data)
+}
+
 public struct EncodedReminderMutation: Sendable, Equatable {
     public let id: UUID
     public let title: String
     public let notes: String?
     public let urlString: String?
     public let enabled: Bool
-    public let scheduleData: Data
     public let tagIDs: Set<UUID>
     public let createdAt: Date
     public let updatedAt: Date
+    public let command: ReminderMutationCommand
 
     public init(
         id: UUID,
@@ -18,35 +24,43 @@ public struct EncodedReminderMutation: Sendable, Equatable {
         notes: String?,
         urlString: String?,
         enabled: Bool,
-        scheduleData: Data,
         tagIDs: Set<UUID>,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        command: ReminderMutationCommand
     ) {
         self.id = id
         self.title = title
         self.notes = notes
         self.urlString = urlString
         self.enabled = enabled
-        self.scheduleData = scheduleData
         self.tagIDs = tagIDs
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.command = command
     }
 
-    public init(_ aggregate: ValidatedReminderAggregate) {
+    public init(
+        _ aggregate: ValidatedReminderAggregate,
+        command: ReminderMutationCommand
+    ) {
         self.init(
             id: aggregate.id,
             title: aggregate.title,
             notes: aggregate.notes,
             urlString: aggregate.urlString,
             enabled: aggregate.enabled,
-            scheduleData: aggregate.scheduleData,
             tagIDs: aggregate.tagIDs,
             createdAt: aggregate.createdAt,
-            updatedAt: aggregate.updatedAt
+            updatedAt: aggregate.updatedAt,
+            command: command
         )
     }
+}
+
+public enum TagMutationCommand: Sendable, Equatable {
+    case create
+    case update
 }
 
 public struct EncodedTagMutation: Sendable, Equatable {
@@ -56,6 +70,7 @@ public struct EncodedTagMutation: Sendable, Equatable {
     public let normalizationVersion: String
     public let createdAt: Date
     public let updatedAt: Date
+    public let command: TagMutationCommand
 
     public init(
         id: UUID,
@@ -63,7 +78,8 @@ public struct EncodedTagMutation: Sendable, Equatable {
         normalizedName: String,
         normalizationVersion: String,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        command: TagMutationCommand
     ) {
         self.id = id
         self.name = name
@@ -71,6 +87,7 @@ public struct EncodedTagMutation: Sendable, Equatable {
         self.normalizationVersion = normalizationVersion
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.command = command
     }
 }
 

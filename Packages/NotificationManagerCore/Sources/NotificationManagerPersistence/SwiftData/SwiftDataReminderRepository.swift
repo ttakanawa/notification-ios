@@ -3,6 +3,11 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import SwiftData
 
+public enum ScheduleReplacementBlockedState: Sendable, Equatable {
+    case unsupportedFuture
+    case corrupt
+}
+
 public enum PersistenceError: Error, Sendable, Equatable {
     case diskFull
     case reminderNotFound(UUID)
@@ -10,7 +15,9 @@ public enum PersistenceError: Error, Sendable, Equatable {
     case duplicateReminderID(UUID)
     case duplicateTagID(UUID)
     case duplicateNormalizedTagName(String)
+    case invalidReminder(ReminderValidationIssue)
     case invalidTag(TagValidationIssue)
+    case scheduleReplacementNotAllowed(UUID, currentState: ScheduleReplacementBlockedState)
     case snapshotConsistencyUnavailable(attempts: Int)
     case storeFailure
 }
@@ -22,6 +29,7 @@ public enum PersistenceSaveFailure: Sendable {
 public actor SwiftDataReminderRepository: ReminderRepository {
     private let container: ModelContainer
     private let mapper: RecordMapper
+    private let scheduleCodec: any SchedulePayloadCoding
     private let tagNormalizer: TagNameNormalizerV1
     private let saveFailure: PersistenceSaveFailure?
     private let snapshotAttemptLimit: Int
@@ -35,6 +43,7 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         saveFailure: PersistenceSaveFailure? = nil
     ) {
         self.container = container
+        self.scheduleCodec = scheduleCodec
         mapper = RecordMapper(scheduleCodec: scheduleCodec)
         self.tagNormalizer = tagNormalizer
         self.saveFailure = saveFailure
@@ -53,6 +62,7 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     ) {
         precondition(snapshotAttemptLimit >= 2)
         self.container = container
+        self.scheduleCodec = scheduleCodec
         mapper = RecordMapper(scheduleCodec: scheduleCodec)
         self.tagNormalizer = tagNormalizer
         self.saveFailure = saveFailure
@@ -156,28 +166,65 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     private func saveCoordinated(_ mutation: EncodedReminderMutation) throws -> ReminderSnapshot {
         let context = makeContext()
         do {
-            let record = try fetchReminder(id: mutation.id, in: context) ?? ReminderRecordV1(
-                id: mutation.id,
-                title: mutation.title,
-                notes: mutation.notes,
-                urlString: mutation.urlString,
-                enabled: mutation.enabled,
-                scheduleData: mutation.scheduleData,
-                createdAt: mutation.createdAt,
-                updatedAt: mutation.updatedAt
+            let existing = try fetchReminder(id: mutation.id, in: context)
+            let record: ReminderRecordV1
+            let finalScheduleData: Data
+            switch mutation.command {
+            case let .create(scheduleData):
+                guard existing == nil else {
+                    throw PersistenceError.duplicateReminderID(mutation.id)
+                }
+                record = ReminderRecordV1(
+                    id: mutation.id,
+                    title: mutation.title,
+                    notes: mutation.notes,
+                    urlString: mutation.urlString,
+                    enabled: mutation.enabled,
+                    scheduleData: scheduleData,
+                    createdAt: mutation.createdAt,
+                    updatedAt: mutation.updatedAt
+                )
+                finalScheduleData = scheduleData
+            case .updateMetadataPreservingCurrentSchedule:
+                guard let existing else {
+                    throw PersistenceError.reminderNotFound(mutation.id)
+                }
+                record = existing
+                finalScheduleData = existing.scheduleData
+            case let .replaceSchedule(scheduleData):
+                guard let existing else {
+                    throw PersistenceError.reminderNotFound(mutation.id)
+                }
+                try requireReplaceableCurrentSchedule(
+                    existing.scheduleData,
+                    reminderID: mutation.id
+                )
+                record = existing
+                finalScheduleData = scheduleData
+            }
+
+            let validated = try validateFinalAggregate(
+                mutation,
+                scheduleData: finalScheduleData
             )
+            switch mutation.command {
+            case .create, .replaceSchedule:
+                try requireValidProposedSchedule(validated.scheduleData)
+            case .updateMetadataPreservingCurrentSchedule:
+                break
+            }
+
+            let tags = try resolveTags(ids: validated.tagIDs, in: context)
             if record.modelContext == nil {
                 context.insert(record)
             }
-
-            let tags = try resolveTags(ids: mutation.tagIDs, in: context)
-            record.title = mutation.title
-            record.notes = mutation.notes
-            record.urlString = mutation.urlString
-            record.enabled = mutation.enabled
-            record.scheduleData = mutation.scheduleData
-            record.createdAt = mutation.createdAt
-            record.updatedAt = mutation.updatedAt
+            record.title = validated.title
+            record.notes = validated.notes
+            record.urlString = validated.urlString
+            record.enabled = validated.enabled
+            record.scheduleData = validated.scheduleData
+            record.createdAt = validated.createdAt
+            record.updatedAt = validated.updatedAt
             record.tags = tags
 
             try injectSaveFailureIfNeeded()
@@ -228,22 +275,31 @@ public actor SwiftDataReminderRepository: ReminderRepository {
             try validateTag(mutation)
             let allTags = try context.fetch(FetchDescriptor<TagRecordV1>())
             try ensureUniqueTagIDs(allTags)
+            let matches = allTags.filter { $0.id == mutation.id }
+            guard matches.count <= 1 else { throw PersistenceError.duplicateTagID(mutation.id) }
+            let record: TagRecordV1
+            switch mutation.command {
+            case .create:
+                guard matches.isEmpty else { throw PersistenceError.duplicateTagID(mutation.id) }
+                record = TagRecordV1(
+                    id: mutation.id,
+                    name: mutation.name,
+                    normalizedName: mutation.normalizedName,
+                    normalizationVersion: mutation.normalizationVersion,
+                    createdAt: mutation.createdAt,
+                    updatedAt: mutation.updatedAt
+                )
+            case .update:
+                guard let existing = matches.first else {
+                    throw PersistenceError.tagNotFound(mutation.id)
+                }
+                record = existing
+            }
             if allTags.contains(where: {
                 $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
             }) {
                 throw PersistenceError.duplicateNormalizedTagName(mutation.normalizedName)
             }
-
-            let matches = allTags.filter { $0.id == mutation.id }
-            guard matches.count <= 1 else { throw PersistenceError.duplicateTagID(mutation.id) }
-            let record = matches.first ?? TagRecordV1(
-                id: mutation.id,
-                name: mutation.name,
-                normalizedName: mutation.normalizedName,
-                normalizationVersion: mutation.normalizationVersion,
-                createdAt: mutation.createdAt,
-                updatedAt: mutation.updatedAt
-            )
             if record.modelContext == nil {
                 context.insert(record)
             }
@@ -346,6 +402,55 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         }
         guard Self.isFiniteIntegralSecond(mutation.updatedAt) else {
             throw PersistenceError.invalidTag(.invalidUpdatedAt)
+        }
+    }
+
+    private func validateFinalAggregate(
+        _ mutation: EncodedReminderMutation,
+        scheduleData: Data
+    ) throws -> ValidatedReminderAggregate {
+        let draft = ReminderDraft(
+            id: mutation.id,
+            title: mutation.title,
+            notes: mutation.notes,
+            urlString: mutation.urlString,
+            enabled: mutation.enabled,
+            scheduleChange: .preserveOriginal,
+            originalScheduleData: scheduleData,
+            tagIDs: mutation.tagIDs,
+            createdAt: mutation.createdAt,
+            updatedAt: mutation.updatedAt
+        )
+        do {
+            return try ReminderAggregateValidator().validate(draft)
+        } catch let issue as ReminderValidationIssue {
+            throw PersistenceError.invalidReminder(issue)
+        }
+    }
+
+    private func requireReplaceableCurrentSchedule(
+        _ scheduleData: Data,
+        reminderID: UUID
+    ) throws {
+        switch scheduleCodec.decode(scheduleData) {
+        case .valid, .domainInvalid:
+            return
+        case .unsupportedFuture:
+            throw PersistenceError.scheduleReplacementNotAllowed(
+                reminderID,
+                currentState: .unsupportedFuture
+            )
+        case .corrupt:
+            throw PersistenceError.scheduleReplacementNotAllowed(
+                reminderID,
+                currentState: .corrupt
+            )
+        }
+    }
+
+    private func requireValidProposedSchedule(_ scheduleData: Data) throws {
+        guard case .valid = scheduleCodec.decode(scheduleData) else {
+            throw PersistenceError.invalidReminder(.invalidSchedule)
         }
     }
 

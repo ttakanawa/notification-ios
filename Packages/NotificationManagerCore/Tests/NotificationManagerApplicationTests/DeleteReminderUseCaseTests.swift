@@ -1,4 +1,5 @@
 import Foundation
+import NotificationManagerDomain
 import Testing
 @testable import NotificationManagerApplication
 
@@ -6,7 +7,14 @@ import Testing
 struct DeleteReminderUseCaseTests {
     @Test func persistsBeforeBestEffortNotificationCleanupAndReconcile() async throws {
         let trace = LockedApplicationTrace()
-        let repository = InMemoryReminderRepository(trace: trace)
+        let reminder = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z")
+        )
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+            trace: trace
+        )
         let cleanup = RecordingNotificationCleanup(trace: trace)
         let reconciler = RecordingReconcileRequester(trace: trace)
         let useCase = DeleteReminderUseCase(
@@ -47,7 +55,22 @@ struct DeleteReminderUseCaseTests {
     }
 
     @Test func deleteDoesNotNeedToDecodeAnOpaqueSchedule() async throws {
-        let repository = InMemoryReminderRepository()
+        let raw = Data([0xFF, 0x00, 0x7B])
+        let reminder = ReminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            title: "Imported",
+            notes: nil,
+            urlString: nil,
+            enabled: true,
+            schedule: .corrupt(originalData: raw),
+            tagIDs: [],
+            createdAt: testDate("2026-08-01T00:00:00Z"),
+            updatedAt: testDate("2026-08-01T00:00:00Z")
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [reminder],
+            tags: []
+        ))
         let cleanup = RecordingNotificationCleanup()
         let reconciler = RecordingReconcileRequester()
         let useCase = DeleteReminderUseCase(

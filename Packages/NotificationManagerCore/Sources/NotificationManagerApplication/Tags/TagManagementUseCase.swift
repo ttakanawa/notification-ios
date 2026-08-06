@@ -29,7 +29,8 @@ public struct TagManagementUseCase: Sendable {
             normalizedName: normalizedName,
             normalizationVersion: TagLimits.normalizationVersion,
             createdAt: timestamp,
-            updatedAt: timestamp
+            updatedAt: timestamp,
+            command: .create
         ))
     }
 
@@ -45,7 +46,8 @@ public struct TagManagementUseCase: Sendable {
             normalizedName: normalizedName,
             normalizationVersion: TagLimits.normalizationVersion,
             createdAt: current.createdAt,
-            updatedAt: Self.integralSecond(now())
+            updatedAt: Self.integralSecond(now()),
+            command: .update
         ))
     }
 

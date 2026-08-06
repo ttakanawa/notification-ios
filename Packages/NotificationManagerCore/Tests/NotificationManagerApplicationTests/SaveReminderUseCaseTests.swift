@@ -172,7 +172,15 @@ struct SaveReminderUseCaseTests {
     @Test func commitBoundaryRequestsExpiredConsentForAnExistingScheduleEdit() async throws {
         let raw = Data("old-schedule".utf8)
         let schedule = oneShotSchedule("2026-08-06T12:00:00Z")
-        let repository = InMemoryReminderRepository()
+        let existing = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: schedule,
+            scheduleData: raw
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [existing],
+            tags: []
+        ))
         let useCase = makeSaveUseCase(
             repository: repository,
             clock: SequenceDateSource([
@@ -201,7 +209,15 @@ struct SaveReminderUseCaseTests {
     @Test func existingScheduleReplacementCanBeSavedExhaustedOnlyWithConsent() async throws {
         let raw = Data("old-schedule".utf8)
         let schedule = oneShotSchedule("2026-08-05T12:00:00Z")
-        let repository = InMemoryReminderRepository()
+        let existing = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
+            scheduleData: raw
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [existing],
+            tags: []
+        ))
         let reconciler = RecordingReconcileRequester()
         let clock = SequenceDateSource([
             testDate("2026-08-06T12:00:00Z"),
@@ -259,7 +275,11 @@ struct SaveReminderUseCaseTests {
         let outcome = try await useCase.execute(draft: draft)
 
         #expect(outcome == .saved(draft.id))
-        #expect(await repository.savedMutations.first?.scheduleData == raw)
+        #expect(
+            await repository.savedMutations.first?.command
+                == .updateMetadataPreservingCurrentSchedule
+        )
+        #expect(try await repository.reminder(id: draft.id)?.schedule.originalBytes == raw)
     }
 
     @Test func opaqueMetadataEditPreservesRawBytesWithoutDecodingOrReencoding() async throws {
@@ -297,7 +317,43 @@ struct SaveReminderUseCaseTests {
         #expect(outcome == .saved(draft.id))
         #expect(codec.decodeCount == 0)
         #expect(codec.encodeCount == 0)
-        #expect(await repository.savedMutations.first?.scheduleData == raw)
+        #expect(
+            await repository.savedMutations.first?.command
+                == .updateMetadataPreservingCurrentSchedule
+        )
+        #expect(try await repository.reminder(id: draft.id)?.schedule.originalBytes == raw)
+    }
+
+    @Test func metadataValidationDoesNotRejectStaleDraftBytesWhenDurableBytesAreCurrent() async throws {
+        let current = Data("current-schedule".utf8)
+        let snapshot = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
+            scheduleData: current
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [snapshot],
+            tags: []
+        ))
+        let stale = Data(repeating: 0xFF, count: ReminderLimits.scheduleBytes + 1)
+        let draft = ReminderDraft(
+            id: snapshot.id,
+            title: "Metadata edit",
+            scheduleChange: .preserveOriginal,
+            originalScheduleData: stale,
+            createdAt: snapshot.createdAt,
+            updatedAt: snapshot.updatedAt
+        )
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([testDate("2026-08-06T12:00:00Z")]),
+            deviceEnabled: false
+        )
+
+        let outcome = try await useCase.execute(draft: draft)
+
+        #expect(outcome == .saved(snapshot.id))
+        #expect(try await repository.reminder(id: snapshot.id)?.schedule.originalBytes == current)
     }
 
     @Test func deviceToggleOffBypassesCapacitySnapshotAcquisition() async throws {
@@ -459,6 +515,95 @@ struct SaveReminderUseCaseTests {
         }
         #expect(await repository.saveAttempts == 0)
     }
+
+    @Test func deviceNotificationsOffStillUsesUpdateIntentAndCannotResurrectADeletedReminder() async throws {
+        let raw = Data("current-schedule".utf8)
+        let existing = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
+            scheduleData: raw
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [existing],
+            tags: []
+        ))
+        var draft = ReminderDraft(snapshot: existing)
+        draft.title = "Stale edit"
+        try await repository.delete(id: existing.id)
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([testDate("2026-08-06T12:00:00Z")]),
+            deviceEnabled: false
+        )
+
+        await #expect(throws: RepositoryTestError.reminderNotFound(existing.id)) {
+            try await useCase.execute(draft: draft)
+        }
+
+        #expect(await repository.savedMutations.isEmpty)
+        #expect(try await repository.fetchCompleteSnapshot().reminders.isEmpty)
+    }
+
+    @Test func deniedAuthorizationStillUsesReplaceIntentAndCannotResurrectADeletedReminder() async throws {
+        let oldSchedule = oneShotSchedule("2026-08-07T12:00:00Z")
+        let replacement = oneShotSchedule("2026-08-08T12:00:00Z")
+        let existing = reminderSnapshot(
+            id: TestApplicationValues.reminderID,
+            schedule: oldSchedule
+        )
+        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
+            reminders: [existing],
+            tags: []
+        ))
+        let draft = existingReplacementDraft(
+            id: existing.id,
+            schedule: replacement,
+            originalData: existing.schedule.originalBytes
+        )
+        try await repository.delete(id: existing.id)
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([
+                testDate("2026-08-06T12:00:00Z"),
+                testDate("2026-08-06T12:00:01Z")
+            ]),
+            deviceEnabled: true,
+            authorization: .denied
+        )
+
+        await #expect(throws: RepositoryTestError.reminderNotFound(existing.id)) {
+            try await useCase.execute(draft: draft)
+        }
+
+        #expect(await repository.snapshotFetchCount == 0)
+        #expect(await repository.savedMutations.isEmpty)
+        #expect(try await repository.fetchCompleteSnapshot().reminders.isEmpty)
+    }
+
+    @Test func aSuccessfulCreateIsReturnedByAFreshRepositorySnapshot() async throws {
+        let repository = InMemoryReminderRepository()
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([
+                testDate("2026-08-06T11:00:00Z"),
+                testDate("2026-08-06T11:00:01Z")
+            ]),
+            deviceEnabled: false
+        )
+        let draft = replacementDraft(
+            id: TestApplicationValues.reminderID,
+            schedule: oneShotSchedule("2026-08-07T12:00:00Z")
+        )
+
+        _ = try await useCase.execute(draft: draft)
+
+        let snapshot = try await repository.fetchCompleteSnapshot()
+        #expect(snapshot.reminders.map(\.id) == [draft.id])
+        guard case .create = await repository.savedMutations.first?.command else {
+            Issue.record("Expected a create mutation command")
+            return
+        }
+    }
 }
 
 func testDate(_ value: String) -> Date {
@@ -525,7 +670,8 @@ func reminderSnapshot(
     id: UUID,
     schedule: ScheduleDefinition,
     scheduleData: Data = Data("existing-schedule".utf8),
-    title: String = "Existing"
+    title: String = "Existing",
+    tagIDs: Set<UUID> = []
 ) -> ReminderSnapshot {
     ReminderSnapshot(
         id: id,
@@ -534,7 +680,7 @@ func reminderSnapshot(
         urlString: nil,
         enabled: true,
         schedule: .valid(schedule, sourceVersion: 1, originalData: scheduleData),
-        tagIDs: [],
+        tagIDs: tagIDs,
         createdAt: testDate("2026-08-01T00:00:00Z"),
         updatedAt: testDate("2026-08-01T00:00:00Z")
     )
@@ -633,21 +779,25 @@ enum RepositoryTestError: Error, Equatable {
     case snapshot
     case save
     case delete
+    case reminderNotFound(UUID)
+    case duplicateReminderID(UUID)
+    case scheduleReplacementNotAllowed(UUID)
     case tagNotFound(UUID)
+    case duplicateTagID(UUID)
     case duplicateNormalizedTagName(String)
 }
 
 actor InMemoryReminderRepository: ReminderRepository {
-    private(set) var reminders: [UUID: EncodedReminderMutation] = [:]
+    private(set) var reminders: [UUID: ReminderSnapshot]
     private(set) var savedMutations: [EncodedReminderMutation] = []
     private(set) var savedTagMutations: [EncodedTagMutation] = []
     private(set) var snapshotFetchCount = 0
     private(set) var saveAttempts = 0
-    private var snapshot: CompleteReminderSnapshot
     private var tagsByID: [UUID: TagSnapshot]
     private let fetchError: RepositoryTestError?
     private let saveError: RepositoryTestError?
     private let deleteError: RepositoryTestError?
+    private let deleteTagBeforeNextSaveID: UUID?
     private let trace: LockedApplicationTrace?
 
     init(
@@ -655,13 +805,15 @@ actor InMemoryReminderRepository: ReminderRepository {
         fetchError: RepositoryTestError? = nil,
         saveError: RepositoryTestError? = nil,
         deleteError: RepositoryTestError? = nil,
+        deleteTagBeforeNextSaveID: UUID? = nil,
         trace: LockedApplicationTrace? = nil
     ) {
-        self.snapshot = snapshot
+        reminders = Dictionary(uniqueKeysWithValues: snapshot.reminders.map { ($0.id, $0) })
         tagsByID = Dictionary(uniqueKeysWithValues: snapshot.tags.map { ($0.id, $0) })
         self.fetchError = fetchError
         self.saveError = saveError
         self.deleteError = deleteError
+        self.deleteTagBeforeNextSaveID = deleteTagBeforeNextSaveID
         self.trace = trace
     }
 
@@ -670,45 +822,83 @@ actor InMemoryReminderRepository: ReminderRepository {
         trace?.record(.snapshotFetched)
         if let fetchError { throw fetchError }
         return CompleteReminderSnapshot(
-            reminders: snapshot.reminders,
+            reminders: reminders.values.sorted { $0.id.uuidString < $1.id.uuidString },
             tags: tagsByID.values.sorted { $0.id.uuidString < $1.id.uuidString }
         )
     }
 
     func reminder(id: UUID) async throws -> ReminderSnapshot? {
-        snapshot.reminders.first { $0.id == id }
+        reminders[id]
     }
 
     func save(_ mutation: EncodedReminderMutation) async throws -> ReminderSnapshot {
         saveAttempts += 1
         if let saveError { throw saveError }
+        let schedule: ScheduleReadState
+        switch mutation.command {
+        case let .create(scheduleData):
+            guard reminders[mutation.id] == nil else {
+                throw RepositoryTestError.duplicateReminderID(mutation.id)
+            }
+            schedule = .corrupt(originalData: scheduleData)
+        case .updateMetadataPreservingCurrentSchedule:
+            guard let current = reminders[mutation.id] else {
+                throw RepositoryTestError.reminderNotFound(mutation.id)
+            }
+            schedule = current.schedule
+        case let .replaceSchedule(scheduleData):
+            guard let current = reminders[mutation.id] else {
+                throw RepositoryTestError.reminderNotFound(mutation.id)
+            }
+            switch current.schedule {
+            case .valid, .domainInvalid:
+                break
+            case .unsupportedFuture, .corrupt:
+                throw RepositoryTestError.scheduleReplacementNotAllowed(mutation.id)
+            }
+            schedule = .corrupt(originalData: scheduleData)
+        }
+        if let missingTagID = mutation.tagIDs.first(where: { tagsByID[$0] == nil }) {
+            throw RepositoryTestError.tagNotFound(missingTagID)
+        }
         trace?.record(.repositorySaved)
-        reminders[mutation.id] = mutation
         savedMutations.append(mutation)
-        return ReminderSnapshot(
+        let saved = ReminderSnapshot(
             id: mutation.id,
             title: mutation.title,
             notes: mutation.notes,
             urlString: mutation.urlString,
             enabled: mutation.enabled,
-            schedule: .corrupt(originalData: mutation.scheduleData),
+            schedule: schedule,
             tagIDs: mutation.tagIDs,
             createdAt: mutation.createdAt,
             updatedAt: mutation.updatedAt
         )
+        reminders[mutation.id] = saved
+        return saved
     }
 
     func delete(id: UUID) async throws {
         trace?.record(.repositoryDeleted)
         if let deleteError { throw deleteError }
+        guard reminders[id] != nil else { throw RepositoryTestError.reminderNotFound(id) }
         reminders[id] = nil
-        snapshot = CompleteReminderSnapshot(
-            reminders: snapshot.reminders.filter { $0.id != id },
-            tags: Array(tagsByID.values)
-        )
     }
 
     func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
+        if deleteTagBeforeNextSaveID == mutation.id {
+            tagsByID[mutation.id] = nil
+        }
+        switch mutation.command {
+        case .create:
+            guard tagsByID[mutation.id] == nil else {
+                throw RepositoryTestError.duplicateTagID(mutation.id)
+            }
+        case .update:
+            guard tagsByID[mutation.id] != nil else {
+                throw RepositoryTestError.tagNotFound(mutation.id)
+            }
+        }
         if tagsByID.values.contains(where: {
             $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
         }) {
@@ -732,6 +922,19 @@ actor InMemoryReminderRepository: ReminderRepository {
         guard tagsByID[id] != nil else { throw RepositoryTestError.tagNotFound(id) }
         trace?.record(.tagDeleted)
         tagsByID[id] = nil
+        reminders = reminders.mapValues { reminder in
+            ReminderSnapshot(
+                id: reminder.id,
+                title: reminder.title,
+                notes: reminder.notes,
+                urlString: reminder.urlString,
+                enabled: reminder.enabled,
+                schedule: reminder.schedule,
+                tagIDs: reminder.tagIDs.subtracting([id]),
+                createdAt: reminder.createdAt,
+                updatedAt: reminder.updatedAt
+            )
+        }
     }
 
     func storedTag(id: UUID) -> TagSnapshot? {

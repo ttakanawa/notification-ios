@@ -82,7 +82,7 @@ public struct SaveReminderUseCase: Sendable {
         let replacementSchedule = replacementSchedule(in: draft)
         let replacementData = try replacementSchedule.map(scheduleCodec.encodeCurrent)
 
-        let validated = try draftValidator.validate(
+        let validated = try validatePreflight(
             draft,
             replacementScheduleData: replacementData
         )
@@ -161,11 +161,17 @@ public struct SaveReminderUseCase: Sendable {
 
         var committingDraft = draft
         committingDraft.updatedAt = Self.integralSecond(commitNow)
-        let committingAggregate = try draftValidator.validate(
+        let committingAggregate = try validatePreflight(
             committingDraft,
             replacementScheduleData: replacementData
         )
-        let saved = try await repository.save(EncodedReminderMutation(committingAggregate))
+        let saved = try await repository.save(EncodedReminderMutation(
+            committingAggregate,
+            command: mutationCommand(
+                for: committingDraft,
+                validatedScheduleData: committingAggregate.scheduleData
+            )
+        ))
         await reconcileRequester.requestReconcile(.reminderSaved(saved.id))
         return .saved(saved.id)
     }
@@ -173,6 +179,57 @@ public struct SaveReminderUseCase: Sendable {
     private func replacementSchedule(in draft: ReminderDraft) -> ScheduleDefinition? {
         guard case let .replace(schedule) = draft.scheduleChange else { return nil }
         return schedule
+    }
+
+    private func validatePreflight(
+        _ draft: ReminderDraft,
+        replacementScheduleData: Data?
+    ) throws -> ValidatedReminderAggregate {
+        guard case .preserveOriginal = draft.scheduleChange else {
+            return try draftValidator.validate(
+                draft,
+                replacementScheduleData: replacementScheduleData
+            )
+        }
+        guard draft.originalScheduleData != nil else {
+            throw ReminderValidationIssue.missingScheduleData
+        }
+        let metadataOnlyDraft = ReminderDraft(
+            id: draft.id,
+            title: draft.title,
+            notes: draft.notes,
+            urlString: draft.urlString,
+            enabled: draft.enabled,
+            source: draft.source,
+            rule: draft.rule,
+            end: draft.end,
+            early: draft.early,
+            scheduleChange: .preserveOriginal,
+            originalScheduleData: Data(),
+            tagIDs: draft.tagIDs,
+            createdAt: draft.createdAt,
+            updatedAt: draft.updatedAt
+        )
+        return try draftValidator.validate(
+            metadataOnlyDraft,
+            replacementScheduleData: nil
+        )
+    }
+
+    private func mutationCommand(
+        for draft: ReminderDraft,
+        validatedScheduleData: Data
+    ) -> ReminderMutationCommand {
+        switch (draft.originalScheduleData, draft.scheduleChange) {
+        case (nil, .replace):
+            return .create(scheduleData: validatedScheduleData)
+        case (.some, .preserveOriginal):
+            return .updateMetadataPreservingCurrentSchedule
+        case (.some, .replace):
+            return .replaceSchedule(scheduleData: validatedScheduleData)
+        case (nil, .preserveOriginal):
+            preconditionFailure("Validated new reminders always provide a replacement schedule")
+        }
     }
 
     private func hasFutureNotification(
