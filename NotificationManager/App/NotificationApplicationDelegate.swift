@@ -18,9 +18,7 @@ enum NotificationResponseOutcome: Sendable, Equatable {
 }
 
 @MainActor
-final class NotificationApplicationDelegate: NSObject,
-    @preconcurrency UNUserNotificationCenterDelegate
-{
+final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterDelegate {
     nonisolated static let reminderIDKey = "notification-manager.reminder-id"
     nonisolated static let openLinkCategoryIdentifier = "notification-manager.open-link"
     nonisolated static let openLinkActionIdentifier = "notification-manager.open-link-action"
@@ -36,7 +34,7 @@ final class NotificationApplicationDelegate: NSObject,
     ) -> Void
     typealias URLOpener = @MainActor @Sendable (URL) -> Void
 
-    private let eligibilityIndexStore: ForegroundEligibilityIndexStore
+    nonisolated private let eligibilityIndexStore: ForegroundEligibilityIndexStore
     private let installHandler: InstallHandler
     private var reminderLookup: ReminderLookup
     private var routeResponse: ResponseRouter
@@ -44,7 +42,8 @@ final class NotificationApplicationDelegate: NSObject,
     private var reconcileAfterNotification: @Sendable (AppLifecycleTrigger) async -> Void
     private var isInstalled = false
     private var responseHandlingIsBound: Bool
-    private var pendingResponses: [PendingNotificationResponse] = []
+    private var responseQueue: [QueuedNotificationResponse] = []
+    private var responseDrainTask: Task<Void, Never>?
 
     var eligibilityIndex: ForegroundEligibilityIndexStore {
         eligibilityIndexStore
@@ -116,23 +115,16 @@ final class NotificationApplicationDelegate: NSObject,
             AppLifecycleTrigger
         ) async -> Void
     ) {
+        guard !responseHandlingIsBound else { return }
         self.reminderLookup = reminderLookup
         self.routeResponse = routeResponse
         self.openURL = openURL
         self.reconcileAfterNotification = reconcileAfterNotification
         responseHandlingIsBound = true
-        let responses = pendingResponses
-        pendingResponses.removeAll(keepingCapacity: true)
-        guard !responses.isEmpty else { return }
-        Task { @MainActor [weak self] in
-            guard let self else { return }
-            for response in responses {
-                _ = await handleResponse(response)
-            }
-        }
+        startResponseDrainIfNeeded()
     }
 
-    func immediatePresentationOptions(
+    nonisolated func immediatePresentationOptions(
         for request: UNNotificationRequest
     ) -> UNNotificationPresentationOptions {
         guard request.identifier.hasPrefix(NotificationIdentifierCodec.root),
@@ -144,12 +136,15 @@ final class NotificationApplicationDelegate: NSObject,
         return [.banner, .list, .sound]
     }
 
-    func presentationOptions(
+    nonisolated func presentationOptions(
         for request: UNNotificationRequest,
         completion: @escaping @Sendable (UNNotificationPresentationOptions) -> Void
     ) {
         completion(immediatePresentationOptions(for: request))
-        Task { await reconcileAfterNotification(.notificationPresentationCompleted) }
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            await reconcileAfterNotification(.notificationPresentationCompleted)
+        }
     }
 
     func handleResponse(
@@ -170,29 +165,38 @@ final class NotificationApplicationDelegate: NSObject,
         userInfo: [AnyHashable: Any],
         completion: @escaping @Sendable () -> Void
     ) {
-        let response = Self.responseValue(
+        receiveResponse(Self.responseValue(
             actionIdentifier: actionIdentifier,
             categoryIdentifier: categoryIdentifier,
             userInfo: userInfo
-        )
+        ), completion: completion)
+    }
+
+    private func receiveResponse(
+        _ response: PendingNotificationResponse,
+        completion: @escaping @Sendable () -> Void
+    ) {
         guard responseHandlingIsBound else {
-            if pendingResponses.count == Self.pendingResponseLimit {
-                pendingResponses.removeFirst()
+            if responseQueue.count == Self.pendingResponseLimit {
+                responseQueue.removeFirst()
             }
-            pendingResponses.append(response)
+            responseQueue.append(QueuedNotificationResponse(
+                response: response,
+                completion: nil
+            ))
             completion()
             return
         }
-        Task { @MainActor [weak self] in
-            if let self {
-                _ = await handleResponse(response)
-            }
-            completion()
-        }
+        responseQueue.append(QueuedNotificationResponse(
+            response: response,
+            completion: completion
+        ))
+        startResponseDrainIfNeeded()
     }
 
     private func handleResponse(
-        _ response: PendingNotificationResponse
+        _ response: PendingNotificationResponse,
+        completion: (@Sendable () -> Void)? = nil
     ) async -> NotificationResponseOutcome {
         let outcome: NotificationResponseOutcome
         switch response.action {
@@ -205,11 +209,35 @@ final class NotificationApplicationDelegate: NSObject,
             )
             apply(outcome)
         }
+        completion?()
         await reconcileAfterNotification(.notificationResponseCompleted)
         return outcome
     }
 
-    private static func responseValue(
+    private func startResponseDrainIfNeeded() {
+        guard responseHandlingIsBound,
+              responseDrainTask == nil,
+              !responseQueue.isEmpty
+        else {
+            return
+        }
+        responseDrainTask = Task { @MainActor [weak self] in
+            await self?.drainResponseQueue()
+        }
+    }
+
+    private func drainResponseQueue() async {
+        while !responseQueue.isEmpty {
+            let queued = responseQueue.removeFirst()
+            _ = await handleResponse(
+                queued.response,
+                completion: queued.completion
+            )
+        }
+        responseDrainTask = nil
+    }
+
+    nonisolated private static func responseValue(
         actionIdentifier: String,
         categoryIdentifier: String,
         userInfo: [AnyHashable: Any]
@@ -232,7 +260,7 @@ final class NotificationApplicationDelegate: NSObject,
         )
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
         withCompletionHandler completionHandler: @escaping @Sendable (
@@ -242,17 +270,23 @@ final class NotificationApplicationDelegate: NSObject,
         presentationOptions(for: notification.request, completion: completionHandler)
     }
 
-    func userNotificationCenter(
+    nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping @Sendable () -> Void
     ) {
-        receiveResponse(
+        let responseValue = Self.responseValue(
             actionIdentifier: response.actionIdentifier,
             categoryIdentifier: response.notification.request.content.categoryIdentifier,
-            userInfo: response.notification.request.content.userInfo,
-            completion: completionHandler
+            userInfo: response.notification.request.content.userInfo
         )
+        Task { @MainActor [weak self] in
+            guard let self else {
+                completionHandler()
+                return
+            }
+            receiveResponse(responseValue, completion: completionHandler)
+        }
     }
 
     private func currentResponseOutcome(
@@ -289,7 +323,9 @@ final class NotificationApplicationDelegate: NSObject,
         }
     }
 
-    private static func reminderID(from userInfo: [AnyHashable: Any]) -> UUID? {
+    nonisolated private static func reminderID(
+        from userInfo: [AnyHashable: Any]
+    ) -> UUID? {
         guard let rawValue = userInfo[reminderIDKey] as? String,
               rawValue == rawValue.lowercased(),
               let identifier = UUID(uuidString: rawValue),
@@ -324,4 +360,9 @@ private enum ResponseAction: Sendable, Equatable {
 private struct PendingNotificationResponse: Sendable {
     let action: ResponseAction
     let reminderID: UUID?
+}
+
+private struct QueuedNotificationResponse: Sendable {
+    let response: PendingNotificationResponse
+    let completion: (@Sendable () -> Void)?
 }

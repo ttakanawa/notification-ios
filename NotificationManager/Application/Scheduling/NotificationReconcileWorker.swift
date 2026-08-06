@@ -337,8 +337,9 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         }
 
         let pendingDesired = Set(pending.map(\.identifier)).intersection(desiredIdentifiers)
+        let pendingOrAdded = pendingDesired.union(successfulAdds)
         let publishedNextTriggerDates = inspectedNextTriggerDates.filter {
-            successfulAdds.contains($0.key)
+            pendingOrAdded.contains($0.key)
         }
         await stateStore.publish(
             deviceNotificationsEnabled: deviceEnabled,
@@ -347,7 +348,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             scheduledThrough: logicalPlan.scheduledThrough,
             materializedKinds: materializedKinds,
             nextTriggerDates: publishedNextTriggerDates,
-            pendingOrAddedIdentifiers: pendingDesired.union(successfulAdds)
+            pendingOrAddedIdentifiers: pendingOrAdded
         )
 
         if outcomes.values.contains(.unscheduledError) {

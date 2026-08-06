@@ -768,6 +768,46 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
+    @Test func snapshotPrunesCachedPersistedDetailBeforeInitialListPublication() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.showReminder(id)
+
+        router.prunePersistedReminders(keeping: [])
+
+        #expect(router.detailModel(for: id) == nil)
+        #expect(router.formModel(for: id) == nil)
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
+    }
+
+    @MainActor
+    @Test func snapshotPruningPreservesCreateDraftWithoutPersistedDetail() {
+        let draftID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let router = AppRouter(actions: ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            )
+        ))
+        let form = ReminderFormModel(
+            newReminderID: draftID,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in .saved(draft.id) },
+                delete: { _ in }
+            )
+        )
+        router.register(form: form)
+        router.setCompactPathFromSystem([.reminderCreate(draftID)])
+
+        router.prunePersistedReminders(keeping: [])
+
+        #expect(router.formModel(for: draftID) === form)
+        #expect(router.compactPath == [.reminderCreate(draftID)])
+    }
+
+    @MainActor
     @Test func compactDeletionCannotResurrectReminderAfterRegularTransition() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)

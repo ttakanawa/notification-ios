@@ -7,6 +7,8 @@ import UIKit
 
 @MainActor
 final class AppEnvironment {
+    typealias NotificationHandlingActivation = @MainActor @Sendable () -> Void
+
     let container: ModelContainer?
     let repository: SwiftDataReminderRepository?
     let eligibilityIndexStore: ForegroundEligibilityIndexStore
@@ -18,6 +20,7 @@ final class AppEnvironment {
 
     private let stateStore: DeviceSchedulingStateStore?
     private let formActions: ReminderFormActions
+    private let notificationHandlingActivation: NotificationHandlingActivation
     private let presentationRefreshCoordinator:
         LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
@@ -26,9 +29,12 @@ final class AppEnvironment {
     private var schedulingStateObserver: SchedulingStatePresentationObserver?
     private var snapshotGeneration: UInt64 = 0
     private var hasStarted = false
+    private var notificationHandlingIsActive = false
 
     /// Identity-only environment used by bootstrap state-machine tests.
-    init() {
+    init(
+        notificationHandlingActivation: @escaping NotificationHandlingActivation = {}
+    ) {
         let actions = ReminderActionCoordinator(handlers: ReminderActionHandlers(
             setEnabled: { command in .saved(command.reminderID) },
             delete: { _ in }
@@ -54,6 +60,7 @@ final class AppEnvironment {
             save: { draft, _, _ in .saved(draft.id) },
             delete: { _ in }
         )
+        self.notificationHandlingActivation = notificationHandlingActivation
         presentationRefreshCoordinator = nil
         schedulingStateObserver = nil
     }
@@ -69,6 +76,7 @@ final class AppEnvironment {
         lifecycleCoordinator: AppLifecycleCoordinator,
         stateStore: DeviceSchedulingStateStore,
         formActions: ReminderFormActions,
+        notificationHandlingActivation: @escaping NotificationHandlingActivation,
         presentationRefreshCoordinator: LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
             DeviceSchedulingStateSnapshot
@@ -84,6 +92,7 @@ final class AppEnvironment {
         self.lifecycleCoordinator = lifecycleCoordinator
         self.stateStore = stateStore
         self.formActions = formActions
+        self.notificationHandlingActivation = notificationHandlingActivation
         self.presentationRefreshCoordinator = presentationRefreshCoordinator
         schedulingStateObserver = nil
     }
@@ -132,6 +141,13 @@ final class AppEnvironment {
             },
             publish: { snapshot, deviceState in
                 relay.publish(snapshot, deviceState: deviceState)
+            }
+        )
+        let responseSnapshotPreparer = NotificationResponseSnapshotPreparer(
+            prepareSnapshot: {
+                await presentationRefreshCoordinator.refresh(stateProvider: {
+                    await stateStore.snapshot()
+                })
             }
         )
         let formActions = ReminderFormActions(
@@ -219,6 +235,27 @@ final class AppEnvironment {
                 await relay.refreshPresentation()
             }
         )
+        let notificationHandlingActivation: NotificationHandlingActivation = {
+            notificationDelegate.bind(
+                reminderLookup: { reminderID in
+                    await responseSnapshotPreparer.prepare(reminderID: reminderID)
+                },
+                routeResponse: { destination in
+                    switch destination {
+                    case let .reminderDetail(reminderID):
+                        router.showReminder(reminderID)
+                    case .notificationUnavailable:
+                        router.showNotificationUnavailable()
+                    }
+                },
+                openURL: { url in
+                    UIApplication.shared.open(url)
+                },
+                reconcileAfterNotification: { trigger in
+                    await lifecycle.handle(trigger)
+                }
+            )
+        }
         let environment = AppEnvironment(
             container: container,
             repository: repository,
@@ -230,6 +267,7 @@ final class AppEnvironment {
             lifecycleCoordinator: lifecycle,
             stateStore: stateStore,
             formActions: formActions,
+            notificationHandlingActivation: notificationHandlingActivation,
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
         relay.environment = environment
@@ -239,30 +277,13 @@ final class AppEnvironment {
                 await environment?.refreshPresentation(deviceState: state)
             }
         )
-        notificationDelegate.bind(
-            reminderLookup: { reminderID in
-                let reminder = try await repository.reminder(id: reminderID)
-                if let reminder {
-                    await relay.prepareForRouting(reminder)
-                }
-                return reminder
-            },
-            routeResponse: { destination in
-                switch destination {
-                case let .reminderDetail(reminderID):
-                    router.showReminder(reminderID)
-                case .notificationUnavailable:
-                    router.showNotificationUnavailable()
-                }
-            },
-            openURL: { url in
-                UIApplication.shared.open(url)
-            },
-            reconcileAfterNotification: { trigger in
-                await lifecycle.handle(trigger)
-            }
-        )
         return environment
+    }
+
+    func activateNotificationHandling() {
+        guard !notificationHandlingIsActive else { return }
+        notificationHandlingIsActive = true
+        notificationHandlingActivation()
     }
 
     func start() async {
@@ -307,29 +328,13 @@ final class AppEnvironment {
         await presentationRefreshCoordinator?.refresh(state: deviceState)
     }
 
-    func prepareForRouting(_ reminder: ReminderSnapshot) async {
-        guard let stateStore else { return }
-        let complete = try? await repository?.fetchCompleteSnapshot()
-        let tags = complete?.tags ?? []
-        let deviceState = await stateStore.snapshot()
-        register(
-            reminder,
-            tags: tags,
-            deviceState: deviceState,
-            now: Date()
-        )
-    }
-
     fileprivate func publish(
         _ snapshot: CompleteReminderSnapshot,
         deviceState: DeviceSchedulingStateSnapshot
     ) {
         let now = Date()
-        let previousIDs = Set(listModel.items.map(\.id))
         let currentIDs = Set(snapshot.reminders.map(\.id))
-        for deletedID in previousIDs.subtracting(currentIDs) {
-            router.reminderWasDeleted(deletedID)
-        }
+        router.prunePersistedReminders(keeping: currentIDs)
 
         let items = snapshot.reminders.map {
             register($0, tags: snapshot.tags, deviceState: deviceState, now: now)
@@ -477,6 +482,22 @@ final class AppEnvironment {
 }
 
 @MainActor
+final class NotificationResponseSnapshotPreparer {
+    typealias PrepareSnapshot = @MainActor @Sendable () async -> CompleteReminderSnapshot?
+
+    private let prepareSnapshot: PrepareSnapshot
+
+    init(prepareSnapshot: @escaping PrepareSnapshot) {
+        self.prepareSnapshot = prepareSnapshot
+    }
+
+    func prepare(reminderID: UUID) async -> ReminderSnapshot? {
+        guard let snapshot = await prepareSnapshot() else { return nil }
+        return snapshot.reminders.first { $0.id == reminderID }
+    }
+}
+
+@MainActor
 final class LatestPresentationRefreshCoordinator<
     Snapshot: Sendable,
     State: Sendable
@@ -497,31 +518,34 @@ final class LatestPresentationRefreshCoordinator<
         self.publish = publish
     }
 
-    func refresh(state: State) async {
+    @discardableResult
+    func refresh(state: State) async -> Snapshot? {
         let refreshGeneration = beginRefresh()
-        await loadAndPublish(state: state, generation: refreshGeneration)
+        return await loadAndPublish(state: state, generation: refreshGeneration)
     }
 
-    func refresh(stateProvider: @escaping StateProvider) async {
+    @discardableResult
+    func refresh(stateProvider: @escaping StateProvider) async -> Snapshot? {
         let refreshGeneration = beginRefresh()
         guard let state = await stateProvider(),
               refreshGeneration == generation
         else {
-            return
+            return nil
         }
-        await loadAndPublish(state: state, generation: refreshGeneration)
+        return await loadAndPublish(state: state, generation: refreshGeneration)
     }
 
     private func loadAndPublish(
         state: State,
         generation refreshGeneration: UInt64
-    ) async {
+    ) async -> Snapshot? {
         guard let snapshot = await loadSnapshot(),
               refreshGeneration == generation
         else {
-            return
+            return nil
         }
         publish(snapshot, state)
+        return snapshot
     }
 
     private func beginRefresh() -> UInt64 {
@@ -580,10 +604,6 @@ private final class AppEnvironmentRelay {
 
     func refreshPresentation() async {
         await environment?.refreshPresentation()
-    }
-
-    func prepareForRouting(_ reminder: ReminderSnapshot) async {
-        await environment?.prepareForRouting(reminder)
     }
 
     func publish(

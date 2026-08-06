@@ -107,6 +107,13 @@ final class AppRouter {
         }
     }
 
+    func prunePersistedReminders(keeping currentIDs: Set<UUID>) {
+        let removedIDs = Set(detailsByID.keys).subtracting(currentIDs)
+        for reminderID in removedIDs {
+            reminderWasDeleted(reminderID)
+        }
+    }
+
     func reminderFormWasSaved(_ reminderID: UUID) {
         formsByID.removeValue(forKey: reminderID)
         compactPath.removeAll { $0.formReminderID == reminderID }

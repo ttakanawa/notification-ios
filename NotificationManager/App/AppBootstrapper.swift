@@ -106,6 +106,7 @@ final class AppBootstrapper {
 
         switch result {
         case let .success(environment):
+            environment.activateNotificationHandling()
             state = .ready(environment)
         case .failure:
             state = .dataUnavailable(makeDataUnavailableActions { [weak self] in

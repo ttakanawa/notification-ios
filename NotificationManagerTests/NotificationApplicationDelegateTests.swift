@@ -136,6 +136,158 @@ struct NotificationApplicationDelegateTests {
     }
 
     @MainActor
+    @Test func responsePreparationUsesOneCompleteSnapshotForLookupAndPublication() async {
+        let expectedReminder = reminder(urlString: nil)
+        let expectedSnapshot = CompleteReminderSnapshot(
+            reminders: [expectedReminder],
+            tags: []
+        )
+        let loader = ResponseSnapshotLoader(snapshots: [
+            expectedSnapshot,
+            CompleteReminderSnapshot(reminders: [], tags: [])
+        ])
+        let publications = ResponseSnapshotPublicationRecorder()
+        let coordinator = LatestPresentationRefreshCoordinator<
+            CompleteReminderSnapshot,
+            Int
+        >(
+            loadSnapshot: { try? await loader.load() },
+            publish: { snapshot, _ in publications.record(snapshot) }
+        )
+        let preparer = NotificationResponseSnapshotPreparer(
+            prepareSnapshot: {
+                await coordinator.refresh(state: 1)
+            }
+        )
+
+        let reminder = await preparer.prepare(reminderID: Self.reminderID)
+
+        #expect(reminder == expectedReminder)
+        #expect(await loader.loadCount == 1)
+        #expect(publications.snapshots == [expectedSnapshot])
+    }
+
+    @MainActor
+    @Test func routingSnapshotInvalidatesAnOlderSuspendedPresentationRefresh() async {
+        let olderReminder = reminder(title: "Older projection", urlString: nil)
+        let newerReminder = reminder(title: "Newer routing value", urlString: nil)
+        let olderSnapshot = CompleteReminderSnapshot(
+            reminders: [olderReminder],
+            tags: []
+        )
+        let newerSnapshot = CompleteReminderSnapshot(
+            reminders: [newerReminder],
+            tags: []
+        )
+        let gate = ResponsePresentationSnapshotGate()
+        let recorder = RoutingSnapshotProjectionRecorder()
+        let coordinator = LatestPresentationRefreshCoordinator<
+            CompleteReminderSnapshot,
+            Int
+        >(
+            loadSnapshot: { await gate.load() },
+            publish: { snapshot, state in
+                recorder.publish(snapshot: snapshot, state: state)
+            }
+        )
+        let preparer = NotificationResponseSnapshotPreparer(
+            prepareSnapshot: {
+                await coordinator.refresh(stateProvider: { 2 })
+            }
+        )
+        let olderRefresh = Task { @MainActor in
+            await coordinator.refresh(state: 1)
+        }
+        await gate.waitForPendingCount(1)
+        let routing = Task { @MainActor in
+            await preparer.prepare(reminderID: Self.reminderID)
+        }
+        await gate.waitForPendingCount(2)
+
+        await gate.resolve(attempt: 1, snapshot: newerSnapshot)
+        let matchedReminder = await routing.value
+
+        #expect(matchedReminder == newerReminder)
+        #expect(recorder.publishedTitles == [["Newer routing value"]])
+        #expect(recorder.publishedStates == [2])
+        #expect(
+            recorder.router.detailModel(for: Self.reminderID)?.item.title
+                == "Newer routing value"
+        )
+        #expect(
+            recorder.router.formModel(for: Self.reminderID)?.title
+                == "Newer routing value"
+        )
+
+        await gate.resolve(attempt: 0, snapshot: olderSnapshot)
+        _ = await olderRefresh.value
+
+        #expect(recorder.publishedTitles == [["Newer routing value"]])
+        #expect(recorder.publishedStates == [2])
+        #expect(
+            recorder.router.detailModel(for: Self.reminderID)?.item.title
+                == "Newer routing value"
+        )
+        #expect(
+            recorder.router.formModel(for: Self.reminderID)?.title
+                == "Newer routing value"
+        )
+    }
+
+    @MainActor
+    @Test func newerLifecycleRefreshInvalidatesAnOlderSuspendedRoutingLookup() async {
+        let olderReminder = reminder(title: "Older routing value", urlString: nil)
+        let newerReminder = reminder(title: "Newer lifecycle value", urlString: nil)
+        let gate = ResponsePresentationSnapshotGate()
+        let recorder = RoutingSnapshotProjectionRecorder()
+        let coordinator = LatestPresentationRefreshCoordinator<
+            CompleteReminderSnapshot,
+            Int
+        >(
+            loadSnapshot: { await gate.load() },
+            publish: { snapshot, state in
+                recorder.publish(snapshot: snapshot, state: state)
+            }
+        )
+        let preparer = NotificationResponseSnapshotPreparer(
+            prepareSnapshot: {
+                await coordinator.refresh(stateProvider: { 1 })
+            }
+        )
+        let routing = Task { @MainActor in
+            await preparer.prepare(reminderID: Self.reminderID)
+        }
+        await gate.waitForPendingCount(1)
+        let lifecycle = Task { @MainActor in
+            await coordinator.refresh(state: 2)
+        }
+        await gate.waitForPendingCount(2)
+
+        await gate.resolve(
+            attempt: 1,
+            snapshot: CompleteReminderSnapshot(reminders: [newerReminder], tags: [])
+        )
+        _ = await lifecycle.value
+        await gate.resolve(
+            attempt: 0,
+            snapshot: CompleteReminderSnapshot(reminders: [olderReminder], tags: [])
+        )
+        let staleMatch = await routing.value
+
+        #expect(staleMatch == nil)
+        #expect(recorder.publishedTitles == [["Newer lifecycle value"]])
+        #expect(recorder.publishedStates == [2])
+        #expect(
+            recorder.router.detailModel(for: Self.reminderID)?.item.title
+                == "Newer lifecycle value"
+        )
+        #expect(
+            recorder.router.formModel(for: Self.reminderID)?.title
+                == "Newer lifecycle value"
+        )
+    }
+
+    @MainActor
     @Test func missingOrNoncanonicalReminderRoutesOnlyToNeutralUnavailable() async {
         let lookup = NotificationLookupRecorder(reminder: nil)
         let routes = NotificationRouteRecorder()
@@ -242,6 +394,66 @@ struct NotificationApplicationDelegateTests {
         #expect(routes.destinations == [.reminderDetail(Self.reminderID)])
         #expect(await lookup.requestedIDs == [Self.reminderID])
         #expect(routes.openedURLs.isEmpty)
+    }
+
+    @MainActor
+    @Test func boundResponsesStayFIFOAndCompleteBeforeEachReconcile() async {
+        let secondReminderID = UUID(
+            uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+        )!
+        let events = OrderedNotificationResponseEvents()
+        let lookup = BlockingFirstNotificationLookup(
+            blockedReminderID: Self.reminderID,
+            events: events
+        )
+        let delegate = NotificationApplicationDelegate(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            reminderLookup: { await lookup.reminder(id: $0) },
+            routeResponse: { destination in
+                events.record("route:\(destination.eventReminderID)")
+            },
+            openURL: { _ in events.record("open") },
+            reconcileAfterNotification: { _ in events.record("reconcile") }
+        )
+
+        delegate.receiveResponse(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            categoryIdentifier: "",
+            userInfo: [
+                NotificationApplicationDelegate.reminderIDKey:
+                    Self.reminderID.uuidString.lowercased()
+            ],
+            completion: { events.record("completion:\(Self.reminderID)") }
+        )
+        await lookup.waitUntilBlockedLookupStarts()
+        delegate.receiveResponse(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            categoryIdentifier: "",
+            userInfo: [
+                NotificationApplicationDelegate.reminderIDKey:
+                    secondReminderID.uuidString.lowercased()
+            ],
+            completion: { events.record("completion:\(secondReminderID)") }
+        )
+
+        for _ in 0..<50 {
+            await Task.yield()
+        }
+        #expect(events.values == ["lookup:\(Self.reminderID)"])
+
+        await lookup.releaseBlockedLookup()
+        await events.waitForCount(8)
+
+        #expect(events.values == [
+            "lookup:\(Self.reminderID)",
+            "route:\(Self.reminderID)",
+            "completion:\(Self.reminderID)",
+            "reconcile",
+            "lookup:\(secondReminderID)",
+            "route:\(secondReminderID)",
+            "completion:\(secondReminderID)",
+            "reconcile"
+        ])
     }
 
     @MainActor
@@ -446,10 +658,13 @@ struct NotificationApplicationDelegateTests {
         ]
     }
 
-    private func reminder(urlString: String?) -> ReminderSnapshot {
+    private func reminder(
+        title: String = "Current title",
+        urlString: String?
+    ) -> ReminderSnapshot {
         ReminderSnapshot(
             id: Self.reminderID,
-            title: "Current title",
+            title: title,
             notes: "Current notes",
             urlString: urlString,
             enabled: true,
@@ -483,6 +698,28 @@ struct NotificationApplicationDelegateTests {
     }
 }
 
+private func requireStrictNonisolatedNotificationDelegateWitnesses(
+    delegate: NotificationApplicationDelegate,
+    center: UNUserNotificationCenter,
+    notification: UNNotification,
+    response: UNNotificationResponse,
+    presentationCompletion: @escaping @Sendable (
+        UNNotificationPresentationOptions
+    ) -> Void,
+    responseCompletion: @escaping @Sendable () -> Void
+) {
+    delegate.userNotificationCenter(
+        center,
+        willPresent: notification,
+        withCompletionHandler: presentationCompletion
+    )
+    delegate.userNotificationCenter(
+        center,
+        didReceive: response,
+        withCompletionHandler: responseCompletion
+    )
+}
+
 @MainActor
 private final class RouterSaveRefreshRelay {
     weak var router: AppRouter?
@@ -513,6 +750,195 @@ private actor NotificationLookupRecorder {
     func waitForRequestCount(_ count: Int) async {
         while requestedIDs.count < count {
             await Task.yield()
+        }
+    }
+}
+
+private actor ResponseSnapshotLoader {
+    private var snapshots: [CompleteReminderSnapshot]
+    private(set) var loadCount = 0
+
+    init(snapshots: [CompleteReminderSnapshot]) {
+        self.snapshots = snapshots
+    }
+
+    func load() throws -> CompleteReminderSnapshot {
+        loadCount += 1
+        guard !snapshots.isEmpty else {
+            throw ResponseSnapshotTestFailure.exhausted
+        }
+        return snapshots.removeFirst()
+    }
+}
+
+@MainActor
+private final class ResponseSnapshotPublicationRecorder {
+    private(set) var snapshots: [CompleteReminderSnapshot] = []
+
+    func record(_ snapshot: CompleteReminderSnapshot) {
+        snapshots.append(snapshot)
+    }
+}
+
+private actor ResponsePresentationSnapshotGate {
+    private var nextAttempt = 0
+    private var pending: [
+        Int: CheckedContinuation<CompleteReminderSnapshot, Never>
+    ] = [:]
+
+    func load() async -> CompleteReminderSnapshot {
+        let attempt = nextAttempt
+        nextAttempt += 1
+        return await withCheckedContinuation { continuation in
+            pending[attempt] = continuation
+        }
+    }
+
+    func waitForPendingCount(_ count: Int) async {
+        while pending.count < count {
+            await Task.yield()
+        }
+    }
+
+    func resolve(attempt: Int, snapshot: CompleteReminderSnapshot) {
+        pending.removeValue(forKey: attempt)?.resume(returning: snapshot)
+    }
+}
+
+@MainActor
+private final class RoutingSnapshotProjectionRecorder {
+    let router: AppRouter
+    private(set) var publishedTitles: [[String]] = []
+    private(set) var publishedStates: [Int] = []
+
+    init() {
+        router = AppRouter(actions: ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            )
+        ))
+    }
+
+    func publish(snapshot: CompleteReminderSnapshot, state: Int) {
+        router.prunePersistedReminders(keeping: Set(snapshot.reminders.map(\.id)))
+        for reminder in snapshot.reminders {
+            let item = ReminderListItemPresentation(
+                id: reminder.id,
+                title: reminder.title,
+                reminderStatus: ReminderStatus(
+                    primary: .invalidSchedule,
+                    secondary: []
+                ),
+                deviceSchedulingStatus: .notApplicable,
+                nextPresentation: nil,
+                updatedAt: reminder.updatedAt
+            )
+            router.register(detail: ReminderDetailModel(
+                item: item,
+                sourceTime: nil,
+                currentDeviceTime: nil,
+                localizedRepeatSummary: nil,
+                nextNotifications: [],
+                alertGroups: [],
+                scheduledThrough: nil,
+                requestDiagnostics: []
+            ))
+            router.registerFormIfAbsent(ReminderFormModel(
+                snapshot: reminder,
+                savedRepeatPresentation: nil,
+                now: reminder.updatedAt,
+                actions: ReminderFormActions(
+                    save: { draft, _, _ in .saved(draft.id) },
+                    delete: { _ in }
+                )
+            ))
+        }
+        publishedTitles.append(snapshot.reminders.map(\.title))
+        publishedStates.append(state)
+    }
+}
+
+private enum ResponseSnapshotTestFailure: Error {
+    case exhausted
+}
+
+private actor BlockingFirstNotificationLookup {
+    private let blockedReminderID: UUID
+    private let events: OrderedNotificationResponseEvents
+    private var blockedLookupStarted = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    init(
+        blockedReminderID: UUID,
+        events: OrderedNotificationResponseEvents
+    ) {
+        self.blockedReminderID = blockedReminderID
+        self.events = events
+    }
+
+    func reminder(id: UUID) async -> ReminderSnapshot? {
+        events.record("lookup:\(id)")
+        if id == blockedReminderID {
+            blockedLookupStarted = true
+            let waiters = startWaiters
+            startWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+            await withCheckedContinuation { continuation in
+                releaseContinuation = continuation
+            }
+        }
+        return ReminderSnapshot(
+            id: id,
+            title: "Current",
+            notes: nil,
+            urlString: nil,
+            enabled: true,
+            schedule: .corrupt(originalData: Data([0xff])),
+            tagIDs: [],
+            createdAt: Date(timeIntervalSince1970: 1),
+            updatedAt: Date(timeIntervalSince1970: 2)
+        )
+    }
+
+    func waitUntilBlockedLookupStarts() async {
+        guard !blockedLookupStarted else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func releaseBlockedLookup() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+private final class OrderedNotificationResponseEvents: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedValues: [String] = []
+
+    var values: [String] { lock.withLock { storedValues } }
+
+    func record(_ value: String) {
+        lock.withLock { storedValues.append(value) }
+    }
+
+    func waitForCount(_ count: Int) async {
+        while values.count < count {
+            await Task.yield()
+        }
+    }
+}
+
+private extension NotificationResponseDestination {
+    var eventReminderID: UUID {
+        switch self {
+        case let .reminderDetail(reminderID):
+            reminderID
+        case .notificationUnavailable:
+            UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
         }
     }
 }

@@ -54,6 +54,7 @@ final class AppLifecycleCoordinator {
     private let refreshDeviceState: AsyncAction
     private let refreshModelSnapshot: AsyncAction
     private var observerTokens: [NSObjectProtocol] = []
+    private var sceneGeneration: UInt64 = 0
 
     init(
         eligibilityIndexStore: ForegroundEligibilityIndexStore,
@@ -76,16 +77,23 @@ final class AppLifecycleCoordinator {
     func handle(_ trigger: AppLifecycleTrigger) async {
         switch trigger {
         case .launch, .foreground:
+            let generation = beginSceneTransition()
             eligibilityIndexStore.markStale()
             await refreshDeviceState()
+            guard generation == sceneGeneration else { return }
             await refreshModelSnapshot()
+            guard generation == sceneGeneration else { return }
             await requestReconcile(.foreground)
         case .background:
+            _ = beginSceneTransition()
             await enterBackgroundAction()
         case .backgroundRefresh:
+            let generation = beginSceneTransition()
             await enterBackgroundAction()
+            guard generation == sceneGeneration else { return }
             eligibilityIndexStore.markStale()
             await refreshModelSnapshot()
+            guard generation == sceneGeneration else { return }
             await requestReconcile(.modelChanged)
         case .notificationPresentationCompleted, .notificationResponseCompleted:
             await requestReconcile(.foreground)
@@ -125,15 +133,22 @@ final class AppLifecycleCoordinator {
         _ name: Notification.Name,
         trigger: AppLifecycleTrigger
     ) {
+        let eligibilityIndexStore = self.eligibilityIndexStore
         observerTokens.append(notificationCenter.addObserver(
             forName: name,
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            eligibilityIndexStore.markStale()
             Task { @MainActor [weak self] in
                 await self?.handle(trigger)
             }
         })
+    }
+
+    private func beginSceneTransition() -> UInt64 {
+        sceneGeneration &+= 1
+        return sceneGeneration
     }
 }
 

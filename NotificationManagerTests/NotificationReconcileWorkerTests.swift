@@ -386,6 +386,51 @@ struct NotificationReconcileWorkerTests {
         #expect(await center.addedIdentifiers() == [first.identifier])
     }
 
+    @Test func pendingRepeatingRequestKeepsInspectedFireWhenReplacementAddFails() async throws {
+        let reminder = validReminder()
+        let request = repeatingRequest(
+            reminderID: reminder.id,
+            baseInstant: testDate("2040-08-31T13:30:00Z")
+        )
+        let group = try #require(request.contributingGroupIDs.first)
+        let authoritativeFire = testDate("2040-08-31T13:30:00Z")
+        let stateStore = DeviceSchedulingStateStore()
+        let center = NotificationCenterClientSpy(
+            pending: [NotificationInventoryItem(identifier: request.identifier)],
+            addFailures: [request.identifier]
+        )
+        let worker = testWorker(
+            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+            center: center,
+            planner: FixedNotificationPlanner(plan: plan(
+                requests: [request],
+                outcomes: [group: .scheduled]
+            )),
+            materializer: RecordingNotificationMaterializer { logical, _ in
+                notificationRequest(identifier: logical.identifier)
+            },
+            stateStore: stateStore,
+            clock: SequenceReconcileClock([
+                testDate("2040-08-01T00:00:00Z"),
+                testDate("2040-08-02T00:00:00Z")
+            ]),
+            triggerInspector: { _ in
+                NotificationTriggerInspection(
+                    repeats: true,
+                    nextTriggerDate: authoritativeFire
+                )
+            }
+        )
+
+        await worker.requestReconcile(.foreground)
+        await worker.waitUntilIdle()
+
+        let state = await stateStore.snapshot()
+        #expect(state.outcomes[group] == .unscheduledError)
+        #expect(state.nextTriggerDates == [request.identifier: authoritativeFire])
+        #expect(state.pendingOrAddedIdentifiers == [request.identifier])
+    }
+
     @Test func dispatchSmokeFailuresMarkOneShotAndRepeatingContributors() async throws {
         let reminder = validReminder()
         let oneShot = try oneShotRequest(

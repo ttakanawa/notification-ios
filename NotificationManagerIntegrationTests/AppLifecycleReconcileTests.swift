@@ -26,6 +26,70 @@ struct AppLifecycleReconcileTests {
     }
 
     @MainActor
+    @Test func backgroundInvalidatesASuspendedForegroundBeforeItCanReconcile() async {
+        let gate = FirstLifecycleDeviceRefreshGate()
+        let trace = LifecycleTraceRecorder()
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await trace.record(.reconcile(reason))
+            },
+            enterBackground: {
+                await trace.record(.backgroundEntered)
+            },
+            refreshDeviceState: {
+                await gate.refresh()
+            },
+            refreshModelSnapshot: {
+                await trace.record(.modelSnapshotRefreshed)
+            }
+        )
+        let foreground = Task { @MainActor in
+            await coordinator.handle(.foreground)
+        }
+        await gate.waitForCallCount(1)
+
+        await coordinator.handle(.background)
+        await gate.releaseFirstRefresh()
+        await foreground.value
+
+        #expect(await trace.events == [.backgroundEntered])
+    }
+
+    @MainActor
+    @Test func newerForegroundInvalidatesAnOlderSuspendedForeground() async {
+        let gate = FirstLifecycleDeviceRefreshGate()
+        let trace = LifecycleTraceRecorder()
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await trace.record(.reconcile(reason))
+            },
+            enterBackground: {},
+            refreshDeviceState: {
+                await gate.refresh()
+            },
+            refreshModelSnapshot: {
+                await trace.record(.modelSnapshotRefreshed)
+            }
+        )
+        let older = Task { @MainActor in
+            await coordinator.handle(.foreground)
+        }
+        await gate.waitForCallCount(1)
+
+        await coordinator.handle(.foreground)
+        await gate.waitForCallCount(2)
+        await gate.releaseFirstRefresh()
+        await older.value
+
+        #expect(await trace.events == [
+            .modelSnapshotRefreshed,
+            .reconcile(.foreground)
+        ])
+    }
+
+    @MainActor
     @Test func everyStateChangingTriggerInvalidatesEligibilityBeforeRefresh() async {
         let reminderID = UUID(
             uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
@@ -125,6 +189,35 @@ struct AppLifecycleReconcileTests {
         center.post(name: names.modelImported, object: nil)
         await Task.yield()
         #expect(await trace.reconcileReasons.count == 4)
+    }
+
+    @MainActor
+    @Test func systemNotificationStalesEligibilityBeforePostReturns() {
+        let center = NotificationCenter()
+        let names = AppLifecycleNotificationNames(
+            significantTimeChanged: Notification.Name("test.immediate-significant-time"),
+            timeZoneChanged: Notification.Name("test.immediate-time-zone"),
+            localeChanged: Notification.Name("test.immediate-locale"),
+            modelImported: Notification.Name("test.immediate-model-import")
+        )
+        let reminderID = UUID(
+            uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        )!
+        let index = ForegroundEligibilityIndexStore()
+        index.publish(eligibleReminderIDs: [reminderID])
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: index,
+            notificationCenter: center,
+            notificationNames: names,
+            requestReconcile: { _ in },
+            enterBackground: {}
+        )
+        coordinator.startObservingSystemChanges()
+
+        center.post(name: names.modelImported, object: nil)
+
+        #expect(index.snapshot().isStale)
+        coordinator.stopObservingSystemChanges()
     }
 
     @MainActor
@@ -437,6 +530,35 @@ private actor EligibilityObservationRecorder {
 
     func record(_ snapshot: ForegroundEligibilityIndex) {
         snapshots.append(snapshot)
+    }
+}
+
+private actor FirstLifecycleDeviceRefreshGate {
+    private var callCount = 0
+    private var callWaiters: [(Int, CheckedContinuation<Void, Never>)] = []
+    private var firstRelease: CheckedContinuation<Void, Never>?
+
+    func refresh() async {
+        callCount += 1
+        let ready = callWaiters.filter { callCount >= $0.0 }
+        callWaiters.removeAll { callCount >= $0.0 }
+        ready.forEach { $0.1.resume() }
+        guard callCount == 1 else { return }
+        await withCheckedContinuation { continuation in
+            firstRelease = continuation
+        }
+    }
+
+    func waitForCallCount(_ count: Int) async {
+        guard callCount < count else { return }
+        await withCheckedContinuation { continuation in
+            callWaiters.append((count, continuation))
+        }
+    }
+
+    func releaseFirstRefresh() {
+        firstRelease?.resume()
+        firstRelease = nil
     }
 }
 

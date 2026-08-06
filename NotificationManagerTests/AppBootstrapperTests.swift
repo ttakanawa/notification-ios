@@ -1,5 +1,6 @@
 import Foundation
 import NotificationManagerApplication
+import NotificationManagerDomain
 import Testing
 import UserNotifications
 @testable import NotificationManager
@@ -139,6 +140,63 @@ struct AppBootstrapperTests {
     }
 
     @MainActor
+    @Test func onlyWinningEnvironmentActivatesAndDrainsTheQueuedResponse() async {
+        let gate = BootstrapAttemptGate()
+        let staleRoutes = BootstrapNotificationRouteRecorder()
+        let winningRoutes = BootstrapNotificationRouteRecorder()
+        let delegate = NotificationApplicationDelegate(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            installHandler: { _, _ in },
+            responseHandlingInitiallyBound: false
+        )
+        let staleEnvironment = AppEnvironment(notificationHandlingActivation: {
+            staleRoutes.recordActivation()
+            Self.bind(delegate, routes: staleRoutes)
+        })
+        let winningEnvironment = AppEnvironment(notificationHandlingActivation: {
+            winningRoutes.recordActivation()
+            Self.bind(delegate, routes: winningRoutes)
+        })
+        let bootstrapper = AppBootstrapper(
+            notificationDelegate: delegate,
+            openEnvironment: {
+                let attempt = await gate.begin()
+                try await gate.wait(attempt)
+                return attempt == 1 ? staleEnvironment : winningEnvironment
+            },
+            makeDataUnavailableActions: makeBootstrapFailureActions
+        )
+        let completion = BootstrapNotificationCompletionRecorder()
+        delegate.receiveResponse(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            categoryIdentifier: "",
+            userInfo: [
+                NotificationApplicationDelegate.reminderIDKey:
+                    Self.reminderID.uuidString.lowercased()
+            ],
+            completion: { completion.record() }
+        )
+
+        let original = Task { @MainActor in await bootstrapper.start() }
+        await gate.waitForAttempts(1)
+        let retry = Task { @MainActor in await bootstrapper.retry() }
+        await gate.waitForAttempts(2)
+
+        await gate.resolve(2)
+        await retry.value
+        await winningRoutes.waitForDestinationCount(1)
+
+        await gate.resolve(1)
+        await original.value
+
+        #expect(completion.count == 1)
+        #expect(staleRoutes.activationCount == 0)
+        #expect(staleRoutes.destinations.isEmpty)
+        #expect(winningRoutes.activationCount == 1)
+        #expect(winningRoutes.destinations == [.reminderDetail(Self.reminderID)])
+    }
+
+    @MainActor
     private func makeBootstrapper(
         openEnvironment: @escaping AppBootstrapper.EnvironmentOpener
     ) -> AppBootstrapper {
@@ -159,6 +217,48 @@ struct AppBootstrapperTests {
             }
         )
     }
+
+    private static let reminderID = UUID(
+        uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )!
+
+    @MainActor
+    private static func bind(
+        _ delegate: NotificationApplicationDelegate,
+        routes: BootstrapNotificationRouteRecorder
+    ) {
+        delegate.bind(
+            reminderLookup: { reminderID in
+                ReminderSnapshot(
+                    id: reminderID,
+                    title: "Current",
+                    notes: nil,
+                    urlString: nil,
+                    enabled: true,
+                    schedule: .corrupt(originalData: Data([0xff])),
+                    tagIDs: [],
+                    createdAt: Date(timeIntervalSince1970: 1),
+                    updatedAt: Date(timeIntervalSince1970: 2)
+                )
+            },
+            routeResponse: { routes.record($0) },
+            openURL: { _ in },
+            reconcileAfterNotification: { _ in }
+        )
+    }
+}
+
+@MainActor
+private func makeBootstrapFailureActions(
+    retry: @escaping @MainActor @Sendable () async -> Void
+) -> DataUnavailableActions {
+    DataUnavailableActions(
+        preferenceStore: BootstrapPreferenceStore(),
+        authorizationProvider: BootstrapAuthorizationController(),
+        authorizationRequester: BootstrapAuthorizationController(),
+        pendingCleaner: BootstrapPendingCleaner(),
+        retry: retry
+    )
 }
 
 private enum BootstrapTraceEvent: Equatable {
@@ -181,6 +281,37 @@ private final class BootstrapAttemptCounter {
 
     func increment() {
         value += 1
+    }
+}
+
+@MainActor
+private final class BootstrapNotificationRouteRecorder {
+    private(set) var activationCount = 0
+    private(set) var destinations: [NotificationResponseDestination] = []
+
+    func recordActivation() {
+        activationCount += 1
+    }
+
+    func record(_ destination: NotificationResponseDestination) {
+        destinations.append(destination)
+    }
+
+    func waitForDestinationCount(_ count: Int) async {
+        while destinations.count < count {
+            await Task.yield()
+        }
+    }
+}
+
+private final class BootstrapNotificationCompletionRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storedCount = 0
+
+    var count: Int { lock.withLock { storedCount } }
+
+    func record() {
+        lock.withLock { storedCount += 1 }
     }
 }
 
