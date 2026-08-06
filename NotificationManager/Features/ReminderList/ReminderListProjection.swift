@@ -7,34 +7,59 @@ struct ReminderTagPresentation: Sendable, Equatable, Identifiable {
     let normalizedName: String
 }
 
+enum PhysicalNotificationReasonRole: Sendable, Equatable {
+    case primary
+    case secondary
+}
+
+struct PhysicalNotificationReasonPresentation: Sendable, Equatable {
+    let role: PhysicalNotificationReasonRole
+    let kind: AlertKind
+    let baseOccurrenceInstant: Date
+}
+
 struct PhysicalNotificationPresentation: Sendable, Equatable, Identifiable {
     var id: Date { alertInstant }
 
     let alertInstant: Date
-    let primaryReason: AlertKind
-    let secondaryEarlyReasonCount: Int
-    let baseOccurrenceInstants: [Date]
+    let reasons: [PhysicalNotificationReasonPresentation]
     let sourceTime: Date
     let sourceTimeZoneIdentifier: String?
     let deviceLocalTime: Date
 
     init(
+        notification: PhysicalNotification,
+        sourceTimeZoneIdentifier: String? = nil,
+        deviceLocalTime: Date
+    ) {
+        alertInstant = notification.alertInstant
+        reasons = notification.reasons.enumerated().map { index, reason in
+            PhysicalNotificationReasonPresentation(
+                role: index == 0 ? .primary : .secondary,
+                kind: reason.kind,
+                baseOccurrenceInstant: reason.baseOccurrence.instant
+            )
+        }
+        sourceTime = notification.primaryReason.baseOccurrence.instant
+        self.sourceTimeZoneIdentifier = sourceTimeZoneIdentifier
+        self.deviceLocalTime = deviceLocalTime
+    }
+
+    init(
         alertInstant: Date,
-        primaryReason: AlertKind,
-        secondaryEarlyReasonCount: Int,
-        baseOccurrenceInstants: [Date],
+        reasons: [PhysicalNotificationReasonPresentation],
         sourceTime: Date,
         sourceTimeZoneIdentifier: String? = nil,
         deviceLocalTime: Date
     ) {
+        precondition(reasons.first?.role == .primary)
         self.alertInstant = alertInstant
-        self.primaryReason = primaryReason
-        self.secondaryEarlyReasonCount = secondaryEarlyReasonCount
-        self.baseOccurrenceInstants = baseOccurrenceInstants
+        self.reasons = reasons
         self.sourceTime = sourceTime
         self.sourceTimeZoneIdentifier = sourceTimeZoneIdentifier
         self.deviceLocalTime = deviceLocalTime
     }
+
 }
 
 enum ReminderNextPresentation: Sendable, Equatable {
@@ -52,7 +77,7 @@ enum ReminderNextPresentation: Sendable, Equatable {
 struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     let id: UUID
     let title: String
-    let lifecycleStatus: LifecycleStatus
+    let reminderStatus: ReminderStatus
     let deviceSchedulingStatus: DeviceSchedulingStatus
     let nextPresentation: ReminderNextPresentation?
     let nextReason: AlertKind?
@@ -67,7 +92,7 @@ struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     init(
         id: UUID,
         title: String,
-        lifecycleStatus: LifecycleStatus,
+        reminderStatus: ReminderStatus,
         deviceSchedulingStatus: DeviceSchedulingStatus,
         nextPresentation: ReminderNextPresentation?,
         nextReason: AlertKind? = nil,
@@ -81,7 +106,7 @@ struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     ) {
         self.id = id
         self.title = title
-        self.lifecycleStatus = lifecycleStatus
+        self.reminderStatus = reminderStatus
         self.deviceSchedulingStatus = deviceSchedulingStatus
         self.nextPresentation = nextPresentation
         self.nextReason = nextReason
@@ -93,6 +118,8 @@ struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
         self.earliestGroupOutcome = earliestGroupOutcome
         self.updatedAt = updatedAt
     }
+
+    var lifecycleStatus: LifecycleStatus { reminderStatus.primary }
 }
 
 struct ReminderListSections: Sendable, Equatable {

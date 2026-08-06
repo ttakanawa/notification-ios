@@ -146,7 +146,11 @@ struct PhysicalNotificationPreviewView: View {
 
             ForEach(Array(notification.reasons.enumerated()), id: \.offset) { index, reason in
                 LabeledContent {
-                    Label(reason.kind.semanticKey, systemImage: "bell")
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Label(reason.kind.semanticKey, systemImage: "bell")
+                        Text(reason.baseOccurrence.instant, format: .dateTime)
+                            .environment(\.timeZone, sourceTimeZone ?? .current)
+                    }
                 } label: {
                     if index == 0 {
                         Text("reminder.next.primary-reason")
@@ -176,16 +180,6 @@ struct PhysicalNotificationPreviewView: View {
                 Text(notification.alertInstant, format: .dateTime)
             }
 
-            ForEach(
-                Array(notification.contributingBaseOccurrences.enumerated()),
-                id: \.offset
-            ) { _, occurrence in
-                LabeledContent("reminder.next.base-occurrence") {
-                    Text(occurrence.instant, format: .dateTime)
-                        .environment(\.timeZone, sourceTimeZone ?? .current)
-                }
-                .font(.caption)
-            }
         }
         .fixedSize(horizontal: false, vertical: true)
         .accessibilityElement(children: .contain)

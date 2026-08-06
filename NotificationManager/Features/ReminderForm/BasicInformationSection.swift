@@ -69,6 +69,7 @@ extension ReminderFormFieldIssue {
         case .notesTooLarge: "reminder.form.error.notes-too-large"
         case .urlInvalid: "reminder.form.error.url-invalid"
         case .urlTooLarge: "reminder.form.error.url-too-large"
+        case .timeZoneRequired: "reminder.form.error.time-zone-required"
         case .timeZoneInvalid: "reminder.form.error.time-zone-invalid"
         case .repeatEndInvalid: "reminder.form.error.invalid-repeat-end-date"
         case .repeatEndBeforeStart: "reminder.form.error.repeat-end-before-start"

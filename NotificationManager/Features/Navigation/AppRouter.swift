@@ -64,6 +64,11 @@ final class AppRouter {
         route(to: .reminderCreate(form.detachedDraft.id))
     }
 
+    func setCompactPathFromSystem(_ path: [AppRouterDestination]) {
+        compactPath = path
+        selectedReminderID = path.reversed().lazy.compactMap(\.detailReminderID).first
+    }
+
     func reminderWasDeleted(_ reminderID: UUID) {
         detailsByID.removeValue(forKey: reminderID)
         formsByID.removeValue(forKey: reminderID)
@@ -74,6 +79,24 @@ final class AppRouter {
         if regularDestination?.reminderID == reminderID {
             regularDestination = nil
         }
+    }
+
+    func reminderFormWasSaved(_ reminderID: UUID) {
+        formsByID.removeValue(forKey: reminderID)
+        compactPath.removeAll { $0.formReminderID == reminderID }
+        if regularDestination?.formReminderID == reminderID {
+            regularDestination = nil
+        }
+    }
+
+    @discardableResult
+    func performReminderSave(
+        _ reminderID: UUID,
+        operation: @MainActor () async -> Bool
+    ) async -> Bool {
+        guard await operation() else { return false }
+        reminderFormWasSaved(reminderID)
+        return true
     }
 
     @discardableResult
@@ -115,5 +138,19 @@ private extension AppRouterDestination {
         case let .reminderDetail(id), let .reminderEdit(id), let .reminderCreate(id):
             id
         }
+    }
+
+    var formReminderID: UUID? {
+        switch self {
+        case .reminderDetail:
+            nil
+        case let .reminderEdit(id), let .reminderCreate(id):
+            id
+        }
+    }
+
+    var detailReminderID: UUID? {
+        guard case let .reminderDetail(id) = self else { return nil }
+        return id
     }
 }

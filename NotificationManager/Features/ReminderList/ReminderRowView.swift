@@ -89,11 +89,14 @@ struct ReminderRowView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(notification.alertInstant, format: .dateTime)
                     .font(.subheadline.weight(.semibold))
-                Label(notification.primaryReason.semanticKey, systemImage: "bell")
+                ForEach(Array(notification.reasons.enumerated()), id: \.offset) { _, reason in
+                    LabeledContent(reason.role.semanticKey) {
+                        VStack(alignment: .trailing, spacing: 2) {
+                            Label(reason.kind.semanticKey, systemImage: "bell")
+                            Text(reason.baseOccurrenceInstant, format: .dateTime)
+                        }
+                    }
                     .font(.caption)
-                if notification.secondaryEarlyReasonCount > 0 {
-                    Text("reminder.next.secondary-early \(notification.secondaryEarlyReasonCount)")
-                        .font(.caption)
                 }
             }
             .accessibilityIdentifier("reminder-row.next-rolling")
@@ -132,6 +135,15 @@ extension AlertKind {
         switch self {
         case .main: "reminder.reason.main"
         case .early: "reminder.reason.early"
+        }
+    }
+}
+
+extension PhysicalNotificationReasonRole {
+    var semanticKey: LocalizedStringKey {
+        switch self {
+        case .primary: "reminder.next.primary-reason"
+        case .secondary: "reminder.next.secondary-reason"
         }
     }
 }

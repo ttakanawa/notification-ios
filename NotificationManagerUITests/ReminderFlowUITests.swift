@@ -136,6 +136,56 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testEarlyReminderExposesOneMinuteFiveMinuteAndCustomChoices() {
+        let app = launch(scenario: "empty-list")
+        app.buttons["reminder-list.add"].tap()
+
+        let picker = app.buttons["reminder-form.early-choice"]
+        XCTAssertTrue(picker.waitForExistence(timeout: 1))
+        picker.tap()
+        XCTAssertTrue(app.buttons["reminder.early.one-minute-before"].exists)
+        XCTAssertTrue(app.buttons["reminder.early.five-minutes-before"].exists)
+        app.buttons["reminder.early.custom"].tap()
+
+        XCTAssertTrue(app.textFields["reminder-form.early-value"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.buttons["reminder-form.early-unit"].exists)
+        XCTAssertTrue(app.switches["reminder-form.main-enabled"].exists)
+    }
+
+    @MainActor
+    func testListEnabledCapacityConfirmationReplaysAcknowledgedChoice() {
+        let app = launch(scenario: "enabled-capacity")
+        let toggle = app.switches[
+            "reminder-row.enabled.ffffffff-ffff-ffff-ffff-ffffffffffff"
+        ]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 2))
+
+        toggle.tap()
+
+        let confirmation = app.otherElements["reminder-form.capacity-confirmation"]
+        XCTAssertTrue(confirmation.waitForExistence(timeout: 1))
+        app.buttons["reminder-form.capacity-confirm"].tap()
+        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 1))
+    }
+
+    @MainActor
+    func testDetailEnabledCapacityConfirmationUsesSharedCoordinator() {
+        let app = launch(scenario: "enabled-capacity")
+        app.buttons["reminder-row.ffffffff-ffff-ffff-ffff-ffffffffffff"].tap()
+        let toggle = app.switches["reminder-detail.enabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 1))
+
+        toggle.tap()
+
+        XCTAssertTrue(
+            app.otherElements["reminder-form.capacity-confirmation"]
+                .waitForExistence(timeout: 1)
+        )
+        app.buttons["reminder-form.capacity-confirm"].tap()
+        XCTAssertTrue(app.otherElements["reminder-detail.root"].exists)
+    }
+
+    @MainActor
     private func launch(scenario: String) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-ui-testing", "-ui-scenario", scenario]

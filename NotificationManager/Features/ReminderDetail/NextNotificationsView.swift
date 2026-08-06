@@ -34,10 +34,17 @@ struct NextNotificationsView: View {
                 VStack(alignment: .leading, spacing: 6) {
                     Text(value.alertInstant, format: .dateTime)
                         .font(.headline)
-                    Label(value.primaryReason.semanticKey, systemImage: "bell")
-                    if value.secondaryEarlyReasonCount > 0 {
-                        Text("reminder.next.secondary-early \(value.secondaryEarlyReasonCount)")
-                            .font(.subheadline)
+                    ForEach(Array(value.reasons.enumerated()), id: \.offset) { _, reason in
+                        LabeledContent(reason.role.semanticKey) {
+                            VStack(alignment: .trailing, spacing: 2) {
+                                Label(reason.kind.semanticKey, systemImage: "bell")
+                                Text(reason.baseOccurrenceInstant, format: .dateTime)
+                                    .environment(
+                                        \.timeZone,
+                                        sourceTimeZone(for: value) ?? .current
+                                    )
+                            }
+                        }
                     }
                     LabeledContent("reminder.next.source-time") {
                         Text(value.sourceTime, format: .dateTime)
@@ -45,13 +52,6 @@ struct NextNotificationsView: View {
                     }
                     LabeledContent("reminder.next.device-time") {
                         Text(value.deviceLocalTime, format: .dateTime)
-                    }
-                    ForEach(Array(value.baseOccurrenceInstants.enumerated()), id: \.offset) {
-                        _, occurrence in
-                        LabeledContent("reminder.next.base-occurrence") {
-                            Text(occurrence, format: .dateTime)
-                                .environment(\.timeZone, sourceTimeZone(for: value) ?? .current)
-                        }
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)

@@ -1,8 +1,15 @@
 import Foundation
+import NotificationManagerApplication
 import Observation
 
+struct SetReminderEnabledCommand: Sendable, Equatable {
+    let reminderID: UUID
+    let enabled: Bool
+    let capacityConsent: CapacityConsent
+}
+
 struct ReminderActionHandlers: Sendable {
-    let setEnabled: @Sendable (UUID, Bool) async throws -> Void
+    let setEnabled: @Sendable (SetReminderEnabledCommand) async throws -> SaveReminderOutcome
     let delete: @Sendable (UUID) async throws -> Void
 }
 
@@ -14,6 +21,7 @@ enum ReminderActionFailure: Sendable, Equatable {
 enum ReminderActionState: Sendable, Equatable {
     case idle
     case working(UUID)
+    case requiresCapacityConfirmation(UUID, Bool, CapacityWarning)
     case failed(UUID, ReminderActionFailure)
     case deleted(UUID)
 }
@@ -25,37 +33,99 @@ final class ReminderActionCoordinator {
     private(set) var state: ReminderActionState = .idle
 
     @ObservationIgnored private let handlers: ReminderActionHandlers
-    private var enabledOverrides: [UUID: Bool] = [:]
+    private var enabledOverrides: [UUID: EnabledOverride] = [:]
+    private var latestEnabledObservations: [UUID: EnabledObservation] = [:]
+    private var pendingEnabledCapacityChange: PendingEnabledCapacityChange?
     private var confirmedDeleteID: UUID?
+    private var actionGeneration: UInt64 = 0
+    private var observationSequence: UInt64 = 0
 
     init(handlers: ReminderActionHandlers) {
         self.handlers = handlers
     }
 
+    var enabledCapacityConfirmation: (
+        reminderID: UUID,
+        warning: CapacityWarning
+    )? {
+        guard case let .requiresCapacityConfirmation(id, _, warning) = state else {
+            return nil
+        }
+        return (id, warning)
+    }
+
     func enabledValue(for id: UUID, fallback: Bool) -> Bool {
-        enabledOverrides[id] ?? fallback
+        enabledOverrides[id]?.value ?? latestEnabledObservations[id]?.value ?? fallback
     }
 
     func isWorking(_ id: UUID) -> Bool {
-        state == .working(id)
+        switch state {
+        case .working(id), .requiresCapacityConfirmation(id, _, _):
+            true
+        default:
+            false
+        }
     }
 
-    func setEnabled(_ enabled: Bool, for id: UUID, fallback: Bool) async {
-        guard !isBusy else { return }
+    @discardableResult
+    func setEnabled(_ enabled: Bool, for id: UUID, fallback: Bool) async -> Bool {
+        guard !isBusy else { return false }
+        actionGeneration &+= 1
+        let generation = actionGeneration
         let previousOverride = enabledOverrides[id]
-        enabledOverrides[id] = enabled
+        enabledOverrides[id] = EnabledOverride(
+            value: enabled,
+            generation: generation,
+            startingObservationSequence: observationSequence,
+            awaitsAuthoritativeObservation: false
+        )
         state = .working(id)
-        do {
-            try await handlers.setEnabled(id, enabled)
-            state = .idle
-        } catch {
-            if let previousOverride {
-                enabledOverrides[id] = previousOverride
-            } else {
-                enabledOverrides.removeValue(forKey: id)
-            }
-            state = .failed(id, .enabledChange)
+        return await performEnabledChange(
+            SetReminderEnabledCommand(
+                reminderID: id,
+                enabled: enabled,
+                capacityConsent: .notProvided
+            ),
+            generation: generation,
+            previousOverride: previousOverride
+        )
+    }
+
+    @discardableResult
+    func confirmEnabledCapacityChange(_ id: UUID) async -> Bool {
+        guard let pending = pendingEnabledCapacityChange,
+              pending.command.reminderID == id,
+              case .requiresCapacityConfirmation(id, _, _) = state
+        else {
+            return false
         }
+        pendingEnabledCapacityChange = nil
+        state = .working(id)
+        return await performEnabledChange(
+            SetReminderEnabledCommand(
+                reminderID: id,
+                enabled: pending.command.enabled,
+                capacityConsent: .acknowledged
+            ),
+            generation: pending.generation,
+            previousOverride: pending.previousOverride
+        )
+    }
+
+    func cancelEnabledCapacityChange(_ id: UUID) {
+        guard let pending = pendingEnabledCapacityChange,
+              pending.command.reminderID == id,
+              case .requiresCapacityConfirmation(id, _, _) = state
+        else {
+            return
+        }
+        restoreEnabledOverride(
+            for: id,
+            generation: pending.generation,
+            previousOverride: pending.previousOverride
+        )
+        pendingEnabledCapacityChange = nil
+        state = .idle
     }
 
     func requestDelete(_ id: UUID) {
@@ -97,14 +167,116 @@ final class ReminderActionCoordinator {
     }
 
     func synchronize(with items: [ReminderListItemPresentation]) {
-        for item in items where enabledOverrides[item.id] == item.enabled {
-            enabledOverrides.removeValue(forKey: item.id)
+        observationSequence &+= 1
+        for item in items {
+            latestEnabledObservations[item.id] = EnabledObservation(
+                value: item.enabled,
+                sequence: observationSequence
+            )
+            guard let override = enabledOverrides[item.id] else { continue }
+            if override.value == item.enabled || override.awaitsAuthoritativeObservation {
+                enabledOverrides.removeValue(forKey: item.id)
+            }
         }
     }
 
-    private var isBusy: Bool {
-        if case .working = state { true } else { false }
+    private func performEnabledChange(
+        _ command: SetReminderEnabledCommand,
+        generation: UInt64,
+        previousOverride: EnabledOverride?
+    ) async -> Bool {
+        do {
+            let outcome = try await handlers.setEnabled(command)
+            switch outcome {
+            case let .saved(savedID) where savedID == command.reminderID:
+                completeEnabledOverride(for: command.reminderID, generation: generation)
+                pendingEnabledCapacityChange = nil
+                state = .idle
+                return true
+            case let .requiresCapacityConfirmation(warning):
+                pendingEnabledCapacityChange = PendingEnabledCapacityChange(
+                    command: command,
+                    generation: generation,
+                    previousOverride: previousOverride
+                )
+                state = .requiresCapacityConfirmation(
+                    command.reminderID,
+                    command.enabled,
+                    warning
+                )
+                return false
+            case .saved, .requiresExpiredScheduleConfirmation:
+                restoreEnabledOverride(
+                    for: command.reminderID,
+                    generation: generation,
+                    previousOverride: previousOverride
+                )
+                pendingEnabledCapacityChange = nil
+                state = .failed(command.reminderID, .enabledChange)
+                return false
+            }
+        } catch {
+            restoreEnabledOverride(
+                for: command.reminderID,
+                generation: generation,
+                previousOverride: previousOverride
+            )
+            pendingEnabledCapacityChange = nil
+            state = .failed(command.reminderID, .enabledChange)
+            return false
+        }
     }
+
+    private func completeEnabledOverride(for id: UUID, generation: UInt64) {
+        guard var override = enabledOverrides[id], override.generation == generation else {
+            return
+        }
+        if let observation = latestEnabledObservations[id],
+           observation.sequence > override.startingObservationSequence,
+           observation.value != override.value
+        {
+            enabledOverrides.removeValue(forKey: id)
+            return
+        }
+        override.awaitsAuthoritativeObservation = true
+        enabledOverrides[id] = override
+    }
+
+    private func restoreEnabledOverride(
+        for id: UUID,
+        generation: UInt64,
+        previousOverride: EnabledOverride?
+    ) {
+        guard enabledOverrides[id]?.generation == generation else { return }
+        enabledOverrides[id] = previousOverride
+    }
+
+    private var isBusy: Bool {
+        switch state {
+        case .working, .requiresCapacityConfirmation:
+            true
+        default:
+            false
+        }
+    }
+}
+
+private struct EnabledOverride {
+    let value: Bool
+    let generation: UInt64
+    let startingObservationSequence: UInt64
+    var awaitsAuthoritativeObservation: Bool
+}
+
+private struct EnabledObservation {
+    let value: Bool
+    let sequence: UInt64
+}
+
+private struct PendingEnabledCapacityChange {
+    let command: SetReminderEnabledCommand
+    let generation: UInt64
+    let previousOverride: EnabledOverride?
 }
 
 @MainActor

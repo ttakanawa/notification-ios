@@ -6,33 +6,39 @@ struct EarlyReminderSection: View {
 
     var body: some View {
         Section("reminder.form.section.early-reminder") {
-            Toggle("reminder.field.early-reminder", isOn: earlyEnabledBinding)
+            Picker("reminder.field.early-reminder", selection: earlyChoiceBinding) {
+                ForEach(EarlyReminderChoice.allCases) { choice in
+                    Text(choice.semanticKey).tag(choice)
+                }
+            }
                 .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityIdentifier("reminder-form.early-enabled")
+                .accessibilityIdentifier("reminder-form.early-choice")
 
             if let early = model.earlyReminder {
-                TextField("reminder.field.early-value", text: earlyValueBinding)
-                    .keyboardType(.numberPad)
-                    .disabled(!model.scheduleFieldsAreEditable)
-                    .accessibilityIdentifier("reminder-form.early-value")
+                if model.earlyReminderChoice == .custom {
+                    TextField("reminder.field.early-value", text: earlyValueBinding)
+                        .keyboardType(.numberPad)
+                        .disabled(!model.scheduleFieldsAreEditable)
+                        .accessibilityIdentifier("reminder-form.early-value")
 
-                if !model.earlyReminderValueTextIsValid {
-                    Label(
-                        "reminder.form.error.invalid-early-value",
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.early-value-error")
-                }
-
-                Picker("reminder.field.early-unit", selection: earlyUnitBinding) {
-                    ForEach(EarlyReminderUnitChoice.allCases) { choice in
-                        Text(choice.semanticKey).tag(choice)
+                    if !model.earlyReminderValueTextIsValid {
+                        Label(
+                            "reminder.form.error.invalid-early-value",
+                            systemImage: "exclamationmark.triangle"
+                        )
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("reminder-form.early-value-error")
                     }
+
+                    Picker("reminder.field.early-unit", selection: earlyUnitBinding) {
+                        ForEach(EarlyReminderUnitChoice.allCases) { choice in
+                            Text(choice.semanticKey).tag(choice)
+                        }
+                    }
+                    .disabled(!model.scheduleFieldsAreEditable)
+                    .accessibilityIdentifier("reminder-form.early-unit")
                 }
-                .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityIdentifier("reminder-form.early-unit")
 
                 Toggle("reminder.field.main-notification", isOn: mainEnabledBinding(early))
                     .disabled(!model.scheduleFieldsAreEditable)
@@ -43,14 +49,10 @@ struct EarlyReminderSection: View {
         .accessibilityIdentifier("reminder-form.section.early-reminder")
     }
 
-    private var earlyEnabledBinding: Binding<Bool> {
+    private var earlyChoiceBinding: Binding<EarlyReminderChoice> {
         Binding(
-            get: { model.earlyReminder != nil },
-            set: { enabled in
-                model.earlyReminder = enabled
-                    ? (model.earlyReminder ?? EarlyReminder(value: 5, unit: .minutes))
-                    : nil
-            }
+            get: { model.earlyReminderChoice },
+            set: model.applyEarlyReminderChoice
         )
     }
 
@@ -77,6 +79,17 @@ struct EarlyReminderSection: View {
                 model.updateMainNotificationEnabled(enabled)
             }
         )
+    }
+}
+
+private extension EarlyReminderChoice {
+    var semanticKey: LocalizedStringKey {
+        switch self {
+        case .none: "reminder.early.none"
+        case .oneMinute: "reminder.early.one-minute-before"
+        case .fiveMinutes: "reminder.early.five-minutes-before"
+        case .custom: "reminder.early.custom"
+        }
     }
 }
 

@@ -25,4 +25,31 @@ public struct ReminderDraftValidator: Sendable {
             )
         }
     }
+
+    public func validateMetadataOnly(
+        _ draft: ReminderDraft
+    ) throws -> ValidatedReminderAggregate {
+        guard case .preserveOriginal = draft.scheduleChange,
+              draft.originalScheduleData != nil
+        else {
+            throw ReminderValidationIssue.missingScheduleData
+        }
+        let neutralScheduleDraft = ReminderDraft(
+            id: draft.id,
+            title: draft.title,
+            notes: draft.notes,
+            urlString: draft.urlString,
+            enabled: draft.enabled,
+            source: draft.source,
+            rule: draft.rule,
+            end: draft.end,
+            early: draft.early,
+            scheduleChange: .preserveOriginal,
+            originalScheduleData: Data(),
+            tagIDs: draft.tagIDs,
+            createdAt: draft.createdAt,
+            updatedAt: draft.updatedAt
+        )
+        return try aggregateValidator.validate(neutralScheduleDraft)
+    }
 }

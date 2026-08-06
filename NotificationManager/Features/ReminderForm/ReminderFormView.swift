@@ -3,7 +3,6 @@ import SwiftUI
 struct ReminderFormView: View {
     @Bindable var model: ReminderFormModel
     @Bindable var router: AppRouter
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         Form {
@@ -18,7 +17,12 @@ struct ReminderFormView: View {
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("reminder.action.save") {
-                    Task { await model.save() }
+                    let reminderID = model.detachedDraft.id
+                    Task {
+                        await router.performReminderSave(reminderID) {
+                            await model.save()
+                        }
+                    }
                 }
                 .disabled(!model.canSave)
                 .accessibilityIdentifier("reminder-form.save")
@@ -28,7 +32,14 @@ struct ReminderFormView: View {
             if case let .requiresCapacityConfirmation(warning) = model.saveState {
                 CapacityConfirmationView(
                     warning: warning,
-                    onConfirm: { Task { await model.confirmCapacitySave() } },
+                    onConfirm: {
+                        let reminderID = model.detachedDraft.id
+                        Task {
+                            await router.performReminderSave(reminderID) {
+                                await model.confirmCapacitySave()
+                            }
+                        }
+                    },
                     onCancel: model.dismissPendingConfirmation
                 )
                 .presentationDetents([.medium])
@@ -39,7 +50,13 @@ struct ReminderFormView: View {
             isPresented: expiredConfirmationPresented
         ) {
             Button("reminder.form.expired-confirmation.confirm", role: .destructive) {
-                Task { await model.confirmExpiredSave() }
+                let reminderID = model.detachedDraft.id
+                guard model.consumeExpiredScheduleConfirmation() else { return }
+                Task {
+                    await router.performReminderSave(reminderID) {
+                        await model.performConfirmedExpiredScheduleSave()
+                    }
+                }
             }
             .accessibilityIdentifier("reminder-form.expired-confirm")
             Button("reminder.action.cancel", role: .cancel) {
@@ -68,9 +85,6 @@ struct ReminderFormView: View {
             .accessibilityIdentifier("reminder-form.delete-cancel")
         } message: {
             Text("reminder.form.delete-confirmation.message")
-        }
-        .onChange(of: model.saveState) { _, state in
-            if case .saved = state { dismiss() }
         }
         .accessibilityIdentifier("reminder-form.root")
     }

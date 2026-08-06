@@ -29,9 +29,15 @@ private struct Task14UITestFixtureComposition {
         let scenario = scenarioName(in: arguments)
         let fixture = fixture(for: scenario)
         let listModel = ReminderListModel(items: fixture.items)
+        let enabledCapacityAction = Task14EnabledCapacityAction()
         let actionCoordinator = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
-                setEnabled: { _, _ in },
+                setEnabled: { command in
+                    if scenario == "enabled-capacity" {
+                        return await enabledCapacityAction.execute(command)
+                    }
+                    return .saved(command.reminderID)
+                },
                 delete: { _ in }
             )
         )
@@ -87,6 +93,8 @@ private struct Task14UITestFixtureComposition {
                 repeatPresentation: .standard(localizedSummary: "Every week"),
                 actions: capacityConfirmationActions()
             )
+        case "enabled-capacity":
+            return enabledCapacityFixture()
         default:
             return editableFixture(
                 id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
@@ -155,6 +163,23 @@ private struct Task14UITestFixtureComposition {
         )
     }
 
+    private static func enabledCapacityFixture() -> Task14ScenarioFixture {
+        let id = uuid("ffffffff-ffff-ffff-ffff-ffffffffffff")
+        let item = makeListItem(
+            id: id,
+            title: "Capacity enable",
+            lifecycleStatus: .disabled,
+            sourceWallClock: schedule.source,
+            localizedRepeatSummary: "Every day",
+            enabled: false
+        )
+        return Task14ScenarioFixture(
+            items: [item],
+            details: [makeDetail(item: item)],
+            forms: []
+        )
+    }
+
     private static func makeNewForm() -> ReminderFormModel {
         ReminderFormModel(
             newReminderID: uuid("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
@@ -186,12 +211,13 @@ private struct Task14UITestFixtureComposition {
         title: String,
         lifecycleStatus: LifecycleStatus,
         sourceWallClock: SourceWallClock?,
-        localizedRepeatSummary: String?
+        localizedRepeatSummary: String?,
+        enabled: Bool = true
     ) -> ReminderListItemPresentation {
         ReminderListItemPresentation(
             id: id,
             title: title,
-            lifecycleStatus: lifecycleStatus,
+            reminderStatus: ReminderStatus(primary: lifecycleStatus, secondary: []),
             deviceSchedulingStatus: lifecycleStatus == .active ? .scheduled : .notApplicable,
             nextPresentation: lifecycleStatus == .active
                 ? .directOSFire(authoritative: sourceInstant, foundationPreview: sourceInstant)
@@ -199,7 +225,7 @@ private struct Task14UITestFixtureComposition {
             nextReason: lifecycleStatus == .active ? .main : nil,
             sourceWallClock: sourceWallClock,
             localizedRepeatSummary: localizedRepeatSummary,
-            enabled: true,
+            enabled: enabled,
             updatedAt: evaluationNow
         )
     }
@@ -277,6 +303,22 @@ private struct Task14UITestFixtureComposition {
             preconditionFailure("Invalid Task 14 UI fixture UUID")
         }
         return id
+    }
+}
+
+private actor Task14EnabledCapacityAction {
+    func execute(_ command: SetReminderEnabledCommand) -> SaveReminderOutcome {
+        guard command.enabled, command.capacityConsent == .notProvided else {
+            return .saved(command.reminderID)
+        }
+        return .requiresCapacityConfirmation(CapacityWarning(
+            reminderID: command.reminderID,
+            earliestGroupID: AlertGroupID(
+                reminderID: command.reminderID,
+                baseOccurrenceInstant: Date(timeIntervalSince1970: 2_229_868_200)
+            ),
+            planningCapacity: 60
+        ))
     }
 }
 

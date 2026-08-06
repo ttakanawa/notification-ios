@@ -84,9 +84,19 @@ enum ReminderFormFieldIssue: Sendable, Equatable {
     case notesTooLarge
     case urlInvalid
     case urlTooLarge
+    case timeZoneRequired
     case timeZoneInvalid
     case repeatEndInvalid
     case repeatEndBeforeStart
+}
+
+enum EarlyReminderChoice: String, Sendable, Equatable, CaseIterable, Identifiable {
+    case none
+    case oneMinute
+    case fiveMinutes
+    case custom
+
+    var id: String { rawValue }
 }
 
 enum ReminderFormSaveState: Sendable, Equatable {
@@ -116,6 +126,7 @@ final class ReminderFormModel {
     private(set) var repeatEndDateText = ""
     private(set) var repeatEndsOnDate = false
     private(set) var earlyReminderValueText = ""
+    private(set) var earlyReminderChoice: EarlyReminderChoice = .none
     private(set) var customRepeatText = ""
     private(set) var isReplacingCustomRepeat = false
     private(set) var customRepeatState: CustomRepeatSessionState = .idle
@@ -134,7 +145,9 @@ final class ReminderFormModel {
     @ObservationIgnored private var editRevision: UInt64 = 0
     @ObservationIgnored private var capacityConsent: CapacityConsent = .notProvided
     @ObservationIgnored private var expiredScheduleConsent: ExpiredScheduleConsent = .notProvided
+    @ObservationIgnored private var confirmedExpiredSaveRevision: UInt64?
     @ObservationIgnored private var confirmedDeleteIsPending = false
+    @ObservationIgnored private var scheduleHasEditIntent = false
     @ObservationIgnored private let requiresReplacementBeforeSave: Bool
 
     init(
@@ -181,6 +194,7 @@ final class ReminderFormModel {
             repeatEndsOnDate = true
         }
         earlyReminderValueText = initialDraft.early.map { String($0.value) } ?? ""
+        earlyReminderChoice = Self.earlyReminderChoice(for: initialDraft.early)
         canDelete = true
         self.availableTags = availableTags
         self.actions = actions
@@ -260,6 +274,7 @@ final class ReminderFormModel {
             sourceDateText = Self.format(newValue)
             refreshAnchorDependentPreset()
             scheduleFieldChanged()
+            refreshRepeatSummaryAfterSourceDateEdit()
         }
     }
 
@@ -324,6 +339,7 @@ final class ReminderFormModel {
             guard canEditSchedule else { return }
             detachedDraft.early = newValue
             earlyReminderValueText = newValue.map { String($0.value) } ?? ""
+            earlyReminderChoice = Self.earlyReminderChoice(for: newValue)
             scheduleFieldChanged()
         }
     }
@@ -359,11 +375,11 @@ final class ReminderFormModel {
     }
 
     var timeZoneFieldIssue: ReminderFormFieldIssue? {
-        guard canEditSchedule,
-              let identifier = detachedDraft.timeZoneIdentifier,
+        guard canEditSchedule else { return nil }
+        guard let identifier = detachedDraft.timeZoneIdentifier,
               !identifier.isEmpty
         else {
-            return nil
+            return scheduleHasEditIntent ? .timeZoneRequired : nil
         }
         return TimeZone.knownTimeZoneIdentifiers.contains(identifier)
             && TimeZone(identifier: identifier) != nil
@@ -372,7 +388,7 @@ final class ReminderFormModel {
     }
 
     var sourceDateTextIsValid: Bool {
-        guard !sourceDateText.isEmpty else { return true }
+        guard !sourceDateText.isEmpty else { return !scheduleHasEditIntent }
         guard let value = Self.parseSourceDate(sourceDateText),
               detachedDraft.date == value
         else {
@@ -389,7 +405,7 @@ final class ReminderFormModel {
     }
 
     var sourceTimeTextIsValid: Bool {
-        guard !sourceTimeText.isEmpty else { return true }
+        guard !sourceTimeText.isEmpty else { return !scheduleHasEditIntent }
         guard let value = Self.parseSourceTime(sourceTimeText),
               detachedDraft.time == value
         else {
@@ -429,6 +445,7 @@ final class ReminderFormModel {
     var canSaveWithoutReplacingSchedule: Bool {
         guard detachedDraft.originalScheduleData != nil,
               !requiresReplacementBeforeSave,
+              !scheduleHasEditIntent,
               !isReplacingCustomRepeat,
               scheduleInputFieldsAreValid,
               case .preserveOriginal = detachedDraft.scheduleChange
@@ -462,6 +479,7 @@ final class ReminderFormModel {
         detachedDraft.date = Self.parseSourceDate(input)
         refreshAnchorDependentPreset()
         scheduleFieldChanged()
+        refreshRepeatSummaryAfterSourceDateEdit()
     }
 
     func updateSourceTimeText(_ input: String) {
@@ -481,6 +499,7 @@ final class ReminderFormModel {
                 mainEnabled: current.mainEnabled
             )
         }
+        earlyReminderChoice = .custom
         scheduleFieldChanged()
     }
 
@@ -491,6 +510,7 @@ final class ReminderFormModel {
             unit: unit,
             mainEnabled: current.mainEnabled
         )
+        earlyReminderChoice = .custom
         scheduleFieldChanged()
     }
 
@@ -501,6 +521,37 @@ final class ReminderFormModel {
             unit: current.unit,
             mainEnabled: enabled
         )
+        scheduleFieldChanged()
+    }
+
+    func applyEarlyReminderChoice(_ choice: EarlyReminderChoice) {
+        guard canEditSchedule else { return }
+        let mainEnabled = detachedDraft.early?.mainEnabled ?? true
+        switch choice {
+        case .none:
+            detachedDraft.early = nil
+            earlyReminderValueText = ""
+        case .oneMinute:
+            detachedDraft.early = EarlyReminder(
+                value: 1,
+                unit: .minutes,
+                mainEnabled: mainEnabled
+            )
+            earlyReminderValueText = "1"
+        case .fiveMinutes:
+            detachedDraft.early = EarlyReminder(
+                value: 5,
+                unit: .minutes,
+                mainEnabled: mainEnabled
+            )
+            earlyReminderValueText = "5"
+        case .custom:
+            if detachedDraft.early == nil {
+                detachedDraft.early = EarlyReminder(value: 5, unit: .minutes)
+                earlyReminderValueText = "5"
+            }
+        }
+        earlyReminderChoice = choice
         scheduleFieldChanged()
     }
 
@@ -626,6 +677,7 @@ final class ReminderFormModel {
         detachedDraft.rule = schedule.rule
         detachedDraft.end = schedule.end
         detachedDraft.early = schedule.early
+        earlyReminderChoice = Self.earlyReminderChoice(for: schedule.early)
         sourceDateText = Self.format(detachedDraft.date)
         sourceTimeText = Self.format(detachedDraft.time)
         switch schedule.end {
@@ -647,22 +699,51 @@ final class ReminderFormModel {
         resetSaveStateAfterEdit()
     }
 
-    func save() async {
+    @discardableResult
+    func save() async -> Bool {
         capacityConsent = .notProvided
         expiredScheduleConsent = .notProvided
-        await performSave()
+        confirmedExpiredSaveRevision = nil
+        return await performSave()
     }
 
-    func confirmCapacitySave() async {
-        guard case .requiresCapacityConfirmation = saveState else { return }
+    @discardableResult
+    func confirmCapacitySave() async -> Bool {
+        guard case .requiresCapacityConfirmation = saveState else { return false }
         capacityConsent = .acknowledged
-        await performSave()
+        return await performSave()
     }
 
-    func confirmExpiredSave() async {
-        guard case .requiresExpiredScheduleConfirmation = saveState else { return }
+    func consumeExpiredScheduleConfirmation() -> Bool {
+        guard case .requiresExpiredScheduleConfirmation = saveState,
+              confirmedExpiredSaveRevision == nil
+        else {
+            return false
+        }
         expiredScheduleConsent = .acknowledged
-        await performSave()
+        confirmedExpiredSaveRevision = editRevision
+        saveState = .saving
+        return true
+    }
+
+    @discardableResult
+    func performConfirmedExpiredScheduleSave() async -> Bool {
+        guard let confirmedRevision = confirmedExpiredSaveRevision else { return false }
+        confirmedExpiredSaveRevision = nil
+        guard confirmedRevision == editRevision else {
+            saveState = .idle
+            capacityConsent = .notProvided
+            expiredScheduleConsent = .notProvided
+            return false
+        }
+        saveState = .idle
+        return await performSave()
+    }
+
+    @discardableResult
+    func confirmExpiredSave() async -> Bool {
+        guard consumeExpiredScheduleConfirmation() else { return false }
+        return await performConfirmedExpiredScheduleSave()
     }
 
     func requestDeleteConfirmation() {
@@ -712,6 +793,7 @@ final class ReminderFormModel {
         saveState = .idle
         capacityConsent = .notProvided
         expiredScheduleConsent = .notProvided
+        confirmedExpiredSaveRevision = nil
     }
 
     private var canEditSchedule: Bool {
@@ -719,19 +801,14 @@ final class ReminderFormModel {
     }
 
     private var metadataIsValid: Bool {
-        var candidate = detachedDraft
+        let candidate = detachedDraft
         if case .replace = candidate.scheduleChange {
             return (try? ReminderDraftValidator().validate(
                 candidate,
                 replacementScheduleData: Data([1])
             )) != nil
         }
-        guard candidate.originalScheduleData != nil else { return false }
-        candidate.scheduleChange = .preserveOriginal
-        return (try? ReminderDraftValidator().validate(
-            candidate,
-            replacementScheduleData: nil
-        )) != nil
+        return (try? ReminderDraftValidator().validateMetadataOnly(candidate)) != nil
     }
 
     private var scheduleInputFieldsAreValid: Bool {
@@ -779,8 +856,24 @@ final class ReminderFormModel {
         }
     }
 
+    private func refreshRepeatSummaryAfterSourceDateEdit() {
+        guard let source = detachedDraft.source else {
+            currentLocalizedRepeatSummary = nil
+            if currentRepeatWasCustom { canonicalEnglishDisclosure = nil }
+            return
+        }
+        currentLocalizedRepeatSummary = localizedRepeatSummary(ScheduleDefinition(
+            source: source,
+            rule: detachedDraft.rule,
+            end: detachedDraft.end,
+            early: detachedDraft.early
+        ))
+        if currentRepeatWasCustom { canonicalEnglishDisclosure = nil }
+    }
+
     private func scheduleFieldChanged() {
         guard canEditSchedule else { return }
+        scheduleHasEditIntent = true
         if isReplacingCustomRepeat {
             customRepeatState = .idle
             customRepeatSession = nil
@@ -850,10 +943,11 @@ final class ReminderFormModel {
         saveState = .idle
         capacityConsent = .notProvided
         expiredScheduleConsent = .notProvided
+        confirmedExpiredSaveRevision = nil
     }
 
-    private func performSave() async {
-        guard canSave else { return }
+    private func performSave() async -> Bool {
+        guard canSave else { return false }
         let submittedRevision = editRevision
         saveState = .saving
         let submittedDraft = detachedDraft
@@ -867,24 +961,28 @@ final class ReminderFormModel {
                 saveState = .idle
                 capacityConsent = .notProvided
                 expiredScheduleConsent = .notProvided
-                return
+                return false
             }
             switch outcome {
             case let .saved(id):
                 saveState = .saved(id)
+                return true
             case let .requiresCapacityConfirmation(warning):
                 saveState = .requiresCapacityConfirmation(warning)
+                return false
             case let .requiresExpiredScheduleConfirmation(warning):
                 saveState = .requiresExpiredScheduleConfirmation(warning)
+                return false
             }
         } catch {
             guard submittedRevision == editRevision else {
                 saveState = .idle
                 capacityConsent = .notProvided
                 expiredScheduleConsent = .notProvided
-                return
+                return false
             }
             saveState = .failed(.save)
+            return false
         }
     }
 
@@ -930,6 +1028,19 @@ final class ReminderFormModel {
         return resolved.year == value.year
             && resolved.month == value.month
             && resolved.day == value.day
+    }
+
+    private static func earlyReminderChoice(for early: EarlyReminder?) -> EarlyReminderChoice {
+        switch early {
+        case nil:
+            .none
+        case let .some(value) where value.value == 1 && value.unit == .minutes:
+            .oneMinute
+        case let .some(value) where value.value == 5 && value.unit == .minutes:
+            .fiveMinutes
+        case .some:
+            .custom
+        }
     }
 }
 

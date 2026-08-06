@@ -14,6 +14,14 @@ struct ReminderDetailView: View {
                 Label(model.lifecycleStatus.semanticKey, systemImage: model.lifecycleStatus.systemImage)
                     .accessibilityIdentifier("reminder-detail.lifecycle-status")
 
+                ForEach(
+                    Array(model.item.reminderStatus.secondary.enumerated()),
+                    id: \.offset
+                ) { _, status in
+                    Label(status.semanticKey, systemImage: status.systemImage)
+                        .accessibilityIdentifier("reminder-detail.secondary-lifecycle-status")
+                }
+
                 Toggle("reminder.field.enabled", isOn: enabledBinding)
                     .disabled(actions.isWorking(model.id))
                     .accessibilityIdentifier("reminder-detail.enabled")

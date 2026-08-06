@@ -1,4 +1,5 @@
 import Foundation
+import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 @testable import NotificationManager
@@ -8,7 +9,7 @@ struct ReminderListProjectionTests {
         let item = ReminderListItemPresentation(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             title: "Visa renewal",
-            lifecycleStatus: .active,
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
             deviceSchedulingStatus: .unscheduledCapacity,
             nextPresentation: .rolling(PhysicalNotificationPresentation.fixture(
                 alertInstant: date("2040-08-31T13:30:00Z")
@@ -21,6 +22,82 @@ struct ReminderListProjectionTests {
         #expect(sections.upcoming.map(\.id) == [item.id])
         #expect(sections.needsAttention.isEmpty)
         #expect(sections.inactive.isEmpty)
+    }
+
+    @Test func secondaryStatusesRemainAttachedWithoutChangingPrimarySection() {
+        let disabledExpired = ReminderListItemPresentation(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            title: "Disabled and expired",
+            reminderStatus: ReminderStatus(primary: .disabled, secondary: [.expired]),
+            deviceSchedulingStatus: .notApplicable,
+            nextPresentation: nil,
+            updatedAt: date("2040-08-01T00:00:00Z")
+        )
+        let updateDisabled = ReminderListItemPresentation(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            title: "Update and disabled",
+            reminderStatus: ReminderStatus(primary: .updateRequired, secondary: [.disabled]),
+            deviceSchedulingStatus: .notApplicable,
+            nextPresentation: nil,
+            updatedAt: date("2040-08-02T00:00:00Z")
+        )
+
+        let sections = ReminderListProjection.make(
+            from: [disabledExpired, updateDisabled],
+            selectedTagID: nil
+        )
+
+        #expect(sections.inactive.map(\.id) == [disabledExpired.id])
+        #expect(sections.needsAttention.map(\.id) == [updateDisabled.id])
+        #expect(disabledExpired.reminderStatus.secondary == [.expired])
+        #expect(updateDisabled.reminderStatus.secondary == [.disabled])
+    }
+
+    @Test func notificationProjectionPreservesEveryReasonOccurrencePairAndRole() {
+        let alertInstant = date("2040-08-31T13:30:00Z")
+        let mainOccurrence = BaseOccurrence(
+            instant: alertInstant,
+            sourceComponents: DateComponents(year: 2040, month: 8, day: 31)
+        )
+        let earlyOccurrence = BaseOccurrence(
+            instant: date("2040-09-01T13:30:00Z"),
+            sourceComponents: DateComponents(year: 2040, month: 9, day: 1)
+        )
+        let notification = PhysicalNotification(
+            reminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            alertInstant: alertInstant,
+            reasons: [
+                EffectiveAlert(
+                    kind: .early,
+                    baseOccurrence: earlyOccurrence,
+                    alertInstant: alertInstant
+                ),
+                EffectiveAlert(
+                    kind: .main,
+                    baseOccurrence: mainOccurrence,
+                    alertInstant: alertInstant
+                )
+            ]
+        )
+
+        let presentation = PhysicalNotificationPresentation(
+            notification: notification,
+            sourceTimeZoneIdentifier: "America/New_York",
+            deviceLocalTime: alertInstant
+        )
+
+        #expect(presentation.reasons == [
+            PhysicalNotificationReasonPresentation(
+                role: .primary,
+                kind: .main,
+                baseOccurrenceInstant: mainOccurrence.instant
+            ),
+            PhysicalNotificationReasonPresentation(
+                role: .secondary,
+                kind: .early,
+                baseOccurrenceInstant: earlyOccurrence.instant
+            )
+        ])
     }
 
     @Test func sectionOrderingAndSingleTagFilterAreDeterministic() {
@@ -73,7 +150,7 @@ struct ReminderListProjectionTests {
         let direct = ReminderListItemPresentation(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             title: "Direct",
-            lifecycleStatus: .active,
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
             deviceSchedulingStatus: .scheduled,
             nextPresentation: .directOSFire(
                 authoritative: date("2040-08-31T10:00:00Z"),
@@ -169,7 +246,7 @@ struct ReminderListProjectionTests {
         let item = ReminderListItemPresentation(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             title: "Capacity constrained",
-            lifecycleStatus: .active,
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
             deviceSchedulingStatus: .unscheduledCapacity,
             nextPresentation: nil,
             updatedAt: date("2040-08-01T00:00:00Z")
@@ -193,7 +270,10 @@ struct ReminderListProjectionTests {
     @Test func managementActionsDriveEnabledAndRequireDeleteConfirmation() async {
         let recorder = ReminderManagementActionRecorder()
         let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { id, enabled in await recorder.recordEnabled(id, enabled) },
+            setEnabled: { command in
+                await recorder.recordEnabled(command)
+                return .saved(command.reminderID)
+            },
             delete: { id in await recorder.recordDelete(id) }
         ))
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
@@ -201,7 +281,11 @@ struct ReminderListProjectionTests {
         await coordinator.setEnabled(false, for: id, fallback: true)
 
         #expect(!coordinator.enabledValue(for: id, fallback: true))
-        #expect(await recorder.enabledCalls() == [EnabledActionCall(id: id, enabled: false)])
+        #expect(await recorder.enabledCalls() == [SetReminderEnabledCommand(
+            reminderID: id,
+            enabled: false,
+            capacityConsent: .notProvided
+        )])
 
         coordinator.requestDelete(id)
 
@@ -217,7 +301,7 @@ struct ReminderListProjectionTests {
     @MainActor
     @Test func failedEnabledActionRestoresPresentedValue() async {
         let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { _, _ in throw ReminderManagementActionProbeError.failed },
+            setEnabled: { _ in throw ReminderManagementActionProbeError.failed },
             delete: { _ in }
         ))
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
@@ -226,6 +310,70 @@ struct ReminderListProjectionTests {
 
         #expect(coordinator.enabledValue(for: id, fallback: true))
         #expect(coordinator.state == .failed(id, .enabledChange))
+    }
+
+    @MainActor
+    @Test func authoritativeOppositeSnapshotWinsAfterSuccessfulEnabledChange() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in .saved(command.reminderID) },
+            delete: { _ in }
+        ))
+
+        await coordinator.setEnabled(true, for: id, fallback: false)
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+
+        coordinator.synchronize(with: [ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )])
+
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+        #expect(coordinator.state == .idle)
+    }
+
+    @MainActor
+    @Test func enabledCapacityConfirmationReplaysAcknowledgedCommandWithFreshEvaluation() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let warning = CapacityWarning(
+            reminderID: id,
+            earliestGroupID: AlertGroupID(
+                reminderID: id,
+                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
+            ),
+            planningCapacity: 60
+        )
+        let recorder = EnabledOutcomeRecorder(outcomes: [
+            .requiresCapacityConfirmation(warning),
+            .saved(id)
+        ])
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in try await recorder.execute(command) },
+            delete: { _ in }
+        ))
+
+        await coordinator.setEnabled(true, for: id, fallback: false)
+
+        #expect(coordinator.state == .requiresCapacityConfirmation(id, true, warning))
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+
+        let saved = await coordinator.confirmEnabledCapacityChange(id)
+
+        #expect(saved)
+        #expect(coordinator.state == .idle)
+        #expect(await recorder.recordedCommands() == [
+            SetReminderEnabledCommand(
+                reminderID: id,
+                enabled: true,
+                capacityConsent: .notProvided
+            ),
+            SetReminderEnabledCommand(
+                reminderID: id,
+                enabled: true,
+                capacityConsent: .acknowledged
+            )
+        ])
     }
 
     @MainActor
@@ -263,6 +411,23 @@ struct ReminderListProjectionTests {
         #expect(router.compactPath.isEmpty)
         #expect(router.regularDestination == nil)
         #expect(router.selectedReminderID == nil)
+    }
+
+    @MainActor
+    @Test func compactPathBindingPopClearsExitedSelectionBeforeRegularTransition() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.showReminder(id)
+        router.showEdit(id)
+
+        router.setCompactPathFromSystem([.reminderDetail(id)])
+        #expect(router.selectedReminderID == id)
+
+        router.setCompactPathFromSystem([])
+        router.synchronizeLayout(.regular)
+
+        #expect(router.selectedReminderID == nil)
+        #expect(router.regularDestination == nil)
     }
 
     @MainActor
@@ -399,6 +564,122 @@ struct ReminderListProjectionTests {
         #expect(router.selectedReminderID == nil)
     }
 
+    @MainActor
+    @Test func successfulCompactSaveCompletesFormRouteAndEvictsSession() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.showReminder(id)
+        router.showEdit(id)
+        guard let form = router.formModel(for: id) else {
+            Issue.record("Expected a registered edit form")
+            return
+        }
+
+        let saved = await router.performReminderSave(id) {
+            await form.save()
+        }
+
+        #expect(saved)
+        #expect(router.compactPath == [.reminderDetail(id)])
+        #expect(router.formModel(for: id) == nil)
+    }
+
+    @MainActor
+    @Test func successfulRegularSaveClearsFormDestinationAndEvictsSession() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.synchronizeLayout(.regular)
+        router.showEdit(id)
+        guard let form = router.formModel(for: id) else {
+            Issue.record("Expected a registered edit form")
+            return
+        }
+
+        let saved = await router.performReminderSave(id) {
+            await form.save()
+        }
+
+        #expect(saved)
+        #expect(router.regularDestination == nil)
+        #expect(router.formModel(for: id) == nil)
+    }
+
+    @MainActor
+    @Test func failedSaveRetainsFormRouteAndSession() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(
+            id: id,
+            formSave: { _, _, _ in throw ReminderManagementActionProbeError.failed }
+        )
+        router.showEdit(id)
+        guard let form = router.formModel(for: id) else {
+            Issue.record("Expected a registered edit form")
+            return
+        }
+
+        let saved = await router.performReminderSave(id) {
+            await form.save()
+        }
+
+        #expect(!saved)
+        #expect(router.compactPath == [.reminderEdit(id)])
+        #expect(router.formModel(for: id) === form)
+    }
+
+    @MainActor
+    @Test func compactPopDuringSaveStillEvictsCompletedFormSession() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let gate = SuspendedReminderSaveAction()
+        let router = routerWithRegisteredReminder(
+            id: id,
+            formSave: { draft, _, _ in await gate.save(draft) }
+        )
+        router.showReminder(id)
+        router.showEdit(id)
+        guard let form = router.formModel(for: id) else {
+            Issue.record("Expected a registered edit form")
+            return
+        }
+        let save = Task { @MainActor in
+            await router.performReminderSave(id) { await form.save() }
+        }
+        await gate.waitUntilCalled()
+
+        router.compactPath = [.reminderDetail(id)]
+        await gate.resolve(.saved(id))
+
+        #expect(await save.value)
+        #expect(router.compactPath == [.reminderDetail(id)])
+        #expect(router.formModel(for: id) == nil)
+    }
+
+    @MainActor
+    @Test func regularDismissDuringSaveStillEvictsCompletedFormSession() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let gate = SuspendedReminderSaveAction()
+        let router = routerWithRegisteredReminder(
+            id: id,
+            formSave: { draft, _, _ in await gate.save(draft) }
+        )
+        router.synchronizeLayout(.regular)
+        router.showEdit(id)
+        guard let form = router.formModel(for: id) else {
+            Issue.record("Expected a registered edit form")
+            return
+        }
+        let save = Task { @MainActor in
+            await router.performReminderSave(id) { await form.save() }
+        }
+        await gate.waitUntilCalled()
+
+        router.regularDestination = nil
+        await gate.resolve(.saved(id))
+
+        #expect(await save.value)
+        #expect(router.regularDestination == nil)
+        #expect(router.formModel(for: id) == nil)
+    }
+
     private func date(_ value: String) -> Date {
         ISO8601DateFormatter().date(from: value)!
     }
@@ -407,10 +688,15 @@ struct ReminderListProjectionTests {
     private func routerWithRegisteredReminder(
         id: UUID,
         delete: @escaping @Sendable (UUID) async throws -> Void = { _ in },
-        formDelete: @escaping @Sendable (UUID) async throws -> Void = { _ in }
+        formDelete: @escaping @Sendable (UUID) async throws -> Void = { _ in },
+        formSave: @escaping @Sendable (
+            ReminderDraft,
+            CapacityConsent,
+            ExpiredScheduleConsent
+        ) async throws -> SaveReminderOutcome = { draft, _, _ in .saved(draft.id) }
     ) -> AppRouter {
         let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { _, _ in },
+            setEnabled: { command in .saved(command.reminderID) },
             delete: delete
         ))
         let router = AppRouter(actions: coordinator)
@@ -456,7 +742,7 @@ struct ReminderListProjectionTests {
             savedRepeatPresentation: .standard(localizedSummary: "Every day"),
             now: date("2040-08-01T00:00:00Z"),
             actions: ReminderFormActions(
-                save: { draft, _, _ in .saved(draft.id) },
+                save: formSave,
                 delete: formDelete
             )
         ))
@@ -464,25 +750,37 @@ struct ReminderListProjectionTests {
     }
 }
 
-private struct EnabledActionCall: Sendable, Equatable {
-    let id: UUID
-    let enabled: Bool
-}
-
 private actor ReminderManagementActionRecorder {
-    private var enabled: [EnabledActionCall] = []
+    private var enabled: [SetReminderEnabledCommand] = []
     private var deleted: [UUID] = []
 
-    func recordEnabled(_ id: UUID, _ value: Bool) {
-        enabled.append(EnabledActionCall(id: id, enabled: value))
+    func recordEnabled(_ command: SetReminderEnabledCommand) {
+        enabled.append(command)
     }
 
     func recordDelete(_ id: UUID) {
         deleted.append(id)
     }
 
-    func enabledCalls() -> [EnabledActionCall] { enabled }
+    func enabledCalls() -> [SetReminderEnabledCommand] { enabled }
     func deletedIDs() -> [UUID] { deleted }
+}
+
+private actor EnabledOutcomeRecorder {
+    private var outcomes: [SaveReminderOutcome]
+    private var commands: [SetReminderEnabledCommand] = []
+
+    init(outcomes: [SaveReminderOutcome]) {
+        self.outcomes = outcomes
+    }
+
+    func execute(_ command: SetReminderEnabledCommand) throws -> SaveReminderOutcome {
+        commands.append(command)
+        guard !outcomes.isEmpty else { throw ReminderManagementActionProbeError.failed }
+        return outcomes.removeFirst()
+    }
+
+    func recordedCommands() -> [SetReminderEnabledCommand] { commands }
 }
 
 private enum ReminderManagementActionProbeError: Error {
@@ -510,13 +808,43 @@ private actor SuspendedReminderDeleteAction {
     }
 }
 
+private actor SuspendedReminderSaveAction {
+    private var called = false
+    private var callWaiters: [CheckedContinuation<Void, Never>] = []
+    private var resultContinuation: CheckedContinuation<SaveReminderOutcome, Never>?
+
+    func save(_ draft: ReminderDraft) async -> SaveReminderOutcome {
+        called = true
+        let waiters = callWaiters
+        callWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        return await withCheckedContinuation { continuation in
+            resultContinuation = continuation
+        }
+    }
+
+    func waitUntilCalled() async {
+        guard !called else { return }
+        await withCheckedContinuation { continuation in
+            callWaiters.append(continuation)
+        }
+    }
+
+    func resolve(_ outcome: SaveReminderOutcome) {
+        resultContinuation?.resume(returning: outcome)
+        resultContinuation = nil
+    }
+}
+
 private extension PhysicalNotificationPresentation {
     static func fixture(alertInstant: Date) -> Self {
         Self(
             alertInstant: alertInstant,
-            primaryReason: .main,
-            secondaryEarlyReasonCount: 0,
-            baseOccurrenceInstants: [alertInstant],
+            reasons: [PhysicalNotificationReasonPresentation(
+                role: .primary,
+                kind: .main,
+                baseOccurrenceInstant: alertInstant
+            )],
             sourceTime: alertInstant,
             deviceLocalTime: alertInstant
         )
@@ -529,17 +857,19 @@ private extension ReminderListItemPresentation {
         lifecycleStatus: LifecycleStatus,
         nextAlertInstant: Date? = nil,
         updatedAt: Date = .distantPast,
-        tags: [ReminderTagPresentation] = []
+        tags: [ReminderTagPresentation] = [],
+        enabled: Bool = true
     ) -> Self {
         Self(
             id: UUID(uuidString: id)!,
             title: id,
-            lifecycleStatus: lifecycleStatus,
+            reminderStatus: ReminderStatus(primary: lifecycleStatus, secondary: []),
             deviceSchedulingStatus: lifecycleStatus == .active ? .scheduled : .notApplicable,
             nextPresentation: nextAlertInstant.map {
                 .rolling(PhysicalNotificationPresentation.fixture(alertInstant: $0))
             },
             tags: tags,
+            enabled: enabled,
             updatedAt: updatedAt
         )
     }

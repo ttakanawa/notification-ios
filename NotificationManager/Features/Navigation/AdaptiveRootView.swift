@@ -18,7 +18,7 @@ struct AdaptiveRootView: View {
                 }
                 .accessibilityIdentifier("adaptive-root.regular-split")
             } else {
-                NavigationStack(path: $router.compactPath) {
+                NavigationStack(path: compactPathBinding) {
                     ReminderListView(model: listModel, router: router)
                         .navigationDestination(for: AppRouterDestination.self) { destination in
                             AppRouterDestinationView(destination: destination, router: router)
@@ -29,9 +29,50 @@ struct AdaptiveRootView: View {
         }
         .onAppear { synchronizeRouter() }
         .onChange(of: horizontalSizeClass) { _, _ in synchronizeRouter() }
+        .sheet(isPresented: enabledCapacityConfirmationPresented) {
+            if let confirmation = router.actions.enabledCapacityConfirmation {
+                CapacityConfirmationView(
+                    warning: confirmation.warning,
+                    onConfirm: {
+                        Task {
+                            await router.actions.confirmEnabledCapacityChange(
+                                confirmation.reminderID
+                            )
+                        }
+                    },
+                    onCancel: {
+                        router.actions.cancelEnabledCapacityChange(
+                            confirmation.reminderID
+                        )
+                    }
+                )
+                .presentationDetents([.medium])
+            }
+        }
     }
 
     private func synchronizeRouter() {
         router.synchronizeLayout(horizontalSizeClass == .regular ? .regular : .compact)
+    }
+
+    private var compactPathBinding: Binding<[AppRouterDestination]> {
+        Binding(
+            get: { router.compactPath },
+            set: router.setCompactPathFromSystem
+        )
+    }
+
+    private var enabledCapacityConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { router.actions.enabledCapacityConfirmation != nil },
+            set: { presented in
+                guard !presented,
+                      let confirmation = router.actions.enabledCapacityConfirmation
+                else {
+                    return
+                }
+                router.actions.cancelEnabledCapacityChange(confirmation.reminderID)
+            }
+        )
     }
 }

@@ -312,6 +312,33 @@ struct ReminderFormModelTests {
         #expect(model.saveState == .saved(model.detachedDraft.id))
     }
 
+    @Test func expiredConfirmationIsConsumedBeforeAlertAutoDismissAndRunsExactlyOnce() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let recorder = SaveActionRecorder(outcomes: [
+            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                reminderID: id,
+                evaluationNow: date("2040-08-31T13:30:00Z")
+            )),
+            .saved(id)
+        ])
+        let model = configuredNewModel(recorder: recorder)
+
+        await model.save()
+        #expect(model.consumeExpiredScheduleConfirmation())
+
+        model.dismissPendingConfirmation()
+        let saved = await model.performConfirmedExpiredScheduleSave()
+        let staleReplay = await model.performConfirmedExpiredScheduleSave()
+
+        #expect(saved)
+        #expect(!staleReplay)
+        #expect(await recorder.recordedCalls().map(\.expiredConsent) == [
+            .notProvided,
+            .acknowledged
+        ])
+        #expect(model.saveState == .saved(id))
+    }
+
     @Test func saveFailureRetainsEveryDetachedDraftField() async {
         let actions = ReminderFormActions(
             save: { _, _, _ in throw SaveProbeError.failed },
@@ -359,7 +386,7 @@ struct ReminderFormModelTests {
             ),
             planningCapacity: 60
         )))
-        await saveTask.value
+        _ = await saveTask.value
 
         #expect(model.detachedDraft.title == "Edited while saving")
         #expect(model.saveState == .idle)
@@ -389,6 +416,141 @@ struct ReminderFormModelTests {
         #expect(model.earlyReminderValueText.isEmpty)
         #expect(!model.canSave)
         #expect(model.previewNotifications.isEmpty)
+    }
+
+    @Test func clearingExistingRequiredScheduleFieldsKeepsInvalidReplacementIntent() {
+        let dateModel = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        dateModel.updateSourceDateText("")
+
+        #expect(!dateModel.sourceDateTextIsValid)
+        #expect(!dateModel.canSave)
+        #expect(dateModel.detachedDraft.scheduleChange == .preserveOriginal)
+
+        let timeModel = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        timeModel.updateSourceTimeText("")
+
+        #expect(!timeModel.sourceTimeTextIsValid)
+        #expect(!timeModel.canSave)
+        #expect(timeModel.detachedDraft.scheduleChange == .preserveOriginal)
+
+        let zoneModel = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        zoneModel.timeZoneIdentifier = nil
+
+        #expect(zoneModel.timeZoneFieldIssue == .timeZoneRequired)
+        #expect(!zoneModel.canSave)
+        #expect(zoneModel.detachedDraft.scheduleChange == .preserveOriginal)
+    }
+
+    @Test func metadataOnlyUIValidationIgnoresStaleOpaqueScheduleBytes() {
+        let stale = Data(repeating: 0xFF, count: ReminderLimits.scheduleBytes + 1)
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(schedule: .unsupportedFuture(
+                version: 99,
+                originalData: stale
+            )),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        model.title = "Metadata edit"
+
+        #expect(model.canSave)
+        #expect(model.detachedDraft.originalScheduleData == stale)
+        #expect(model.detachedDraft.scheduleChange == .preserveOriginal)
+    }
+
+    @Test func sourceDateEditRecomputesEveryAnchorDependentRepeatSummary() {
+        let cases: [(RepeatRule, SavedRepeatPresentation)] = [
+            (
+                .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.friday]),
+                .standard(localizedSummary: "stale weekly")
+            ),
+            (
+                .weekly(interval: 2, weekdaySetKind: .explicit, weekdays: [.friday]),
+                .standard(localizedSummary: "stale biweekly")
+            ),
+            (
+                .monthly(interval: 1, selector: .anchorDay),
+                .standard(localizedSummary: "stale monthly")
+            ),
+            (
+                .yearly(interval: 1, month: nil, selector: .anchorMonthDay),
+                .standard(localizedSummary: "stale yearly")
+            ),
+            (
+                .monthly(interval: 2, selector: .anchorDay),
+                .custom(
+                    localizedSummary: "stale custom",
+                    canonicalEnglishDisclosure: "Every 2 months on day 31"
+                )
+            )
+        ]
+
+        for (rule, presentation) in cases {
+            let model = ReminderFormModel(
+                snapshot: validSnapshot(rule: rule),
+                savedRepeatPresentation: presentation,
+                now: date("2040-08-01T00:00:00Z"),
+                actions: .inert,
+                localizedRepeatSummary: { schedule in
+                    "localized-\(schedule.source.year)-\(schedule.source.month)-\(schedule.source.day)"
+                }
+            )
+
+            model.updateSourceDateText("2040-09-01")
+
+            #expect(model.currentLocalizedRepeatSummary == "localized-2040-9-1")
+            if case .custom = presentation {
+                #expect(model.canonicalEnglishDisclosure == nil)
+            }
+        }
+    }
+
+    @Test func earlyPresetAndCustomTransitionsUpdateDetachedDraftExactly() {
+        let model = ReminderFormModel(
+            newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        populateSchedule(model, rule: .daily(interval: 1))
+
+        model.applyEarlyReminderChoice(.oneMinute)
+        #expect(model.earlyReminderChoice == .oneMinute)
+        #expect(model.earlyReminder == EarlyReminder(value: 1, unit: .minutes))
+
+        model.updateMainNotificationEnabled(false)
+        model.applyEarlyReminderChoice(.fiveMinutes)
+        #expect(model.earlyReminderChoice == .fiveMinutes)
+        #expect(model.earlyReminder == EarlyReminder(
+            value: 5,
+            unit: .minutes,
+            mainEnabled: false
+        ))
+
+        model.applyEarlyReminderChoice(.none)
+        #expect(model.earlyReminderChoice == .none)
+        #expect(model.earlyReminder == nil)
+
+        model.applyEarlyReminderChoice(.custom)
+        model.updateEarlyReminderValueText("1")
+        #expect(model.earlyReminderChoice == .custom)
+        #expect(model.earlyReminder == EarlyReminder(value: 1, unit: .minutes))
     }
 
     @Test func deleteWaitsForExplicitConfirmation() async {
@@ -513,7 +675,12 @@ struct ReminderFormModelTests {
     }
 
     private func validSnapshot(
-        schedule: ScheduleReadState? = nil
+        schedule: ScheduleReadState? = nil,
+        rule: RepeatRule = .weekly(
+            interval: 1,
+            weekdaySetKind: .explicit,
+            weekdays: [.monday]
+        )
     ) -> ReminderSnapshot {
         let definition = ScheduleDefinition(
             source: SourceWallClock(
@@ -524,11 +691,7 @@ struct ReminderFormModelTests {
                 minute: 30,
                 timeZoneIdentifier: "America/New_York"
             ),
-            rule: .weekly(
-                interval: 1,
-                weekdaySetKind: .explicit,
-                weekdays: [.monday]
-            ),
+            rule: rule,
             end: .never,
             early: nil
         )
