@@ -9,21 +9,32 @@ public enum LogicalNotificationRequestValidationError: Error, Sendable, Equatabl
     case repeatingPayloadNotDerivable
 }
 
+public struct LogicalNotificationRequestValidationContext: Sendable {
+    public let evaluationNow: Date
+    public let recurrenceEnvironment: any RecurrenceEnvironment
+
+    public init(
+        evaluationNow: Date,
+        recurrenceEnvironment: any RecurrenceEnvironment
+    ) {
+        self.evaluationNow = evaluationNow
+        self.recurrenceEnvironment = recurrenceEnvironment
+    }
+}
+
 public struct LogicalNotificationRequestValidator: Sendable {
-    private let environment: any RecurrenceEnvironment
-
-    public init() {
-        environment = FoundationRecurrenceEnvironment()
-    }
-
-    init(environment: any RecurrenceEnvironment) {
-        self.environment = environment
-    }
+    public init() {}
 
     public func validate(
         _ request: LogicalNotificationRequest,
-        for schedule: ScheduleDefinition
+        for reminder: ReminderSnapshot,
+        context: LogicalNotificationRequestValidationContext
     ) throws {
+        guard request.reminderID == reminder.id,
+              case let .valid(schedule, _, _) = reminder.schedule
+        else {
+            throw LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable
+        }
         guard !request.contributingGroupIDs.isEmpty,
               request.contributingGroupIDs.allSatisfy({
                   $0.reminderID == request.reminderID
@@ -40,14 +51,17 @@ public struct LogicalNotificationRequestValidator: Sendable {
                 reasons: reasons,
                 groups: request.contributingGroupIDs,
                 reminderID: request.reminderID,
-                schedule: schedule
+                schedule: schedule,
+                environment: context.recurrenceEnvironment
             )
-        case let .repeating(components, contributors):
+        case let .repeating(_, contributors):
             try validateRepeating(
-                components: components,
+                request: request,
                 contributors: contributors,
                 groups: request.contributingGroupIDs,
-                schedule: schedule
+                schedule: schedule,
+                reminder: reminder,
+                context: context
             )
         }
     }
@@ -57,7 +71,8 @@ public struct LogicalNotificationRequestValidator: Sendable {
         reasons: [EffectiveAlert],
         groups: Set<AlertGroupID>,
         reminderID: UUID,
-        schedule: ScheduleDefinition
+        schedule: ScheduleDefinition,
+        environment: any RecurrenceEnvironment
     ) throws {
         guard !reasons.isEmpty else {
             throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
@@ -89,17 +104,23 @@ public struct LogicalNotificationRequestValidator: Sendable {
                 }
                 throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
             }
-            guard try reasonIsDerivable(reason, schedule: schedule) else {
+            guard try reasonIsDerivable(
+                reason,
+                schedule: schedule,
+                environment: environment
+            ) else {
                 throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
             }
         }
     }
 
     private func validateRepeating(
-        components: RepeatingTriggerComponents,
+        request: LogicalNotificationRequest,
         contributors: [RepeatingTriggerContributor],
         groups: Set<AlertGroupID>,
-        schedule: ScheduleDefinition
+        schedule: ScheduleDefinition,
+        reminder: ReminderSnapshot,
+        context: LogicalNotificationRequestValidationContext
     ) throws {
         var identities: Set<RepeatingContributorIdentity> = []
         for contributor in contributors {
@@ -109,28 +130,38 @@ public struct LogicalNotificationRequestValidator: Sendable {
         }
         guard groups.count == 1,
               let group = groups.first,
-              try isBaseOccurrence(group.baseOccurrenceInstant, of: schedule)
+              try isBaseOccurrence(
+                  group.baseOccurrenceInstant,
+                  of: schedule,
+                  environment: context.recurrenceEnvironment
+              )
         else {
             throw LogicalNotificationRequestValidationError.contributorIdentityMismatch
         }
 
-        let candidate = RepeatingTriggerCandidate(
-            components: components,
-            contributors: contributors
-        )
-        guard RepeatingTriggerPlanner().isStructurallyValid(candidate, for: schedule) else {
+        guard let plan = try? LogicalNotificationPlanner().plan(PlannerInput(
+            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+            evaluationNow: context.evaluationNow,
+            deviceNotificationsEnabled: true,
+            authorizationAllowsScheduling: true,
+            capacity: 60,
+            recurrenceEnvironment: context.recurrenceEnvironment
+        )), plan.requests.contains(request)
+        else {
             throw LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable
         }
     }
 
     private func reasonIsDerivable(
         _ reason: EffectiveAlert,
-        schedule: ScheduleDefinition
+        schedule: ScheduleDefinition,
+        environment: any RecurrenceEnvironment
     ) throws -> Bool {
         guard isFiniteIntegralSecond(reason.alertInstant),
               let derived = try baseOccurrence(
                   at: reason.baseOccurrence.instant,
-                  of: schedule
+                  of: schedule,
+                  environment: environment
               ),
               sourceComponentsMatch(
                   reason.baseOccurrence.sourceComponents,
@@ -162,14 +193,20 @@ public struct LogicalNotificationRequestValidator: Sendable {
 
     private func isBaseOccurrence(
         _ instant: Date,
-        of schedule: ScheduleDefinition
+        of schedule: ScheduleDefinition,
+        environment: any RecurrenceEnvironment
     ) throws -> Bool {
-        try baseOccurrence(at: instant, of: schedule) != nil
+        try baseOccurrence(
+            at: instant,
+            of: schedule,
+            environment: environment
+        ) != nil
     }
 
     private func baseOccurrence(
         at instant: Date,
-        of schedule: ScheduleDefinition
+        of schedule: ScheduleDefinition,
+        environment: any RecurrenceEnvironment
     ) throws -> BaseOccurrence? {
         guard isFiniteIntegralSecond(instant),
               let upperBound = Calendar(identifier: .gregorian).date(

@@ -164,7 +164,8 @@ struct LogicalNotificationRequestValidatorTests {
             (
                 repeatingRequest(
                     components: source,
-                    contributors: [RepeatingTriggerContributor(kind: .main, sourceComponents: source)]
+                    contributors: [RepeatingTriggerContributor(kind: .main, sourceComponents: source)],
+                    groupInstants: [date("2040-09-02T13:30:00Z")]
                 ),
                 schedule(rule: .daily(interval: 2))
             )
@@ -207,7 +208,114 @@ struct LogicalNotificationRequestValidatorTests {
         }
     }
 
-    private let validator = LogicalNotificationRequestValidator()
+    @Test func rejectsDirectRepeatingMainWhenEarlyPathCollidesAcrossOccurrences() throws {
+        let definition = schedule(early: EarlyReminder(value: 1, unit: .days))
+        let source = repeatingComponents(hour: 9, minute: 30)
+        let forged = repeatingRequest(
+            components: source,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: source
+            )],
+            groupInstants: [date("2040-09-01T13:30:00Z")]
+        )
+
+        #expect(throws: LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable) {
+            try validator.validate(forged, for: definition)
+        }
+    }
+
+    @Test func rejectsDirectRepeatingEarlyWhoseResidueChangesAtTimeZoneTransition() throws {
+        let definition = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2040,
+                month: 8,
+                day: 31,
+                hour: 3,
+                minute: 30,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            rule: .daily(interval: 1),
+            end: .never,
+            early: EarlyReminder(value: 2, unit: .hours, mainEnabled: false)
+        )
+        let source = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 3,
+            minute: 30,
+            second: 0
+        )
+        let forged = repeatingRequest(
+            components: RepeatingTriggerComponents(
+                timeZoneIdentifier: "America/New_York",
+                hour: 1,
+                minute: 30,
+                second: 0
+            ),
+            contributors: [RepeatingTriggerContributor(
+                kind: .early,
+                sourceComponents: source
+            )],
+            groupInstants: [date("2040-09-01T07:30:00Z")]
+        )
+
+        #expect(throws: LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable) {
+            try validator.validate(forged, for: definition)
+        }
+    }
+
+    @Test func acceptsExactMemberOfValidMultiCandidateCollection() throws {
+        let definition = weeklyFridaySaturdaySchedule()
+        let saturday = repeatingComponents(weekday: 7, hour: 9, minute: 30)
+
+        try validator.validate(repeatingRequest(
+            components: saturday,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: saturday
+            )],
+            groupInstants: [date("2040-09-01T13:30:00Z")]
+        ), for: definition)
+    }
+
+    @Test func rejectsCandidateWithMismatchedBaselineFromValidMultiCandidateCollection() throws {
+        let definition = weeklyFridaySaturdaySchedule()
+        let saturday = repeatingComponents(weekday: 7, hour: 9, minute: 30)
+        let wrongBaseline = repeatingRequest(
+            components: saturday,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: saturday
+            )],
+            groupInstants: [date("2040-09-07T13:30:00Z")]
+        )
+
+        #expect(throws: LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable) {
+            try validator.validate(wrongBaseline, for: definition)
+        }
+    }
+
+    @Test func mapsInvalidRepeatingPlanningContextToValidationFailure() throws {
+        let source = repeatingComponents(hour: 9, minute: 30)
+        let request = repeatingRequest(
+            components: source,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: source
+            )]
+        )
+        let invalidContext = FixedValidationHarness(
+            evaluationNow: Date(timeIntervalSinceReferenceDate: .infinity)
+        )
+
+        #expect(throws: LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable) {
+            try invalidContext.validate(request, for: schedule())
+        }
+    }
+
+    private let validator = FixedValidationHarness(
+        evaluationNow: date("2040-08-31T13:30:00Z")
+    )
     private let reminderID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
 
     private func schedule(
@@ -227,6 +335,14 @@ struct LogicalNotificationRequestValidatorTests {
             end: .never,
             early: early
         )
+    }
+
+    private func weeklyFridaySaturdaySchedule() -> ScheduleDefinition {
+        schedule(rule: .weekly(
+            interval: 1,
+            weekdaySetKind: .explicit,
+            weekdays: [.friday, .saturday]
+        ))
     }
 
     private func mainReason() -> EffectiveAlert {
@@ -257,7 +373,7 @@ struct LogicalNotificationRequestValidatorTests {
     private func repeatingRequest(
         components: RepeatingTriggerComponents,
         contributors: [RepeatingTriggerContributor],
-        groupInstants: [Date] = [date("2040-08-31T13:30:00Z")]
+        groupInstants: [Date] = [date("2040-09-01T13:30:00Z")]
     ) -> LogicalNotificationRequest {
         LogicalNotificationRequest(
             identifier: try! NotificationIdentifierCodec().repeatingIdentifier(
@@ -304,6 +420,35 @@ struct LogicalNotificationRequestValidatorTests {
         let resolvedInstant = date(instant)
         components.weekday = components.calendar?.component(.weekday, from: resolvedInstant)
         return BaseOccurrence(instant: resolvedInstant, sourceComponents: components)
+    }
+}
+
+private struct FixedValidationHarness {
+    let evaluationNow: Date
+
+    func validate(
+        _ request: LogicalNotificationRequest,
+        for schedule: ScheduleDefinition
+    ) throws {
+        let reminder = ReminderSnapshot(
+            id: request.reminderID,
+            title: "Validation fixture",
+            notes: nil,
+            urlString: nil,
+            enabled: true,
+            schedule: .valid(schedule, sourceVersion: 1, originalData: Data([1])),
+            tagIDs: [],
+            createdAt: evaluationNow,
+            updatedAt: evaluationNow
+        )
+        try LogicalNotificationRequestValidator().validate(
+            request,
+            for: reminder,
+            context: LogicalNotificationRequestValidationContext(
+                evaluationNow: evaluationNow,
+                recurrenceEnvironment: .foundation
+            )
+        )
     }
 }
 

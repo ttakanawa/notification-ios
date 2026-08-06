@@ -6,10 +6,19 @@ import UserNotifications
 public struct MaterializationInput: Sendable {
     public let reminder: ReminderSnapshot
     public let locale: Locale
+    public let evaluationNow: Date
+    public let recurrenceEnvironment: any RecurrenceEnvironment
 
-    public init(reminder: ReminderSnapshot, locale: Locale) {
+    public init(
+        reminder: ReminderSnapshot,
+        locale: Locale,
+        evaluationNow: Date,
+        recurrenceEnvironment: any RecurrenceEnvironment
+    ) {
         self.reminder = reminder
         self.locale = locale
+        self.evaluationNow = evaluationNow
+        self.recurrenceEnvironment = recurrenceEnvironment
     }
 }
 
@@ -77,7 +86,14 @@ public struct NotificationRequestMaterializer: Sendable {
         }
         try validatePayloadShape(request.payload, schedule: schedule)
         do {
-            try LogicalNotificationRequestValidator().validate(request, for: schedule)
+            try LogicalNotificationRequestValidator().validate(
+                request,
+                for: input.reminder,
+                context: LogicalNotificationRequestValidationContext(
+                    evaluationNow: input.evaluationNow,
+                    recurrenceEnvironment: input.recurrenceEnvironment
+                )
+            )
         } catch let error as LogicalNotificationRequestValidationError {
             throw materializationError(for: error)
         }

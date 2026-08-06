@@ -3,38 +3,6 @@ import Foundation
 public struct RepeatingTriggerPlanner: Sendable {
     public init() {}
 
-    public func isStructurallyValid(
-        _ candidate: RepeatingTriggerCandidate,
-        for schedule: ScheduleDefinition
-    ) -> Bool {
-        guard ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty,
-              case .never = schedule.end,
-              let plan = whitelistedRulePlan(for: schedule),
-              (try? candidate.components.validated()) != nil,
-              candidate.contributors.count == 1,
-              let contributor = candidate.contributors.first,
-              plan.baseComponents.contains(contributor.sourceComponents)
-        else {
-            return false
-        }
-
-        let expected: RepeatingTriggerComponents?
-        switch contributor.kind {
-        case .main:
-            guard schedule.early?.mainEnabled != false else { return false }
-            expected = contributor.sourceComponents
-        case .early:
-            guard let early = schedule.early else { return false }
-            expected = structuralEarlyComponents(
-                from: contributor.sourceComponents,
-                cadence: plan.cadence,
-                early: early,
-                schedule: schedule
-            )
-        }
-        return candidate.components == expected
-    }
-
     public func plan(
         _ input: RepeatingTriggerPlanningInput
     ) -> [RepeatingTriggerCandidate]? {

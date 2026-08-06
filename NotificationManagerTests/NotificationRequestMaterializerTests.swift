@@ -51,7 +51,6 @@ struct NotificationRequestMaterializerTests {
     @Test func repeatingUsesSourceIANAGregorianComponentsAndHasNextDate() throws {
         let components = RepeatingTriggerComponents(
             timeZoneIdentifier: "America/New_York",
-            weekday: 2,
             hour: 9,
             minute: 30,
             second: 0
@@ -68,7 +67,7 @@ struct NotificationRequestMaterializerTests {
         #expect(actual.year == nil)
         #expect(actual.month == nil)
         #expect(actual.day == nil)
-        #expect(actual.weekday == 2)
+        #expect(actual.weekday == nil)
         #expect(actual.hour == 9)
         #expect(actual.minute == 30)
         #expect(actual.second == 0)
@@ -195,26 +194,48 @@ struct NotificationRequestMaterializerTests {
         )
         let first = repeatingRequest(
             components: triggerComponents,
-            contributingBaseInstant: date("2040-08-31T13:30:00Z"),
+            contributingBaseInstant: date("2040-09-01T13:30:00Z"),
             contributors: [contributor]
         )
         let second = repeatingRequest(
             components: triggerComponents,
-            contributingBaseInstant: date("2041-12-30T14:30:00Z"),
+            contributingBaseInstant: date("2041-12-31T14:30:00Z"),
             contributors: [contributor]
         )
-        let input = MaterializationInput(
+        let early = EarlyReminder(value: 5, unit: .minutes, mainEnabled: false)
+        let firstInput = MaterializationInput(
             reminder: reminder(
                 notes: nil,
                 schedule: validScheduleState(
-                    early: EarlyReminder(value: 5, unit: .minutes, mainEnabled: false)
+                    early: early
                 )
             ),
-            locale: Locale(identifier: "en_US")
+            locale: Locale(identifier: "en_US"),
+            evaluationNow: date("2040-08-31T13:30:00Z"),
+            recurrenceEnvironment: .foundation
+        )
+        let secondInput = MaterializationInput(
+            reminder: reminder(
+                notes: nil,
+                schedule: validScheduleState(
+                    source: SourceWallClock(
+                        year: 2041,
+                        month: 12,
+                        day: 30,
+                        hour: 9,
+                        minute: 30,
+                        timeZoneIdentifier: "America/New_York"
+                    ),
+                    early: early
+                )
+            ),
+            locale: Locale(identifier: "en_US"),
+            evaluationNow: date("2041-12-30T14:30:00Z"),
+            recurrenceEnvironment: .foundation
         )
 
-        let firstBody = try testMaterializer().materialize(first, input: input).content.body
-        let secondBody = try testMaterializer().materialize(second, input: input).content.body
+        let firstBody = try testMaterializer().materialize(first, input: firstInput).content.body
+        let secondBody = try testMaterializer().materialize(second, input: secondInput).content.body
 
         #expect(firstBody == secondBody)
         #expect(firstBody == "Every day.\nSource time: 09:30 (America/New_York).\nEarly reminder for the next occurrence.")
@@ -510,6 +531,77 @@ struct NotificationRequestMaterializerTests {
         }
     }
 
+    @Test func rejectsRepeatingPayloadExcludedFromCompleteTask7Plan() throws {
+        let dailySource = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
+        let collision = repeatingRequest(
+            components: dailySource,
+            contributors: [RepeatingTriggerContributor(
+                kind: .main,
+                sourceComponents: dailySource
+            )]
+        )
+        let collisionReminder = reminder(schedule: validScheduleState(
+            early: EarlyReminder(value: 1, unit: .days)
+        ))
+        #expect(throws: NotificationRequestMaterializationError.repeatingPayloadNotDerivable) {
+            try testMaterializer().materialize(
+                collision,
+                input: MaterializationInput(
+                    reminder: collisionReminder,
+                    locale: Locale(identifier: "en_US")
+                )
+            )
+        }
+
+        let dynamicSource = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 3,
+            minute: 30,
+            second: 0
+        )
+        let dynamicTarget = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 1,
+            minute: 30,
+            second: 0
+        )
+        let dynamic = repeatingRequest(
+            components: dynamicTarget,
+            contributingBaseInstant: date("2040-09-01T07:30:00Z"),
+            contributors: [RepeatingTriggerContributor(
+                kind: .early,
+                sourceComponents: dynamicSource
+            )]
+        )
+        let dynamicReminder = reminder(schedule: validScheduleState(
+            source: SourceWallClock(
+                year: 2040,
+                month: 8,
+                day: 31,
+                hour: 3,
+                minute: 30,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            early: EarlyReminder(value: 2, unit: .hours, mainEnabled: false)
+        ))
+        #expect(throws: NotificationRequestMaterializationError.repeatingPayloadNotDerivable) {
+            try testMaterializer().materialize(
+                dynamic,
+                input: MaterializationInput(
+                    reminder: dynamicReminder,
+                    locale: Locale(identifier: "en_US"),
+                    evaluationNow: date("2040-08-31T07:30:00Z"),
+                    recurrenceEnvironment: .foundation
+                )
+            )
+        }
+    }
+
     @Test func expiredFixtureUsesInjectedTriggerVerificationInsteadOfWallClock() throws {
         let expired = date("2026-08-07T13:30:00Z")
         let expiredSchedule = ScheduleDefinition(
@@ -654,12 +746,13 @@ struct NotificationRequestMaterializerTests {
     }
 
     private func validScheduleState(
+        source: SourceWallClock? = nil,
         rule: RepeatRule = .daily(interval: 1),
         early: EarlyReminder? = nil
     ) -> ScheduleReadState {
         .valid(
             ScheduleDefinition(
-                source: SourceWallClock(
+                source: source ?? SourceWallClock(
                     year: 2040,
                     month: 8,
                     day: 31,
@@ -705,7 +798,7 @@ struct NotificationRequestMaterializerTests {
 
     private func repeatingRequest(
         components: RepeatingTriggerComponents,
-        contributingBaseInstant: Date = date("2040-08-31T13:30:00Z"),
+        contributingBaseInstant: Date = date("2040-09-01T13:30:00Z"),
         contributors: [RepeatingTriggerContributor]? = nil
     ) -> LogicalNotificationRequest {
         LogicalNotificationRequest(
@@ -760,4 +853,15 @@ private func date(_ value: String) -> Date {
         preconditionFailure("Invalid date fixture")
     }
     return value
+}
+
+private extension MaterializationInput {
+    init(reminder: ReminderSnapshot, locale: Locale) {
+        self.init(
+            reminder: reminder,
+            locale: locale,
+            evaluationNow: date("2040-08-31T13:30:00Z"),
+            recurrenceEnvironment: .foundation
+        )
+    }
 }
