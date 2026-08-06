@@ -62,6 +62,43 @@ struct NotificationsNotificationIdentifierCodecTests {
         }
     }
 
+    @Test func rejectsImpossibleMixedAndPartialTriggerShapes() {
+        let invalid = [
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 30, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 4, day: 31, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, weekday: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", day: 15, weekday: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 29, weekday: 2, hour: 9, minute: 0, second: 0)
+        ]
+
+        for components in invalid {
+            #expect(throws: NotificationIdentifierCodecError.invalidRepeatingComponents) {
+                _ = try components.canonicalDocument()
+            }
+            #expect(throws: NotificationIdentifierCodecError.invalidRepeatingComponents) {
+                _ = try codec.repeatingIdentifier(
+                    reminderID: UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!,
+                    components: components
+                )
+            }
+        }
+    }
+
+    @Test func acceptsEveryAllowedTriggerShapeAtItsBoundaries() throws {
+        let allowed = [
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 0, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", weekday: 7, hour: 23, minute: 59, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", day: 31, hour: 23, minute: 59, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 29, hour: 0, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 12, day: 31, hour: 23, minute: 59, second: 0)
+        ]
+
+        for components in allowed {
+            #expect(try !components.canonicalDocument().isEmpty)
+        }
+    }
+
     @Test func oneShotIdentifiersUseCanonicalSignedIntegralInt64UnixSeconds() throws {
         let reminderID = UUID(uuidString: "AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE")!
         let fixtures: [(Date, String)] = [

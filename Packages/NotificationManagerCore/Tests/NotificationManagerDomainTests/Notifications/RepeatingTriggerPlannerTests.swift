@@ -154,6 +154,26 @@ struct NotificationsRepeatingTriggerPlannerTests {
         ])
     }
 
+    @Test func historicalTokyoTransitionPreventsFalseStaticDailyEarlyResidue() {
+        let definition = schedule(
+            source: source(
+                year: 1948,
+                month: 5,
+                day: 1,
+                hour: 2,
+                minute: 30,
+                timeZoneIdentifier: "Asia/Tokyo"
+            ),
+            rule: .daily(interval: 1),
+            early: .init(value: 2, unit: .hours, mainEnabled: false)
+        )
+
+        #expect(plan(
+            definition,
+            evaluationNow: fixtureDate("1948-05-01T00:00:00Z")
+        ) == nil)
+    }
+
     @Test func crossOccurrenceCollisionsRemainRolling() {
         let dailyMainAndPreviousEarly = schedule(
             rule: .daily(interval: 1),
@@ -249,11 +269,12 @@ struct NotificationsRepeatingTriggerPlannerTests {
 
     private func plan(
         _ schedule: ScheduleDefinition,
-        physical: [PhysicalNotification] = []
+        physical: [PhysicalNotification] = [],
+        evaluationNow: Date? = nil
     ) -> [RepeatingTriggerCandidate]? {
         planner.plan(RepeatingTriggerPlanningInput(
             schedule: schedule,
-            evaluationNow: evaluationNow,
+            evaluationNow: evaluationNow ?? self.evaluationNow,
             physicalNotifications: physical,
             environment: .foundation
         ))

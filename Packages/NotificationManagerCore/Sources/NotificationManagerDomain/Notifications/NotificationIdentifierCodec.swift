@@ -67,16 +67,7 @@ public struct NotificationIdentifierCodec: Sendable {
     }
 
     func canonicalDocument(for components: RepeatingTriggerComponents) throws -> Data {
-        guard TimeZone(identifier: components.timeZoneIdentifier) != nil,
-              components.month.map({ (1...12).contains($0) }) ?? true,
-              components.day.map({ (1...31).contains($0) }) ?? true,
-              components.weekday.map({ (1...7).contains($0) }) ?? true,
-              (0...23).contains(components.hour),
-              (0...59).contains(components.minute),
-              components.second == 0
-        else {
-            throw NotificationIdentifierCodecError.invalidRepeatingComponents
-        }
+        _ = try components.validated()
 
         var fields = [#""calendar":"gregorian""#]
         if let day = components.day { fields.append(#""day":\#(day)"#) }

@@ -45,6 +45,8 @@ public struct RepeatingTriggerPlanner: Sendable {
                     cadence: rulePlan.cadence,
                     early: early,
                     schedule: schedule,
+                    evaluationNow: input.evaluationNow,
+                    timeZone: timeZone,
                     calendar: calendar
                 ) else {
                     return nil
@@ -79,6 +81,15 @@ public struct RepeatingTriggerPlanner: Sendable {
                     contributors: [path.contributor]
                 ))
             }
+        }
+
+        guard candidates.allSatisfy({
+            (try? $0.components.validated()) != nil
+                && $0.contributors.allSatisfy {
+                    (try? $0.sourceComponents.validated()) != nil
+                }
+        }) else {
+            return nil
         }
 
         return candidates.sorted {
@@ -150,52 +161,63 @@ public struct RepeatingTriggerPlanner: Sendable {
         cadence: Cadence,
         early: EarlyReminder,
         schedule: ScheduleDefinition,
+        evaluationNow: Date,
+        timeZone: TimeZone,
         calendar: Calendar
     ) -> RepeatingTriggerComponents? {
+        var structuralCalendar = Calendar(identifier: .gregorian)
+        structuralCalendar.timeZone = TimeZone(secondsFromGMT: 0)!
         var result: RepeatingTriggerComponents?
-        for source in representativeSources(
+        for source in gregorianStructuralSources(
             cadence: cadence,
             base: base,
             originalSource: schedule.source
         ) {
             guard let baseInstant = try? SourceWallClockResolver().resolve(
                 source,
-                calendar: calendar
+                calendar: structuralCalendar
             ), let alertInstant = try? earlyAlertInstant(
                 for: baseInstant,
                 early: early,
                 rule: schedule.rule,
-                calendar: calendar
+                calendar: structuralCalendar
             ), let components = normalizedComponents(
                 of: alertInstant,
                 cadence: cadence,
                 timeZoneIdentifier: base.timeZoneIdentifier,
-                calendar: calendar
+                calendar: structuralCalendar
             ) else {
                 return nil
             }
             if let result, result != components { return nil }
             result = components
         }
+        guard let result,
+              futureTransitionsPreserve(
+                  result,
+                  from: base,
+                  cadence: cadence,
+                  early: early,
+                  schedule: schedule,
+                  evaluationNow: evaluationNow,
+                  timeZone: timeZone,
+                  calendar: calendar
+              )
+        else {
+            return nil
+        }
         return result
     }
 
-    private func representativeSources(
+    private func gregorianStructuralSources(
         cadence: Cadence,
         base: RepeatingTriggerComponents,
         originalSource: SourceWallClock
     ) -> [SourceWallClock] {
         var sources: [SourceWallClock] = []
-        let years: Range<Int> = switch cadence {
-        case .daily, .weekly:
-            // Daily/weekly output has no month/day field. A complete 28-year
-            // Gregorian weekday/leap cycle exposes every projected transition
-            // weekday alignment while keeping reconcile-time planning bounded.
-            2_020..<2_048
-        case .monthly, .yearly:
-            // Month/day output must also survive the full Gregorian leap cycle.
-            2_000..<2_400
-        }
+        let years: Range<Int> = cadence == .daily || cadence == .weekly
+            ? 2_000..<2_001
+            : 2_000..<2_400
 
         for year in years {
             for month in 1...12 {
@@ -204,10 +226,12 @@ public struct RepeatingTriggerPlanner: Sendable {
                 for day in 1...maximumDay {
                     switch cadence {
                     case .daily:
-                        break
+                        guard month == 1, day == 15 else { continue }
                     case .weekly:
                         guard gregorianWeekday(year: year, month: month, day: day)
-                            == base.weekday else { continue }
+                            == base.weekday,
+                              month == 1
+                        else { continue }
                     case .monthly:
                         guard day == base.day else { continue }
                     case .yearly:
@@ -219,12 +243,106 @@ public struct RepeatingTriggerPlanner: Sendable {
                         day: day,
                         hour: originalSource.hour,
                         minute: originalSource.minute,
-                        timeZoneIdentifier: originalSource.timeZoneIdentifier
+                        timeZoneIdentifier: "Etc/GMT"
                     ))
                 }
             }
         }
         return sources
+    }
+
+    private func futureTransitionsPreserve(
+        _ expected: RepeatingTriggerComponents,
+        from base: RepeatingTriggerComponents,
+        cadence: Cadence,
+        early: EarlyReminder,
+        schedule: ScheduleDefinition,
+        evaluationNow: Date,
+        timeZone: TimeZone,
+        calendar: Calendar
+    ) -> Bool {
+        switch early.unit {
+        case .days, .weeks:
+            // Calendar subtraction can resolve a target wall time differently at
+            // any future transition. Without enumerating every future occurrence,
+            // only a transition-free regime is a proof of one static residue.
+            return timeZone.nextDaylightSavingTimeTransition(
+                after: evaluationNow.addingTimeInterval(-1)
+            ) == nil
+        case .minutes, .hours:
+            break
+        }
+
+        let secondsPerUnit: Int64 = early.unit == .minutes ? 60 : 3_600
+        let (seconds, overflow) = Int64(early.value).multipliedReportingOverflow(
+            by: secondsPerUnit
+        )
+        guard !overflow else { return false }
+        let duration = TimeInterval(seconds)
+        let firstRelevantTransitionSearch = evaluationNow.addingTimeInterval(-duration - 1)
+        guard firstRelevantTransitionSearch.timeIntervalSinceReferenceDate.isFinite else {
+            return false
+        }
+
+        var cursor = firstRelevantTransitionSearch
+        while let transition = timeZone.nextDaylightSavingTimeTransition(after: cursor) {
+            let transitionYear = calendar.component(.year, from: transition)
+            guard transitionYear <= 9_999 else { break }
+            let occurrenceSearchStart = max(
+                transition.addingTimeInterval(-1),
+                evaluationNow.addingTimeInterval(-1)
+            )
+            guard let occurrence = nextOccurrence(
+                after: occurrenceSearchStart,
+                matching: base,
+                calendar: calendar
+            ) else {
+                return false
+            }
+            if occurrence <= transition.addingTimeInterval(duration) {
+                guard let alert = try? earlyAlertInstant(
+                    for: occurrence,
+                    early: early,
+                    rule: schedule.rule,
+                    calendar: calendar
+                ), let actual = normalizedComponents(
+                    of: alert,
+                    cadence: cadence,
+                    timeZoneIdentifier: base.timeZoneIdentifier,
+                    calendar: calendar
+                ), actual == expected
+                else {
+                    return false
+                }
+            }
+            let nextCursor = transition.addingTimeInterval(1)
+            guard nextCursor > cursor else { return false }
+            cursor = nextCursor
+        }
+        return true
+    }
+
+    private func nextOccurrence(
+        after instant: Date,
+        matching components: RepeatingTriggerComponents,
+        calendar: Calendar
+    ) -> Date? {
+        var matching = DateComponents()
+        matching.calendar = calendar
+        matching.timeZone = calendar.timeZone
+        matching.month = components.month
+        matching.day = components.day
+        matching.weekday = components.weekday
+        matching.hour = components.hour
+        matching.minute = components.minute
+        matching.second = components.second
+        return calendar.nextDate(
+            after: instant,
+            matching: matching,
+            matchingPolicy: .nextTimePreservingSmallerComponents,
+            repeatedTimePolicy: .first,
+            direction: .forward
+        )
     }
 
     private func normalizedComponents(
@@ -316,7 +434,7 @@ public struct RepeatingTriggerPlanner: Sendable {
         hour: Int,
         minute: Int
     ) -> RepeatingTriggerComponents {
-        RepeatingTriggerComponents(
+        let components = RepeatingTriggerComponents(
             timeZoneIdentifier: zone,
             month: month,
             day: day,
@@ -325,6 +443,11 @@ public struct RepeatingTriggerPlanner: Sendable {
             minute: minute,
             second: 0
         )
+        precondition(
+            (try? components.validated()) != nil,
+            "Planner must construct only validated repeating components"
+        )
+        return components
     }
 
     private func foundationWeekday(_ weekday: Weekday) -> Int {
