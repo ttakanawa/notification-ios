@@ -423,6 +423,57 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
+    @Test func cancelledSecondToggleRestoresPriorOverrideWithoutNewerPublication() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let warning = CapacityWarning(
+            reminderID: id,
+            earliestGroupID: AlertGroupID(
+                reminderID: id,
+                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
+            ),
+            planningCapacity: 60
+        )
+        let recorder = EnabledOutcomeRecorder(outcomes: [
+            .saved(id),
+            .requiresCapacityConfirmation(warning)
+        ])
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in try await recorder.execute(command) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        #expect(await coordinator.setEnabled(
+            true,
+            for: id,
+            fallback: model.items[0].enabled
+        ))
+        #expect(!(await coordinator.setEnabled(
+            false,
+            for: id,
+            fallback: model.items[0].enabled
+        )))
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+
+        coordinator.cancelEnabledCapacityChange(id)
+
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+        #expect(coordinator.state == .idle)
+    }
+
+    @MainActor
     @Test func failedSecondToggleRestoresPriorOverrideWithoutNewerPublication() async {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let authoritativeDisabled = ReminderListItemPresentation.fixture(
