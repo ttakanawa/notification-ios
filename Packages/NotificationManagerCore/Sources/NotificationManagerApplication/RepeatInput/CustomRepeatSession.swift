@@ -27,6 +27,11 @@ public enum CustomRepeatSessionState: Sendable, Equatable {
     case confirmed(CustomRepeatPreview)
 }
 
+public enum CustomRepeatSubmissionOutcome: Sendable, Equatable {
+    case applied(CustomRepeatSessionState)
+    case superseded
+}
+
 public actor CustomRepeatSession {
     private let resolver: any CustomRepeatInputResolving
     private let reminderID: UUID
@@ -38,6 +43,7 @@ public actor CustomRepeatSession {
     private var pendingSchedule: ScheduleDefinition?
     private var preview: CustomRepeatPreview?
     private var state: CustomRepeatSessionState = .idle
+    private var submissionGeneration: UInt64 = 0
 
     public init(
         resolver: any CustomRepeatInputResolving,
@@ -52,11 +58,18 @@ public actor CustomRepeatSession {
     }
 
     @discardableResult
-    public func submit(_ input: String) async throws -> CustomRepeatSessionState {
+    public func submit(_ input: String) async throws -> CustomRepeatSubmissionOutcome {
+        submissionGeneration += 1
+        let generation = submissionGeneration
         clearPending()
         rawInput = input
 
-        switch await resolver.resolve(input) {
+        let resolution = await resolver.resolve(input)
+        guard generation == submissionGeneration else {
+            return .superseded
+        }
+
+        switch resolution {
         case let .failed(error):
             state = .failed(error)
         case let .resolved(resolved):
@@ -82,7 +95,7 @@ public actor CustomRepeatSession {
                 throw error
             }
         }
-        return state
+        return .applied(state)
     }
 
     public func confirm() -> ScheduleDefinition? {
@@ -93,6 +106,7 @@ public actor CustomRepeatSession {
 
     @discardableResult
     public func reset() -> CustomRepeatSessionState {
+        submissionGeneration += 1
         rawInput = nil
         clearPending()
         state = .idle

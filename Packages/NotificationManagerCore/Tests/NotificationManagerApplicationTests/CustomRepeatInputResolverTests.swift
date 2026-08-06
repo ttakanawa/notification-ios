@@ -151,10 +151,10 @@ struct CustomRepeatInputResolverTests {
             recurrenceEnvironment: FoundationRecurrenceEnvironment()
         )
 
-        let state = try await session.submit("毎日")
+        let outcome = try await session.submit("毎日")
 
-        guard case let .awaitingConfirmation(preview) = state else {
-            Issue.record("Expected a pending confirmation, got \(state)")
+        guard case let .applied(.awaitingConfirmation(preview)) = outcome else {
+            Issue.record("Expected a pending confirmation, got \(outcome)")
             return
         }
         #expect(preview.route == .japaneseAssisted)
@@ -183,9 +183,9 @@ struct CustomRepeatInputResolverTests {
             recurrenceEnvironment: FoundationRecurrenceEnvironment()
         )
 
-        let state = try await session.submit("毎月")
+        let outcome = try await session.submit("毎月")
 
-        #expect(state == .failed(.validation(.invalidCombination)))
+        #expect(outcome == .applied(.failed(.validation(.invalidCombination))))
         #expect(await session.confirm() == nil)
     }
 
@@ -209,6 +209,65 @@ struct CustomRepeatInputResolverTests {
         #expect(await session.confirm() == nil)
     }
 
+    @Test func resetWhileSubmissionIsSuspendedDiscardsItsLaterResolution() async throws {
+        let resolver = ControlledCustomRepeatResolver()
+        let session = makeControlledSession(resolver: resolver)
+        let staleSubmission = Task {
+            try await session.submit("A")
+        }
+        await resolver.waitUntilRequested("A")
+
+        #expect(await session.reset() == .idle)
+        await resolver.resume("A", with: Self.dailyResolution)
+
+        let staleOutcome = try await staleSubmission.value
+        #expect(staleOutcome == .superseded)
+        #expect(await session.confirm() == nil)
+    }
+
+    @Test func newerSuccessfulSubmissionCannotBeReplacedByAnOlderSuspendedOne() async throws {
+        let resolver = ControlledCustomRepeatResolver(immediate: [
+            "B": Self.weeklyMondayResolution
+        ])
+        let session = makeControlledSession(resolver: resolver)
+        let staleSubmission = Task {
+            try await session.submit("A")
+        }
+        await resolver.waitUntilRequested("A")
+
+        let currentOutcome = try await session.submit("B")
+        guard case let .applied(.awaitingConfirmation(preview)) = currentOutcome else {
+            Issue.record("Expected B to become the current preview, got \(currentOutcome)")
+            return
+        }
+        #expect(preview.rule == Self.weeklyMondaySchedule.rule)
+
+        await resolver.resume("A", with: Self.dailyResolution)
+
+        let staleOutcome = try await staleSubmission.value
+        #expect(staleOutcome == .superseded)
+        #expect(await session.confirm() == Self.weeklyMondaySchedule)
+    }
+
+    @Test func newerFailedSubmissionPreventsAnOlderSuspendedOneFromBeingResurrected() async throws {
+        let resolver = ControlledCustomRepeatResolver(immediate: [
+            "B": .failed(.generation)
+        ])
+        let session = makeControlledSession(resolver: resolver)
+        let staleSubmission = Task {
+            try await session.submit("A")
+        }
+        await resolver.waitUntilRequested("A")
+
+        let currentOutcome = try await session.submit("B")
+        #expect(currentOutcome == .applied(.failed(.generation)))
+        await resolver.resume("A", with: Self.dailyResolution)
+
+        let staleOutcome = try await staleSubmission.value
+        #expect(staleOutcome == .superseded)
+        #expect(await session.confirm() == nil)
+    }
+
     private func makeResolver(
         assisted: some AssistedRepeatInterpreting
     ) -> CustomRepeatInputResolver {
@@ -217,6 +276,17 @@ struct CustomRepeatInputResolverTests {
             end: .never,
             early: nil,
             assistedInterpreter: assisted
+        )
+    }
+
+    private func makeControlledSession(
+        resolver: ControlledCustomRepeatResolver
+    ) -> CustomRepeatSession {
+        CustomRepeatSession(
+            resolver: resolver,
+            reminderID: UUID(uuidString: "13131313-1313-1313-1313-131313131313")!,
+            now: { Self.previewNow },
+            recurrenceEnvironment: FoundationRecurrenceEnvironment()
         )
     }
 
@@ -232,6 +302,75 @@ struct CustomRepeatInputResolverTests {
     private static let previewNow = ISO8601DateFormatter().date(
         from: "2040-08-30T00:00:00Z"
     )!
+
+    private static let dailySchedule = ScheduleDefinition(
+        source: source,
+        rule: .daily(interval: 1),
+        end: .never,
+        early: nil
+    )
+
+    private static let dailyResolution = CustomRepeatResolution.resolved(
+        ResolvedCustomRepeat(
+            route: .japaneseAssisted,
+            candidate: .daily,
+            schedule: dailySchedule
+        )
+    )
+
+    private static let weeklyMondaySchedule = ScheduleDefinition(
+        source: source,
+        rule: .weekly(
+            interval: 1,
+            weekdaySetKind: .explicit,
+            weekdays: [.monday]
+        ),
+        end: .never,
+        early: nil
+    )
+
+    private static let weeklyMondayResolution = CustomRepeatResolution.resolved(
+        ResolvedCustomRepeat(
+            route: .japaneseAssisted,
+            candidate: .weeklyMonday,
+            schedule: weeklyMondaySchedule
+        )
+    )
+}
+
+private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
+    private var requestedInputs: Set<String> = []
+    private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private var resolutionContinuations: [
+        String: CheckedContinuation<CustomRepeatResolution, Never>
+    ] = [:]
+    private let immediate: [String: CustomRepeatResolution]
+
+    init(immediate: [String: CustomRepeatResolution] = [:]) {
+        self.immediate = immediate
+    }
+
+    func resolve(_ input: String) async -> CustomRepeatResolution {
+        requestedInputs.insert(input)
+        requestWaiters.removeValue(forKey: input)?.forEach { $0.resume() }
+        if let resolution = immediate[input] {
+            return resolution
+        }
+        return await withCheckedContinuation { continuation in
+            resolutionContinuations[input] = continuation
+        }
+    }
+
+    func waitUntilRequested(_ input: String) async {
+        guard !requestedInputs.contains(input) else { return }
+        await withCheckedContinuation { continuation in
+            requestWaiters[input, default: []].append(continuation)
+        }
+    }
+
+    func resume(_ input: String, with resolution: CustomRepeatResolution) {
+        resolutionContinuations.removeValue(forKey: input)?.resume(returning: resolution)
+    }
 }
 
 private actor AssistedRepeatInterpreterSpy: AssistedRepeatInterpreting {
