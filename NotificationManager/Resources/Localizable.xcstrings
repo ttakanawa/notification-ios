@@ -722,7 +722,7 @@
       }
     },
     "localization.source-time.sentence" : {
-      "comment" : "Complete source-time sentence. Placeholder 1 is a 24-hour source wall-clock String; placeholder 2 is a bidi-isolated IANA time-zone identifier String.",
+      "comment" : "Complete source-time sentence. Placeholder 1 is a locale-aware short source wall-clock time String; placeholder 2 is a bidi-isolated IANA time-zone identifier String.",
       "extractionState" : "manual",
       "localizations" : {
         "en" : {

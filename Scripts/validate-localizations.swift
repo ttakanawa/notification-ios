@@ -291,23 +291,87 @@ private struct LocalizationValidator {
         var references: Set<String> = []
         for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
             guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
-            for line in source.split(separator: "\n", omittingEmptySubsequences: false) {
-                if line.contains("accessibilityIdentifier") { continue }
-                references.formUnion(Self.semanticReferences(in: String(line)))
-            }
+            references.formUnion(Self.semanticReferences(
+                in: Self.excludingAccessibilityIdentifierCalls(from: source)
+            ))
         }
         for missing in references.subtracting(catalogKeys).sorted() {
             failures.append("\(missing): referenced by app source but missing from the catalog.")
         }
     }
 
-    private static func semanticReferences(in line: String) -> Set<String> {
+    private static func excludingAccessibilityIdentifierCalls(from source: String) -> String {
+        let marker = ".accessibilityIdentifier"
+        var output = ""
+        var cursor = source.startIndex
+
+        while let markerRange = source.range(
+            of: marker,
+            range: cursor..<source.endIndex
+        ) {
+            output.append(contentsOf: source[cursor..<markerRange.lowerBound])
+            guard let callEnd = accessibilityIdentifierCallEnd(
+                in: source,
+                after: markerRange
+            ) else {
+                output.append(contentsOf: source[markerRange])
+                cursor = markerRange.upperBound
+                continue
+            }
+            for character in source[markerRange.lowerBound..<callEnd] {
+                output.append(character == "\n" || character == "\r" ? character : " ")
+            }
+            cursor = callEnd
+        }
+        output.append(contentsOf: source[cursor...])
+        return output
+    }
+
+    private static func accessibilityIdentifierCallEnd(
+        in source: String,
+        after markerRange: Range<String.Index>
+    ) -> String.Index? {
+        var index = markerRange.upperBound
+        while index < source.endIndex, source[index].isWhitespace {
+            index = source.index(after: index)
+        }
+        guard index < source.endIndex, source[index] == "(" else { return nil }
+
+        var depth = 0
+        var isInsideString = false
+        var isEscaped = false
+        while index < source.endIndex {
+            let character = source[index]
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+            } else if character == "\"" {
+                isInsideString = true
+            } else if character == "(" {
+                depth += 1
+            } else if character == ")" {
+                depth -= 1
+                if depth == 0 {
+                    return source.index(after: index)
+                }
+            }
+            index = source.index(after: index)
+        }
+        return nil
+    }
+
+    private static func semanticReferences(in source: String) -> Set<String> {
         let pattern = #"\"((?:reminder|settings|tags|common|data_unavailable|notification_unavailable|privacy|recovery|localization)(?:\.[a-z0-9_-]+)+)\""#
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
-        let range = NSRange(line.startIndex..<line.endIndex, in: line)
-        return Set(expression.matches(in: line, range: range).compactMap { match in
-            guard let valueRange = Range(match.range(at: 1), in: line) else { return nil }
-            return String(line[valueRange])
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        return Set(expression.matches(in: source, range: range).compactMap { match in
+            guard let valueRange = Range(match.range(at: 1), in: source) else { return nil }
+            return String(source[valueRange])
         })
     }
 

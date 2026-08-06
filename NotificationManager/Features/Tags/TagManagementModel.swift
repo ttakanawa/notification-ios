@@ -13,12 +13,18 @@ enum TagActionErrorIdentity: Sendable, Equatable {
     case storeUnavailable
 }
 
+enum TagManagementLoadOutcome: Sendable, Equatable {
+    case acceptedCompleteSnapshot(generation: UInt64)
+    case notAccepted
+}
+
 @MainActor
 @Observable
 final class TagManagementModel {
     private(set) var tags: [TagSnapshot]
     private(set) var isWorking = false
     private(set) var actionError: TagActionErrorIdentity?
+    private(set) var completeSnapshotGeneration: UInt64 = 0
 
     @ObservationIgnored private let repository: any ReminderRepository
     @ObservationIgnored private let useCase: TagManagementUseCase
@@ -33,16 +39,20 @@ final class TagManagementModel {
         tags = Self.sorted(initialTags)
     }
 
-    func load() async {
-        guard !isWorking else { return }
+    @discardableResult
+    func load() async -> TagManagementLoadOutcome {
+        guard !isWorking else { return .notAccepted }
         isWorking = true
         actionError = nil
+        defer { isWorking = false }
         do {
             tags = Self.sorted(try await repository.fetchCompleteSnapshot().tags)
+            completeSnapshotGeneration &+= 1
+            return .acceptedCompleteSnapshot(generation: completeSnapshotGeneration)
         } catch {
             actionError = Self.errorIdentity(for: error)
+            return .notAccepted
         }
-        isWorking = false
     }
 
     func create(name: String) async -> TagSnapshot? {
@@ -159,5 +169,14 @@ enum TagPickerSelection {
         var result = selectedIDs
         result.insert(tagID)
         return result
+    }
+
+    static func reconciled(
+        selectedIDs: Set<UUID>,
+        availableIDs: Set<UUID>,
+        after outcome: TagManagementLoadOutcome
+    ) -> Set<UUID> {
+        guard case .acceptedCompleteSnapshot = outcome else { return selectedIDs }
+        return reconciled(selectedIDs: selectedIDs, availableIDs: availableIDs)
     }
 }

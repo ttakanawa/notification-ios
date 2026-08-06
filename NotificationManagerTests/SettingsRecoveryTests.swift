@@ -200,7 +200,56 @@ struct SettingsRecoveryTests {
         #expect(!actions.isEnabled)
         #expect(await preference.enabled == false)
         #expect(actions.actionError == .pendingCleanup)
-        #expect(actions.didRequestRetry == false)
+        #expect(actions.isRetrying == false)
+    }
+
+    @MainActor
+    @Test func dataUnavailableRetryRejectsOnlyConcurrentAttempts() async {
+        let retry = BlockingRetryAction()
+        let actions = DataUnavailableActions(
+            preferenceStore: RecordingPreferenceStore(enabled: false),
+            authorizationProvider: RecordingAuthorizationController(
+                snapshots: [.fixture(rawValue: 0)]
+            ),
+            authorizationRequester: RecordingAuthorizationController(
+                snapshots: [.fixture(rawValue: 0)]
+            ),
+            pendingCleaner: RecordingPendingCleaner(),
+            retry: { await retry.run() }
+        )
+
+        let firstAttempt = Task { @MainActor in await actions.retry() }
+        await retry.waitUntilStarted()
+
+        #expect(actions.isRetrying)
+        await actions.retry()
+        #expect(await retry.callCount == 1)
+
+        await retry.release()
+        await firstAttempt.value
+        #expect(!actions.isRetrying)
+    }
+
+    @MainActor
+    @Test func dataUnavailableRetryIsAvailableAgainAfterCompletion() async {
+        let counter = RetryCounter()
+        let actions = DataUnavailableActions(
+            preferenceStore: RecordingPreferenceStore(enabled: false),
+            authorizationProvider: RecordingAuthorizationController(
+                snapshots: [.fixture(rawValue: 0)]
+            ),
+            authorizationRequester: RecordingAuthorizationController(
+                snapshots: [.fixture(rawValue: 0)]
+            ),
+            pendingCleaner: RecordingPendingCleaner(),
+            retry: { await counter.increment() }
+        )
+
+        await actions.retry()
+        await actions.retry()
+
+        #expect(await counter.value == 2)
+        #expect(!actions.isRetrying)
     }
 }
 
@@ -319,6 +368,68 @@ struct TagManagementPresentationTests {
     }
 
     @MainActor
+    @Test func failedCompleteSnapshotLoadPreservesDraftTagIDs() async {
+        let existing = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Existing"
+        )
+        let draftID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let repository = ControlledTagSnapshotRepository(
+            snapshot: CompleteReminderSnapshot(reminders: [], tags: [existing]),
+            behavior: .fail
+        )
+        let model = makeTagModel(repository: repository, initialTags: [existing])
+
+        let outcome = await model.load()
+        let selection = TagPickerSelection.reconciled(
+            selectedIDs: [existing.id, draftID],
+            availableIDs: Set(model.tags.map(\.id)),
+            after: outcome
+        )
+
+        #expect(outcome == .notAccepted)
+        #expect(selection == [existing.id, draftID])
+    }
+
+    @MainActor
+    @Test func busyLoadPreservesDraftIDsUntilAcceptedCompleteSnapshotPrunesThem() async {
+        let existing = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Existing"
+        )
+        let draftID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let repository = ControlledTagSnapshotRepository(
+            snapshot: CompleteReminderSnapshot(reminders: [], tags: [existing]),
+            behavior: .blockFirst
+        )
+        let model = makeTagModel(repository: repository, initialTags: [existing])
+        let initialSelection: Set<UUID> = [existing.id, draftID]
+
+        let acceptedLoad = Task { @MainActor in await model.load() }
+        await repository.waitUntilFirstFetchStarts()
+        let droppedLoad = await model.load()
+        let whileBusy = TagPickerSelection.reconciled(
+            selectedIDs: initialSelection,
+            availableIDs: Set(model.tags.map(\.id)),
+            after: droppedLoad
+        )
+
+        #expect(droppedLoad == .notAccepted)
+        #expect(whileBusy == initialSelection)
+
+        await repository.releaseFirstFetch()
+        let acceptedOutcome = await acceptedLoad.value
+        let afterAcceptedLoad = TagPickerSelection.reconciled(
+            selectedIDs: whileBusy,
+            availableIDs: Set(model.tags.map(\.id)),
+            after: acceptedOutcome
+        )
+
+        #expect(acceptedOutcome == .acceptedCompleteSnapshot(generation: 1))
+        #expect(afterAcceptedLoad == [existing.id])
+    }
+
+    @MainActor
     private func makeTagModel() throws -> (
         TagManagementModel,
         SwiftDataReminderRepository
@@ -332,6 +443,33 @@ struct TagManagementPresentationTests {
         return (
             TagManagementModel(repository: repository, useCase: useCase),
             repository
+        )
+    }
+
+    @MainActor
+    private func makeTagModel(
+        repository: any ReminderRepository,
+        initialTags: [TagSnapshot]
+    ) -> TagManagementModel {
+        TagManagementModel(
+            repository: repository,
+            useCase: TagManagementUseCase(
+                repository: repository,
+                normalizer: TagNameNormalizerV1(),
+                now: { Date(timeIntervalSince1970: 1_786_003_200) }
+            ),
+            initialTags: initialTags
+        )
+    }
+
+    private func tagFixture(id: String, name: String) -> TagSnapshot {
+        let timestamp = Date(timeIntervalSince1970: 1_786_003_200)
+        return TagSnapshot(
+            id: UUID(uuidString: id)!,
+            name: name,
+            normalizedName: name.lowercased(),
+            createdAt: timestamp,
+            updatedAt: timestamp
         )
     }
 }
@@ -386,6 +524,47 @@ struct SourceTimePresentationTests {
                 timeZoneIdentifier: source.timeZoneIdentifier,
                 locale: Locale(identifier: "en_US")
             ) == "8/6/2026, 9:30\u{202F}AM · \u{2066}America/New_York\u{2069}"
+        )
+    }
+
+    @Test func dstGapWallClockKeepsNominalCivilComponentsAcrossLocales() throws {
+        let formatter = SourceDateTimePresentationFormatter(
+            localizer: LocalizedTextProvider { key, _ in
+                #expect([
+                    "reminder.source-wall-clock.presentation",
+                    "reminder.source-instant.presentation"
+                ].contains(key))
+                return "%1$@ · %2$@"
+            }
+        )
+        let gap = SourceWallClock(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 2,
+            minute: 30,
+            timeZoneIdentifier: "America/New_York"
+        )
+
+        #expect(
+            formatter.wallClock(gap, locale: Locale(identifier: "en_US"))
+                == "3/8/2026, 2:30\u{202F}AM · \u{2066}America/New_York\u{2069}"
+        )
+        #expect(
+            formatter.wallClock(gap, locale: Locale(identifier: "ja_JP"))
+                == "2026/3/8 2:30 · \u{2066}America/New_York\u{2069}"
+        )
+
+        let resolvedInstant = try SourceWallClockResolver().resolve(
+            gap,
+            environment: FoundationRecurrenceEnvironment()
+        )
+        #expect(
+            formatter.instant(
+                resolvedInstant,
+                timeZoneIdentifier: gap.timeZoneIdentifier,
+                locale: Locale(identifier: "en_US")
+            ) == "3/8/2026, 3:30\u{202F}AM · \u{2066}America/New_York\u{2069}"
         )
     }
 }
@@ -486,6 +665,34 @@ struct LocalizedNotificationReasonPresentationTests {
             ) == "At the scheduled time for August 31, 2040 at 9:30\u{202F}AM."
         )
     }
+
+    @Test func notificationSourceSentenceKeepsSavedDSTGapTime() {
+        let formatter = LocalizedRepeatFormatter(
+            localizer: LocalizedTextProvider { key, locale in
+                #expect(key == "localization.source-time.sentence")
+                return locale.language.languageCode == .japanese
+                    ? "基準時刻：%1$@（%2$@）。"
+                    : "Source time: %1$@ (%2$@)."
+            }
+        )
+        let gap = SourceWallClock(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 2,
+            minute: 30,
+            timeZoneIdentifier: "America/New_York"
+        )
+
+        #expect(
+            formatter.sourceTime(for: gap, locale: Locale(identifier: "en_US"))
+                == "Source time: 2:30\u{202F}AM (\u{2066}America/New_York\u{2069})."
+        )
+        #expect(
+            formatter.sourceTime(for: gap, locale: Locale(identifier: "ja_JP"))
+                == "基準時刻：2:30（\u{2066}America/New_York\u{2069}）。"
+        )
+    }
 }
 
 @Suite("Accessibility error announcement identity")
@@ -532,6 +739,121 @@ private actor SettingsTrace {
 
     func record(_ event: SettingsTraceEvent) {
         events.append(event)
+    }
+}
+
+private actor RetryCounter {
+    private(set) var value = 0
+
+    func increment() {
+        value += 1
+    }
+}
+
+private actor BlockingRetryAction {
+    private(set) var callCount = 0
+    private var started = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func run() async {
+        callCount += 1
+        started = true
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !started else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+private enum ControlledTagSnapshotRepositoryError: Error {
+    case fetchFailed
+    case unsupportedMutation
+}
+
+private actor ControlledTagSnapshotRepository: ReminderRepository {
+    enum Behavior: Sendable {
+        case succeed
+        case fail
+        case blockFirst
+    }
+
+    private let snapshot: CompleteReminderSnapshot
+    private let behavior: Behavior
+    private var fetchCount = 0
+    private var firstFetchStarted = false
+    private var firstFetchStartWaiters: [CheckedContinuation<Void, Never>] = []
+    private var firstFetchRelease: CheckedContinuation<Void, Never>?
+
+    init(snapshot: CompleteReminderSnapshot, behavior: Behavior) {
+        self.snapshot = snapshot
+        self.behavior = behavior
+    }
+
+    func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+        fetchCount += 1
+        switch behavior {
+        case .succeed:
+            return snapshot
+        case .fail:
+            throw ControlledTagSnapshotRepositoryError.fetchFailed
+        case .blockFirst:
+            guard fetchCount == 1 else { return snapshot }
+            firstFetchStarted = true
+            let waiters = firstFetchStartWaiters
+            firstFetchStartWaiters.removeAll()
+            waiters.forEach { $0.resume() }
+            await withCheckedContinuation { continuation in
+                firstFetchRelease = continuation
+            }
+            return snapshot
+        }
+    }
+
+    func waitUntilFirstFetchStarts() async {
+        guard !firstFetchStarted else { return }
+        await withCheckedContinuation { continuation in
+            firstFetchStartWaiters.append(continuation)
+        }
+    }
+
+    func releaseFirstFetch() {
+        firstFetchRelease?.resume()
+        firstFetchRelease = nil
+    }
+
+    func reminder(id: UUID) async throws -> ReminderSnapshot? {
+        throw ControlledTagSnapshotRepositoryError.unsupportedMutation
+    }
+
+    func save(_ mutation: EncodedReminderMutation) async throws -> ReminderSnapshot {
+        throw ControlledTagSnapshotRepositoryError.unsupportedMutation
+    }
+
+    func delete(id: UUID) async throws {
+        throw ControlledTagSnapshotRepositoryError.unsupportedMutation
+    }
+
+    func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
+        throw ControlledTagSnapshotRepositoryError.unsupportedMutation
+    }
+
+    func deleteTag(id: UUID) async throws {
+        throw ControlledTagSnapshotRepositoryError.unsupportedMutation
     }
 }
 

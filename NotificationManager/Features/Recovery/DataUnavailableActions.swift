@@ -5,7 +5,7 @@ import Observation
 @Observable
 final class DataUnavailableActions {
     let notificationSettings: NotificationSettingsModel
-    private(set) var didRequestRetry = false
+    private(set) var isRetrying = false
 
     @ObservationIgnored private let retryAction: @MainActor @Sendable () async -> Void
 
@@ -46,8 +46,9 @@ final class DataUnavailableActions {
     }
 
     func retry() async {
-        guard !didRequestRetry else { return }
-        didRequestRetry = true
+        guard !isRetrying else { return }
+        isRetrying = true
+        defer { isRetrying = false }
         await retryAction()
     }
 }

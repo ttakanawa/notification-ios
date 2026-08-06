@@ -72,6 +72,15 @@ public struct NotificationRequestMaterializer: Sendable {
         self.triggerDateVerifier = triggerDateVerifier
     }
 
+    init(
+        formatter: any LocalizedNotificationTextFormatting,
+        triggerDateVerifier: @escaping @Sendable (UNCalendarNotificationTrigger, Date) -> Bool
+    ) {
+        self.formatter = formatter
+        truncator = NotificationContentTruncator()
+        self.triggerDateVerifier = triggerDateVerifier
+    }
+
     public func materialize(
         _ request: LogicalNotificationRequest,
         input: MaterializationInput

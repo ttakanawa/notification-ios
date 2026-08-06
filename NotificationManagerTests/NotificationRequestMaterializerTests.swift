@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 import UserNotifications
+import NotificationManagerApplication
 import NotificationManagerDomain
 @testable import NotificationManager
 
@@ -25,6 +26,93 @@ struct NotificationRequestMaterializerTests {
         #expect(english.content.body != japanese.content.body)
         #expect(english.content.userInfo["notification-manager.reminder-id"] as? String
             == japanese.content.userInfo["notification-manager.reminder-id"] as? String)
+    }
+
+    @Test func dstGapNotificationSupplementalTextKeepsSavedCivilTimeAcrossLocales() throws {
+        let source = SourceWallClock(
+            year: 2026,
+            month: 3,
+            day: 8,
+            hour: 2,
+            minute: 30,
+            timeZoneIdentifier: "America/New_York"
+        )
+        let schedule = ScheduleDefinition(
+            source: source,
+            rule: .none,
+            end: .never,
+            early: nil
+        )
+        let resolvedInstant = date("2026-03-08T07:30:00Z")
+        var sourceComponents = DateComponents()
+        sourceComponents.calendar = Calendar(identifier: .gregorian)
+        sourceComponents.timeZone = TimeZone(identifier: source.timeZoneIdentifier)!
+        sourceComponents.year = 2026
+        sourceComponents.month = 3
+        sourceComponents.day = 8
+        sourceComponents.hour = 3
+        sourceComponents.minute = 30
+        sourceComponents.second = 0
+        sourceComponents.weekday = 1
+        let reason = EffectiveAlert(
+            kind: .main,
+            baseOccurrence: BaseOccurrence(
+                instant: resolvedInstant,
+                sourceComponents: sourceComponents
+            ),
+            alertInstant: resolvedInstant
+        )
+        let logical = LogicalNotificationRequest(
+            identifier: try NotificationIdentifierCodec().oneShotIdentifier(
+                reminderID: reminderID,
+                alertInstant: resolvedInstant
+            ),
+            reminderID: reminderID,
+            payload: .oneShot(alertInstant: resolvedInstant, reasons: [reason]),
+            contributingGroupIDs: [AlertGroupID(
+                reminderID: reminderID,
+                baseOccurrenceInstant: resolvedInstant
+            )]
+        )
+        let snapshot = reminder(schedule: .valid(
+            schedule,
+            sourceVersion: 1,
+            originalData: Data([1])
+        ))
+        let materializer = NotificationRequestMaterializer(
+            formatter: DSTGapSupplementalTextFormatter(),
+            triggerDateVerifier: { _, _ in true }
+        )
+        let evaluationNow = date("2026-03-07T00:00:00Z")
+
+        let english = try materializer.materialize(
+            logical,
+            input: MaterializationInput(
+                reminder: snapshot,
+                locale: Locale(identifier: "en_US"),
+                evaluationNow: evaluationNow,
+                recurrenceEnvironment: .foundation
+            )
+        )
+        let japanese = try materializer.materialize(
+            logical,
+            input: MaterializationInput(
+                reminder: snapshot,
+                locale: Locale(identifier: "ja_JP"),
+                evaluationNow: evaluationNow,
+                recurrenceEnvironment: .foundation
+            )
+        )
+        #expect(english.identifier == japanese.identifier)
+        #expect(calendarTrigger(english).dateComponents == calendarTrigger(japanese).dateComponents)
+        #expect(
+            english.content.body
+                == "Source time: 2:30\u{202F}AM (\u{2066}America/New_York\u{2069})."
+        )
+        #expect(
+            japanese.content.body
+                == "基準時刻：2:30（\u{2066}America/New_York\u{2069}）。"
+        )
     }
 
     @Test func oneShotUsesFullUTCGregorianComponentsAndExactNextDate() throws {
@@ -948,6 +1036,20 @@ struct NotificationRequestMaterializerTests {
             preconditionFailure("Expected UNCalendarNotificationTrigger")
         }
         return trigger
+    }
+}
+
+private struct DSTGapSupplementalTextFormatter: LocalizedNotificationTextFormatting {
+    func content(for input: NotificationTextInput, locale: Locale) -> NotificationText {
+        let source = LocalizedRepeatFormatter(
+            localizer: LocalizedTextProvider { key, locale in
+                precondition(key == "localization.source-time.sentence")
+                return locale.language.languageCode == .japanese
+                    ? "基準時刻：%1$@（%2$@）。"
+                    : "Source time: %1$@ (%2$@)."
+            }
+        ).sourceTime(for: input.schedule.source, locale: locale)
+        return NotificationText(title: input.title, body: source, ellipsis: "…")
     }
 }
 

@@ -29,8 +29,15 @@ final class LocalizationAccessibilityUITests: XCTestCase {
 
         let root = app.otherElements["data-unavailable.root"]
         XCTAssertTrue(root.waitForExistence(timeout: 2))
-        app.swipeUp()
-        XCTAssertTrue(app.buttons["data-unavailable.retry"].isHittable)
+        for identifier in [
+            "data-unavailable.remove-pending",
+            "data-unavailable.open-os-settings",
+            "data-unavailable.retry"
+        ] {
+            let action = app.buttons[identifier]
+            scrollToHittable(action, in: app)
+            assertHorizontallyContained(action, in: root)
+        }
     }
 
     @MainActor
@@ -38,16 +45,73 @@ final class LocalizationAccessibilityUITests: XCTestCase {
         let app = launch(
             scenario: "data-unavailable",
             extraArguments: [
-                "-AppleLanguages", "(en-XA)",
+                "-AppleLanguages", "(en)",
                 "-AppleLocale", "ar",
+                "-NSDoubleLocalizedStrings", "YES",
                 "-NSForceRightToLeftWritingDirection", "YES",
+                "-NSForceRightToLeftLayoutDirection", "YES",
                 "-AppleTextDirection", "YES"
             ]
         )
 
-        XCTAssertTrue(app.otherElements["data-unavailable.root"].waitForExistence(timeout: 2))
-        XCTAssertTrue(app.buttons["data-unavailable.remove-pending"].exists)
-        XCTAssertTrue(app.buttons["data-unavailable.open-os-settings"].exists)
+        let root = app.otherElements["data-unavailable.root"]
+        XCTAssertTrue(root.waitForExistence(timeout: 2))
+        let removePending = app.buttons["data-unavailable.remove-pending"]
+        let openSettings = app.buttons["data-unavailable.open-os-settings"]
+        XCTAssertTrue(removePending.waitForExistence(timeout: 1))
+        XCTAssertTrue(openSettings.waitForExistence(timeout: 1))
+        XCTAssertLessThan(removePending.frame.minY, openSettings.frame.minY)
+        assertHorizontallyContained(removePending, in: root)
+        assertHorizontallyContained(openSettings, in: root)
+
+        let retry = app.buttons["data-unavailable.retry"]
+        scrollToHittable(retry, in: app)
+        XCTAssertFalse(retry.label.isEmpty)
+        XCTAssertNotEqual(retry.label, "Retry", "Pseudo-localization did not activate visibly.")
+        XCTAssertGreaterThan(
+            retry.label.count,
+            "Retry".count,
+            "Double-length pseudo-localization did not expand the visible label."
+        )
+        assertHorizontallyContained(retry, in: root)
+    }
+
+    @MainActor
+    private func scrollToHittable(
+        _ element: XCUIElement,
+        in app: XCUIApplication,
+        attempts: Int = 8
+    ) {
+        var remainingAttempts = attempts
+        while !element.isHittable, remainingAttempts > 0 {
+            app.swipeUp()
+            remainingAttempts -= 1
+        }
+        XCTAssertTrue(element.exists)
+        XCTAssertTrue(element.isHittable)
+    }
+
+    @MainActor
+    private func assertHorizontallyContained(
+        _ element: XCUIElement,
+        in container: XCUIElement,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let elementFrame = element.frame
+        let containerFrame = container.frame
+        XCTAssertGreaterThanOrEqual(
+            elementFrame.minX,
+            containerFrame.minX - 1,
+            file: file,
+            line: line
+        )
+        XCTAssertLessThanOrEqual(
+            elementFrame.maxX,
+            containerFrame.maxX + 1,
+            file: file,
+            line: line
+        )
     }
 
     @MainActor

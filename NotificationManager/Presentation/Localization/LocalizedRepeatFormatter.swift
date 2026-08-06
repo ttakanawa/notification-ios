@@ -78,12 +78,12 @@ struct LocalizedRepeatFormatter: Sendable {
     }
 
     func sourceTime(for source: SourceWallClock, locale: Locale) -> String {
-        let timeZone = TimeZone(identifier: source.timeZoneIdentifier) ?? .gmt
+        let nominalTimeZone = TimeZone.gmt
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
+        calendar.timeZone = nominalTimeZone
         let date = calendar.date(from: DateComponents(
             calendar: calendar,
-            timeZone: timeZone,
+            timeZone: nominalTimeZone,
             year: source.year,
             month: source.month,
             day: source.day,
@@ -93,7 +93,7 @@ struct LocalizedRepeatFormatter: Sendable {
         let timeFormatter = DateFormatter()
         timeFormatter.locale = locale
         timeFormatter.calendar = calendar
-        timeFormatter.timeZone = timeZone
+        timeFormatter.timeZone = nominalTimeZone
         timeFormatter.dateStyle = .none
         timeFormatter.timeStyle = .short
         let time = timeFormatter.string(from: date)

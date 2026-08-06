@@ -449,9 +449,9 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 private extension ReconcileReason {
     var observesModelChange: Bool {
         switch self {
-        case .reminderSaved, .reminderDeleted, .modelChanged:
+        case .reminderSaved, .reminderDeleted, .modelChanged, .deviceSettingsChanged:
             true
-        case .deviceSettingsChanged, .foreground:
+        case .foreground:
             false
         }
     }

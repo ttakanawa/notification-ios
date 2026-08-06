@@ -36,11 +36,8 @@ struct TagPickerView: View {
             }
         }
         .task {
-            await model.load()
-            reconcileSelection()
-        }
-        .onChange(of: model.tags.map(\.id)) { _, _ in
-            reconcileSelection()
+            let outcome = await model.load()
+            reconcileSelection(after: outcome)
         }
         .announcesAccessibilityErrors(
             model.actionError.map { [$0.accessibilityIdentity] } ?? []
@@ -69,10 +66,11 @@ struct TagPickerView: View {
         }
     }
 
-    private func reconcileSelection() {
+    private func reconcileSelection(after outcome: TagManagementLoadOutcome) {
         selectedTagIDs = TagPickerSelection.reconciled(
             selectedIDs: selectedTagIDs,
-            availableIDs: Set(model.tags.map(\.id))
+            availableIDs: Set(model.tags.map(\.id)),
+            after: outcome
         )
     }
 }

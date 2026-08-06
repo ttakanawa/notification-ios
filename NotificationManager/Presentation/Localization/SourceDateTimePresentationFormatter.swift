@@ -12,12 +12,12 @@ struct SourceDateTimePresentationFormatter: Sendable {
     }
 
     func wallClock(_ source: SourceWallClock, locale: Locale) -> String {
-        let timeZone = TimeZone(identifier: source.timeZoneIdentifier) ?? .gmt
+        let nominalTimeZone = TimeZone.gmt
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
+        calendar.timeZone = nominalTimeZone
         let components = DateComponents(
             calendar: calendar,
-            timeZone: timeZone,
+            timeZone: nominalTimeZone,
             year: source.year,
             month: source.month,
             day: source.day,
@@ -29,7 +29,7 @@ struct SourceDateTimePresentationFormatter: Sendable {
         return presentation(
             key: "reminder.source-wall-clock.presentation",
             date: date,
-            timeZone: timeZone,
+            timeZone: nominalTimeZone,
             timeZoneIdentifier: source.timeZoneIdentifier,
             locale: locale
         )

@@ -70,7 +70,7 @@ struct DataUnavailableView: View {
                     Button("common.retry") {
                         Task { await actions.retry() }
                     }
-                    .disabled(actions.didRequestRetry)
+                    .disabled(actions.isRetrying)
                     .accessibilityIdentifier("data-unavailable.retry")
                 }
             }
