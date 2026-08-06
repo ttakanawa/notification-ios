@@ -57,6 +57,59 @@ struct AppLifecycleReconcileTests {
     }
 
     @MainActor
+    @Test func notificationCompletionsOnlyReconcileWhileSceneIsForeground() async {
+        let trace = LifecycleTraceRecorder()
+        let coordinator = makeCoordinator(trace: trace)
+
+        await coordinator.handle(.launch)
+        await coordinator.handle(.notificationPresentationCompleted)
+        await coordinator.handle(.background)
+        await coordinator.handle(.notificationPresentationCompleted)
+        await coordinator.handle(.notificationResponseCompleted)
+        await coordinator.backgroundRefresh()
+        await coordinator.handle(.notificationResponseCompleted)
+        await coordinator.handle(.foreground)
+        await coordinator.handle(.notificationResponseCompleted)
+
+        #expect(await trace.reconcileReasons == [
+            .foreground,
+            .foreground,
+            .modelChanged,
+            .foreground,
+            .foreground
+        ])
+    }
+
+    @MainActor
+    @Test func launchRunsBeforeDelayedStateObservationSoBackgroundStaysLatest() async {
+        let observerGate = LifecycleObserverStartGate()
+        let trace = LifecycleTraceRecorder()
+        let coordinator = makeCoordinator(trace: trace)
+        let startup = Task { @MainActor in
+            await AppEnvironmentStartSequence.run(
+                startSchedulingStateObservation: {
+                    await observerGate.start()
+                },
+                handleLaunch: {
+                    await coordinator.handle(.launch)
+                }
+            )
+        }
+
+        await observerGate.waitUntilStarted()
+        await coordinator.handle(.background)
+        await observerGate.release()
+        await startup.value
+
+        #expect(await trace.events == [
+            .deviceStateRefreshed,
+            .modelSnapshotRefreshed,
+            .reconcile(.foreground),
+            .backgroundEntered
+        ])
+    }
+
+    @MainActor
     @Test func newerForegroundInvalidatesAnOlderSuspendedForeground() async {
         let gate = FirstLifecycleDeviceRefreshGate()
         let trace = LifecycleTraceRecorder()
@@ -127,6 +180,7 @@ struct AppLifecycleReconcileTests {
         let trace = LifecycleTraceRecorder()
         let coordinator = makeCoordinator(trace: trace)
 
+        await coordinator.handle(.foreground)
         await coordinator.handle(.notificationPresentationCompleted)
         await coordinator.handle(.notificationResponseCompleted)
         await coordinator.handle(.modelSnapshotChanged)
@@ -138,6 +192,7 @@ struct AppLifecycleReconcileTests {
         await coordinator.backgroundRefresh()
 
         #expect(await trace.reconcileReasons == [
+            .foreground,
             .foreground,
             .foreground,
             .modelChanged,
@@ -559,6 +614,34 @@ private actor FirstLifecycleDeviceRefreshGate {
     func releaseFirstRefresh() {
         firstRelease?.resume()
         firstRelease = nil
+    }
+}
+
+private actor LifecycleObserverStartGate {
+    private var didStart = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func start() async {
+        didStart = true
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+    }
+
+    func waitUntilStarted() async {
+        guard !didStart else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
     }
 }
 

@@ -84,7 +84,12 @@ final class AppBootstrapper {
     }
 
     func retry() async {
-        await beginAttempt()
+        switch state {
+        case .loading, .dataUnavailable:
+            await beginAttempt()
+        case .ready:
+            return
+        }
     }
 
     private func beginAttempt() async {

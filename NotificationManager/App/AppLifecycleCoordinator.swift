@@ -55,6 +55,7 @@ final class AppLifecycleCoordinator {
     private let refreshModelSnapshot: AsyncAction
     private var observerTokens: [NSObjectProtocol] = []
     private var sceneGeneration: UInt64 = 0
+    private var sceneIsForeground = false
 
     init(
         eligibilityIndexStore: ForegroundEligibilityIndexStore,
@@ -77,6 +78,7 @@ final class AppLifecycleCoordinator {
     func handle(_ trigger: AppLifecycleTrigger) async {
         switch trigger {
         case .launch, .foreground:
+            sceneIsForeground = true
             let generation = beginSceneTransition()
             eligibilityIndexStore.markStale()
             await refreshDeviceState()
@@ -85,9 +87,11 @@ final class AppLifecycleCoordinator {
             guard generation == sceneGeneration else { return }
             await requestReconcile(.foreground)
         case .background:
+            sceneIsForeground = false
             _ = beginSceneTransition()
             await enterBackgroundAction()
         case .backgroundRefresh:
+            sceneIsForeground = false
             let generation = beginSceneTransition()
             await enterBackgroundAction()
             guard generation == sceneGeneration else { return }
@@ -96,6 +100,7 @@ final class AppLifecycleCoordinator {
             guard generation == sceneGeneration else { return }
             await requestReconcile(.modelChanged)
         case .notificationPresentationCompleted, .notificationResponseCompleted:
+            guard sceneIsForeground else { return }
             await requestReconcile(.foreground)
         case .modelSnapshotChanged, .significantTimeChanged, .timeZoneChanged,
              .localeChanged:
@@ -149,6 +154,19 @@ final class AppLifecycleCoordinator {
     private func beginSceneTransition() -> UInt64 {
         sceneGeneration &+= 1
         return sceneGeneration
+    }
+}
+
+@MainActor
+enum AppEnvironmentStartSequence {
+    typealias AsyncAction = @MainActor @Sendable () async -> Void
+
+    static func run(
+        startSchedulingStateObservation: AsyncAction,
+        handleLaunch: AsyncAction
+    ) async {
+        await handleLaunch()
+        await startSchedulingStateObservation()
     }
 }
 

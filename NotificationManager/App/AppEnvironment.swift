@@ -148,6 +148,11 @@ final class AppEnvironment {
                 await presentationRefreshCoordinator.refresh(stateProvider: {
                     await stateStore.snapshot()
                 })
+            },
+            coalesceSnapshot: { generation in
+                await presentationRefreshCoordinator.latestTerminalResult(
+                    after: generation
+                )
             }
         )
         let formActions = ReminderFormActions(
@@ -290,8 +295,14 @@ final class AppEnvironment {
         guard !hasStarted, let lifecycleCoordinator else { return }
         hasStarted = true
         lifecycleCoordinator.startObservingSystemChanges()
-        await schedulingStateObserver?.start()
-        await lifecycleCoordinator.handle(.launch)
+        await AppEnvironmentStartSequence.run(
+            startSchedulingStateObservation: { [weak self] in
+                await self?.schedulingStateObserver?.start()
+            },
+            handleLaunch: {
+                await lifecycleCoordinator.handle(.launch)
+            }
+        )
     }
 
     func enterForeground() async {
@@ -483,18 +494,59 @@ final class AppEnvironment {
 
 @MainActor
 final class NotificationResponseSnapshotPreparer {
-    typealias PrepareSnapshot = @MainActor @Sendable () async -> CompleteReminderSnapshot?
+    typealias PrepareSnapshot = @MainActor @Sendable () async ->
+        LatestPresentationRefreshResult<CompleteReminderSnapshot>
+    typealias CoalesceSnapshot = @MainActor @Sendable (
+        PresentationRefreshGeneration
+    ) async -> LatestPresentationRefreshTerminalResult<CompleteReminderSnapshot>
 
     private let prepareSnapshot: PrepareSnapshot
+    private let coalesceSnapshot: CoalesceSnapshot
 
-    init(prepareSnapshot: @escaping PrepareSnapshot) {
+    init(
+        prepareSnapshot: @escaping PrepareSnapshot,
+        coalesceSnapshot: @escaping CoalesceSnapshot
+    ) {
         self.prepareSnapshot = prepareSnapshot
+        self.coalesceSnapshot = coalesceSnapshot
     }
 
     func prepare(reminderID: UUID) async -> ReminderSnapshot? {
-        guard let snapshot = await prepareSnapshot() else { return nil }
+        guard !Task.isCancelled else { return nil }
+        let snapshot: CompleteReminderSnapshot
+        switch await prepareSnapshot() {
+        case let .accepted(value):
+            snapshot = value
+        case .unavailable:
+            return nil
+        case let .superseded(generation):
+            guard !Task.isCancelled else { return nil }
+            switch await coalesceSnapshot(generation) {
+            case let .accepted(value):
+                snapshot = value
+            case .unavailable, .cancelled:
+                return nil
+            }
+        }
+        guard !Task.isCancelled else { return nil }
         return snapshot.reminders.first { $0.id == reminderID }
     }
+}
+
+struct PresentationRefreshGeneration: Sendable, Equatable {
+    fileprivate let value: UInt64
+}
+
+enum LatestPresentationRefreshResult<Snapshot: Sendable>: Sendable {
+    case accepted(Snapshot)
+    case unavailable
+    case superseded(PresentationRefreshGeneration)
+}
+
+enum LatestPresentationRefreshTerminalResult<Snapshot: Sendable>: Sendable {
+    case accepted(Snapshot)
+    case unavailable
+    case cancelled
 }
 
 @MainActor
@@ -509,6 +561,16 @@ final class LatestPresentationRefreshCoordinator<
     private let loadSnapshot: LoadSnapshot
     private let publish: Publish
     private var generation: UInt64 = 0
+    private var latestTerminalResult: (
+        generation: PresentationRefreshGeneration,
+        result: LatestPresentationRefreshTerminalResult<Snapshot>
+    )?
+    private var terminalResultWaiters: [
+        UUID: CheckedContinuation<
+            LatestPresentationRefreshTerminalResult<Snapshot>,
+            Never
+        >
+    ] = [:]
 
     init(
         loadSnapshot: @escaping LoadSnapshot,
@@ -519,38 +581,102 @@ final class LatestPresentationRefreshCoordinator<
     }
 
     @discardableResult
-    func refresh(state: State) async -> Snapshot? {
+    func refresh(state: State) async -> LatestPresentationRefreshResult<Snapshot> {
         let refreshGeneration = beginRefresh()
         return await loadAndPublish(state: state, generation: refreshGeneration)
     }
 
     @discardableResult
-    func refresh(stateProvider: @escaping StateProvider) async -> Snapshot? {
+    func refresh(
+        stateProvider: @escaping StateProvider
+    ) async -> LatestPresentationRefreshResult<Snapshot> {
         let refreshGeneration = beginRefresh()
-        guard let state = await stateProvider(),
-              refreshGeneration == generation
-        else {
-            return nil
+        let state = await stateProvider()
+        guard refreshGeneration.value == generation else {
+            return .superseded(refreshGeneration)
         }
+        guard let state else { return finishUnavailable(refreshGeneration) }
         return await loadAndPublish(state: state, generation: refreshGeneration)
+    }
+
+    /// Coalesces a superseded caller onto the newest in-flight refresh. Only the
+    /// current generation's accepted or unavailable result resumes waiters, so
+    /// repeated supersession does not start retry loads or create a livelock.
+    /// Cancellation removes and resumes the waiter with `.cancelled`.
+    func latestTerminalResult(
+        after supersededGeneration: PresentationRefreshGeneration
+    ) async -> LatestPresentationRefreshTerminalResult<Snapshot> {
+        let waiterID = UUID()
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    continuation.resume(returning: .cancelled)
+                } else if let result = currentTerminalResult(
+                    after: supersededGeneration
+                ) {
+                    continuation.resume(returning: result)
+                } else {
+                    terminalResultWaiters[waiterID] = continuation
+                }
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.cancelTerminalResultWaiter(waiterID)
+            }
+        }
     }
 
     private func loadAndPublish(
         state: State,
-        generation refreshGeneration: UInt64
-    ) async -> Snapshot? {
-        guard let snapshot = await loadSnapshot(),
-              refreshGeneration == generation
+        generation refreshGeneration: PresentationRefreshGeneration
+    ) async -> LatestPresentationRefreshResult<Snapshot> {
+        let snapshot = await loadSnapshot()
+        guard refreshGeneration.value == generation else {
+            return .superseded(refreshGeneration)
+        }
+        guard let snapshot else { return finishUnavailable(refreshGeneration) }
+        publish(snapshot, state)
+        finishTerminal(.accepted(snapshot), generation: refreshGeneration)
+        return .accepted(snapshot)
+    }
+
+    private func beginRefresh() -> PresentationRefreshGeneration {
+        generation &+= 1
+        return PresentationRefreshGeneration(value: generation)
+    }
+
+    private func finishUnavailable(
+        _ refreshGeneration: PresentationRefreshGeneration
+    ) -> LatestPresentationRefreshResult<Snapshot> {
+        finishTerminal(.unavailable, generation: refreshGeneration)
+        return .unavailable
+    }
+
+    private func finishTerminal(
+        _ result: LatestPresentationRefreshTerminalResult<Snapshot>,
+        generation refreshGeneration: PresentationRefreshGeneration
+    ) {
+        latestTerminalResult = (refreshGeneration, result)
+        let waiters = Array(terminalResultWaiters.values)
+        terminalResultWaiters.removeAll()
+        waiters.forEach { $0.resume(returning: result) }
+    }
+
+    private func currentTerminalResult(
+        after supersededGeneration: PresentationRefreshGeneration
+    ) -> LatestPresentationRefreshTerminalResult<Snapshot>? {
+        guard let latestTerminalResult,
+              latestTerminalResult.generation.value == generation,
+              latestTerminalResult.generation != supersededGeneration
         else {
             return nil
         }
-        publish(snapshot, state)
-        return snapshot
+        return latestTerminalResult.result
     }
 
-    private func beginRefresh() -> UInt64 {
-        generation &+= 1
-        return generation
+    private func cancelTerminalResultWaiter(_ waiterID: UUID) {
+        terminalResultWaiters.removeValue(forKey: waiterID)?
+            .resume(returning: .cancelled)
     }
 }
 

@@ -197,6 +197,62 @@ struct AppBootstrapperTests {
     }
 
     @MainActor
+    @Test func retryAfterReadyKeepsTheActivatedEnvironmentAndHandlers() async {
+        let attempts = BootstrapAttemptCounter()
+        let firstRoutes = BootstrapNotificationRouteRecorder()
+        let replacementRoutes = BootstrapNotificationRouteRecorder()
+        let delegate = NotificationApplicationDelegate(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            installHandler: { _, _ in },
+            responseHandlingInitiallyBound: false
+        )
+        let firstEnvironment = AppEnvironment(notificationHandlingActivation: {
+            firstRoutes.recordActivation()
+            Self.bind(delegate, routes: firstRoutes)
+        })
+        let replacementEnvironment = AppEnvironment(notificationHandlingActivation: {
+            replacementRoutes.recordActivation()
+            Self.bind(delegate, routes: replacementRoutes)
+        })
+        let bootstrapper = AppBootstrapper(
+            notificationDelegate: delegate,
+            openEnvironment: {
+                attempts.increment()
+                return attempts.value == 1
+                    ? firstEnvironment
+                    : replacementEnvironment
+            },
+            makeDataUnavailableActions: makeBootstrapFailureActions
+        )
+
+        await bootstrapper.start()
+        await bootstrapper.retry()
+
+        guard case let .ready(environment) = bootstrapper.state else {
+            Issue.record("Retry after ready must preserve the ready state")
+            return
+        }
+        #expect(environment === firstEnvironment)
+        #expect(attempts.value == 1)
+        #expect(firstRoutes.activationCount == 1)
+        #expect(replacementRoutes.activationCount == 0)
+
+        delegate.receiveResponse(
+            actionIdentifier: UNNotificationDefaultActionIdentifier,
+            categoryIdentifier: "",
+            userInfo: [
+                NotificationApplicationDelegate.reminderIDKey:
+                    Self.reminderID.uuidString.lowercased()
+            ],
+            completion: {}
+        )
+        await firstRoutes.waitForDestinationCount(1)
+
+        #expect(firstRoutes.destinations == [.reminderDetail(Self.reminderID)])
+        #expect(replacementRoutes.destinations.isEmpty)
+    }
+
+    @MainActor
     private func makeBootstrapper(
         openEnvironment: @escaping AppBootstrapper.EnvironmentOpener
     ) -> AppBootstrapper {

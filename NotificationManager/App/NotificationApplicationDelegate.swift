@@ -35,13 +35,13 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     typealias URLOpener = @MainActor @Sendable (URL) -> Void
 
     nonisolated private let eligibilityIndexStore: ForegroundEligibilityIndexStore
+    nonisolated private let responseIngress: NotificationResponseIngress
     private let installHandler: InstallHandler
     private var reminderLookup: ReminderLookup
     private var routeResponse: ResponseRouter
     private var openURL: URLOpener
     private var reconcileAfterNotification: @Sendable (AppLifecycleTrigger) async -> Void
     private var isInstalled = false
-    private var responseHandlingIsBound: Bool
     private var responseQueue: [QueuedNotificationResponse] = []
     private var responseDrainTask: Task<Void, Never>?
 
@@ -86,7 +86,10 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         self.routeResponse = routeResponse
         self.openURL = openURL
         self.reconcileAfterNotification = reconcileAfterNotification
-        responseHandlingIsBound = responseHandlingInitiallyBound
+        responseIngress = NotificationResponseIngress(
+            isBound: responseHandlingInitiallyBound,
+            pendingLimit: Self.pendingResponseLimit
+        )
         super.init()
     }
 
@@ -115,13 +118,15 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
             AppLifecycleTrigger
         ) async -> Void
     ) {
-        guard !responseHandlingIsBound else { return }
+        let binding = responseIngress.bind()
+        guard case let .bound(shouldScheduleDrain) = binding else { return }
         self.reminderLookup = reminderLookup
         self.routeResponse = routeResponse
         self.openURL = openURL
         self.reconcileAfterNotification = reconcileAfterNotification
-        responseHandlingIsBound = true
-        startResponseDrainIfNeeded()
+        if shouldScheduleDrain {
+            scheduleResponseIngressDrain()
+        }
     }
 
     nonisolated func immediatePresentationOptions(
@@ -159,39 +164,26 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         ))
     }
 
-    func receiveResponse(
+    nonisolated func receiveResponse(
         actionIdentifier: String,
         categoryIdentifier: String,
         userInfo: [AnyHashable: Any],
         completion: @escaping @Sendable () -> Void
     ) {
-        receiveResponse(Self.responseValue(
-            actionIdentifier: actionIdentifier,
-            categoryIdentifier: categoryIdentifier,
-            userInfo: userInfo
-        ), completion: completion)
-    }
-
-    private func receiveResponse(
-        _ response: PendingNotificationResponse,
-        completion: @escaping @Sendable () -> Void
-    ) {
-        guard responseHandlingIsBound else {
-            if responseQueue.count == Self.pendingResponseLimit {
-                responseQueue.removeFirst()
-            }
-            responseQueue.append(QueuedNotificationResponse(
-                response: response,
-                completion: nil
-            ))
-            completion()
-            return
-        }
-        responseQueue.append(QueuedNotificationResponse(
-            response: response,
+        let enqueueResult = responseIngress.enqueue(
+            response: Self.responseValue(
+                actionIdentifier: actionIdentifier,
+                categoryIdentifier: categoryIdentifier,
+                userInfo: userInfo
+            ),
             completion: completion
-        ))
-        startResponseDrainIfNeeded()
+        )
+        if enqueueResult.shouldCompleteImmediately {
+            completion()
+        }
+        if enqueueResult.shouldScheduleDrain {
+            scheduleResponseIngressDrain()
+        }
     }
 
     private func handleResponse(
@@ -215,8 +207,7 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     }
 
     private func startResponseDrainIfNeeded() {
-        guard responseHandlingIsBound,
-              responseDrainTask == nil,
+        guard responseDrainTask == nil,
               !responseQueue.isEmpty
         else {
             return
@@ -235,6 +226,19 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
             )
         }
         responseDrainTask = nil
+    }
+
+    nonisolated private func scheduleResponseIngressDrain() {
+        Task { @MainActor [self] in
+            transferScheduledIngressResponses()
+        }
+    }
+
+    private func transferScheduledIngressResponses() {
+        while let responses = responseIngress.takeNextScheduledBatch() {
+            responseQueue.append(contentsOf: responses)
+        }
+        startResponseDrainIfNeeded()
     }
 
     nonisolated private static func responseValue(
@@ -275,18 +279,12 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         didReceive response: UNNotificationResponse,
         withCompletionHandler completionHandler: @escaping @Sendable () -> Void
     ) {
-        let responseValue = Self.responseValue(
+        receiveResponse(
             actionIdentifier: response.actionIdentifier,
             categoryIdentifier: response.notification.request.content.categoryIdentifier,
-            userInfo: response.notification.request.content.userInfo
+            userInfo: response.notification.request.content.userInfo,
+            completion: completionHandler
         )
-        Task { @MainActor [weak self] in
-            guard let self else {
-                completionHandler()
-                return
-            }
-            receiveResponse(responseValue, completion: completionHandler)
-        }
     }
 
     private func currentResponseOutcome(
@@ -365,4 +363,83 @@ private struct PendingNotificationResponse: Sendable {
 private struct QueuedNotificationResponse: Sendable {
     let response: PendingNotificationResponse
     let completion: (@Sendable () -> Void)?
+}
+
+private final class NotificationResponseIngress: @unchecked Sendable {
+    enum BindingResult: Sendable {
+        case alreadyBound
+        case bound(shouldScheduleDrain: Bool)
+    }
+
+    struct EnqueueResult: Sendable {
+        let shouldCompleteImmediately: Bool
+        let shouldScheduleDrain: Bool
+    }
+
+    private let lock = NSLock()
+    private let pendingLimit: Int
+    private var isBound: Bool
+    private var queuedResponses: [QueuedNotificationResponse] = []
+    private var drainIsScheduled = false
+
+    init(isBound: Bool, pendingLimit: Int) {
+        self.isBound = isBound
+        self.pendingLimit = pendingLimit
+    }
+
+    func bind() -> BindingResult {
+        lock.withLock {
+            guard !isBound else { return .alreadyBound }
+            isBound = true
+            guard !queuedResponses.isEmpty, !drainIsScheduled else {
+                return .bound(shouldScheduleDrain: false)
+            }
+            drainIsScheduled = true
+            return .bound(shouldScheduleDrain: true)
+        }
+    }
+
+    func enqueue(
+        response: PendingNotificationResponse,
+        completion: @escaping @Sendable () -> Void
+    ) -> EnqueueResult {
+        lock.withLock {
+            guard isBound else {
+                if queuedResponses.count == pendingLimit {
+                    queuedResponses.removeFirst()
+                }
+                queuedResponses.append(QueuedNotificationResponse(
+                    response: response,
+                    completion: nil
+                ))
+                return EnqueueResult(
+                    shouldCompleteImmediately: true,
+                    shouldScheduleDrain: false
+                )
+            }
+
+            queuedResponses.append(QueuedNotificationResponse(
+                response: response,
+                completion: completion
+            ))
+            let shouldScheduleDrain = !drainIsScheduled
+            drainIsScheduled = true
+            return EnqueueResult(
+                shouldCompleteImmediately: false,
+                shouldScheduleDrain: shouldScheduleDrain
+            )
+        }
+    }
+
+    func takeNextScheduledBatch() -> [QueuedNotificationResponse]? {
+        lock.withLock {
+            guard !queuedResponses.isEmpty else {
+                drainIsScheduled = false
+                return nil
+            }
+            let responses = queuedResponses
+            queuedResponses.removeAll(keepingCapacity: true)
+            return responses
+        }
+    }
 }
