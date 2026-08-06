@@ -24,6 +24,10 @@ let package = Package(
             name: "NotificationManagerPersistenceTests",
             dependencies: ["NotificationManagerPersistence"],
             resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "NotificationManagerApplicationTests",
+            dependencies: ["NotificationManagerApplication"]
         )
     ]
 )
