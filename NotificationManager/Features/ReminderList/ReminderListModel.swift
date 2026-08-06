@@ -38,7 +38,7 @@ final class ReminderActionCoordinator {
     private var pendingEnabledCapacityChange: PendingEnabledCapacityChange?
     private var confirmedDeleteID: UUID?
     private var actionGeneration: UInt64 = 0
-    private var observationSequence: UInt64 = 0
+    private var latestSnapshotGeneration: UInt64?
 
     init(handlers: ReminderActionHandlers) {
         self.handlers = handlers
@@ -76,8 +76,8 @@ final class ReminderActionCoordinator {
         enabledOverrides[id] = EnabledOverride(
             value: enabled,
             generation: generation,
-            startingObservationSequence: observationSequence,
-            awaitsAuthoritativeObservation: false
+            isCompleted: false,
+            completionSnapshotGeneration: nil
         )
         state = .working(id)
         return await performEnabledChange(
@@ -166,17 +166,25 @@ final class ReminderActionCoordinator {
         return await performConfirmedDelete(id)
     }
 
-    func synchronize(with items: [ReminderListItemPresentation]) {
-        observationSequence &+= 1
-        for item in items {
-            latestEnabledObservations[item.id] = EnabledObservation(
-                value: item.enabled,
-                sequence: observationSequence
-            )
-            guard let override = enabledOverrides[item.id] else { continue }
-            if override.value == item.enabled || override.awaitsAuthoritativeObservation {
-                enabledOverrides.removeValue(forKey: item.id)
+    fileprivate func ingest(_ snapshot: ReminderListSnapshot) {
+        if let latestSnapshotGeneration,
+           snapshot.generation <= latestSnapshotGeneration
+        {
+            return
+        }
+        latestSnapshotGeneration = snapshot.generation
+        latestEnabledObservations = Dictionary(
+            uniqueKeysWithValues: snapshot.items.map { item in
+                (item.id, EnabledObservation(value: item.enabled))
             }
+        )
+        for (id, override) in enabledOverrides where override.isCompleted {
+            if let completionGeneration = override.completionSnapshotGeneration,
+               snapshot.generation <= completionGeneration
+            {
+                continue
+            }
+            enabledOverrides.removeValue(forKey: id)
         }
     }
 
@@ -231,14 +239,8 @@ final class ReminderActionCoordinator {
         guard var override = enabledOverrides[id], override.generation == generation else {
             return
         }
-        if let observation = latestEnabledObservations[id],
-           observation.sequence > override.startingObservationSequence,
-           observation.value != override.value
-        {
-            enabledOverrides.removeValue(forKey: id)
-            return
-        }
-        override.awaitsAuthoritativeObservation = true
+        override.isCompleted = true
+        override.completionSnapshotGeneration = latestSnapshotGeneration
         enabledOverrides[id] = override
     }
 
@@ -264,13 +266,12 @@ final class ReminderActionCoordinator {
 private struct EnabledOverride {
     let value: Bool
     let generation: UInt64
-    let startingObservationSequence: UInt64
-    var awaitsAuthoritativeObservation: Bool
+    var isCompleted: Bool
+    var completionSnapshotGeneration: UInt64?
 }
 
 private struct EnabledObservation {
     let value: Bool
-    let sequence: UInt64
 }
 
 private struct PendingEnabledCapacityChange {
@@ -279,22 +280,34 @@ private struct PendingEnabledCapacityChange {
     let previousOverride: EnabledOverride?
 }
 
+struct ReminderListSnapshot: Sendable, Equatable {
+    let generation: UInt64
+    let items: [ReminderListItemPresentation]
+    let availableTags: [ReminderTagPresentation]
+}
+
 @MainActor
 @Observable
 final class ReminderListModel {
-    private(set) var items: [ReminderListItemPresentation]
-    private(set) var availableTags: [ReminderTagPresentation]
+    private(set) var snapshot: ReminderListSnapshot
     var selectedTagID: UUID?
 
+    @ObservationIgnored private let actions: ReminderActionCoordinator
+
     init(
-        items: [ReminderListItemPresentation] = [],
-        availableTags: [ReminderTagPresentation] = [],
+        snapshot: ReminderListSnapshot,
+        actions: ReminderActionCoordinator,
         selectedTagID: UUID? = nil
     ) {
-        self.items = items
-        self.availableTags = availableTags
+        self.snapshot = snapshot
+        self.actions = actions
         self.selectedTagID = selectedTagID
+        actions.ingest(snapshot)
     }
+
+    var items: [ReminderListItemPresentation] { snapshot.items }
+
+    var availableTags: [ReminderTagPresentation] { snapshot.availableTags }
 
     var sections: ReminderListSections {
         ReminderListProjection.make(from: items, selectedTagID: selectedTagID)
@@ -310,14 +323,12 @@ final class ReminderListModel {
         }
     }
 
-    func replace(
-        items: [ReminderListItemPresentation],
-        availableTags: [ReminderTagPresentation]
-    ) {
-        self.items = items
-        self.availableTags = availableTags
+    func publish(_ snapshot: ReminderListSnapshot) {
+        guard snapshot.generation > self.snapshot.generation else { return }
+        self.snapshot = snapshot
+        actions.ingest(snapshot)
         if let selectedTagID,
-           !availableTags.contains(where: { $0.id == selectedTagID })
+           !snapshot.availableTags.contains(where: { $0.id == selectedTagID })
         {
             self.selectedTagID = nil
         }

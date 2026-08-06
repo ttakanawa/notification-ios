@@ -201,9 +201,17 @@ struct ReminderListProjectionTests {
             nextAlertInstant: date("2040-08-31T13:30:00Z"),
             tags: [beta]
         )
+        let actions = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in .saved(command.reminderID) },
+            delete: { _ in }
+        ))
         let model = ReminderListModel(
-            items: [tagged],
-            availableTags: [beta, upperA, lowerA]
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [tagged],
+                availableTags: [beta, upperA, lowerA]
+            ),
+            actions: actions
         )
 
         #expect(model.tagFilterChoices.map(\.id) == [lowerA.id, upperA.id, beta.id])
@@ -313,29 +321,178 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
-    @Test func authoritativeOppositeSnapshotWinsAfterSuccessfulEnabledChange() async {
+    @Test func newerEqualValuedPublicationClearsCompletedOptimisticOverride() async {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
         let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
             setEnabled: { command in .saved(command.reminderID) },
             delete: { _ in }
         ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
 
-        await coordinator.setEnabled(true, for: id, fallback: false)
+        await coordinator.setEnabled(true, for: id, fallback: model.items[0].enabled)
         #expect(coordinator.enabledValue(for: id, fallback: false))
 
-        coordinator.synchronize(with: [ReminderListItemPresentation.fixture(
-            id: id.uuidString,
-            lifecycleStatus: .disabled,
-            enabled: false
-        )])
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
 
         #expect(!coordinator.enabledValue(for: id, fallback: true))
+        #expect(model.snapshot.generation == 2)
         #expect(coordinator.state == .idle)
     }
 
     @MainActor
-    @Test func enabledCapacityConfirmationReplaysAcknowledgedCommandWithFreshEvaluation() async {
+    @Test func newerIntendedValuePublicationKeepsAuthoritativeEnabledPresentation() async {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let disabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let authoritativeEnabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .active,
+            enabled: true
+        )
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in .saved(command.reminderID) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [disabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        await coordinator.setEnabled(true, for: id, fallback: model.items[0].enabled)
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeEnabled],
+            availableTags: []
+        ))
+
+        #expect(model.snapshot.generation == 2)
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+    }
+
+    @MainActor
+    @Test func staleSnapshotGenerationIsIgnoredByProductionIngestion() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let disabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let enabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .active,
+            enabled: true
+        )
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in .saved(command.reminderID) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 10,
+                items: [disabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+
+        model.publish(ReminderListSnapshot(
+            generation: 11,
+            items: [enabled],
+            availableTags: []
+        ))
+        model.publish(ReminderListSnapshot(
+            generation: 11,
+            items: [disabled],
+            availableTags: []
+        ))
+        model.publish(ReminderListSnapshot(
+            generation: 10,
+            items: [disabled],
+            availableTags: []
+        ))
+
+        #expect(model.snapshot.generation == 11)
+        #expect(model.items == [enabled])
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+    }
+
+    @MainActor
+    @Test func publicationWhileEnabledSaveIsWorkingWaitsForPostCompletionGeneration() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
+        let action = SuspendedEnabledOutcomeAction()
+        let coordinator = ReminderActionCoordinator(handlers: ReminderActionHandlers(
+            setEnabled: { command in await action.execute(command) },
+            delete: { _ in }
+        ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
+        let save = Task { @MainActor in
+            await coordinator.setEnabled(true, for: id, fallback: model.items[0].enabled)
+        }
+        await action.waitUntilCalled()
+
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+        #expect(coordinator.state == .working(id))
+
+        await action.resolve(.saved(id))
+        #expect(await save.value)
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+
+        model.publish(ReminderListSnapshot(
+            generation: 3,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
+    }
+
+    @MainActor
+    @Test func enabledCapacityPendingPublicationWaitsForAcknowledgedCompletion() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let authoritativeDisabled = ReminderListItemPresentation.fixture(
+            id: id.uuidString,
+            lifecycleStatus: .disabled,
+            enabled: false
+        )
         let warning = CapacityWarning(
             reminderID: id,
             earliestGroupID: AlertGroupID(
@@ -352,9 +509,25 @@ struct ReminderListProjectionTests {
             setEnabled: { command in try await recorder.execute(command) },
             delete: { _ in }
         ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [authoritativeDisabled],
+                availableTags: []
+            ),
+            actions: coordinator
+        )
 
-        await coordinator.setEnabled(true, for: id, fallback: false)
+        await coordinator.setEnabled(true, for: id, fallback: model.items[0].enabled)
 
+        #expect(coordinator.state == .requiresCapacityConfirmation(id, true, warning))
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+
+        model.publish(ReminderListSnapshot(
+            generation: 2,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
         #expect(coordinator.state == .requiresCapacityConfirmation(id, true, warning))
         #expect(coordinator.enabledValue(for: id, fallback: false))
 
@@ -362,6 +535,14 @@ struct ReminderListProjectionTests {
 
         #expect(saved)
         #expect(coordinator.state == .idle)
+        #expect(coordinator.enabledValue(for: id, fallback: false))
+
+        model.publish(ReminderListSnapshot(
+            generation: 3,
+            items: [authoritativeDisabled],
+            availableTags: []
+        ))
+        #expect(!coordinator.enabledValue(for: id, fallback: true))
         #expect(await recorder.recordedCommands() == [
             SetReminderEnabledCommand(
                 reminderID: id,
@@ -781,6 +962,34 @@ private actor EnabledOutcomeRecorder {
     }
 
     func recordedCommands() -> [SetReminderEnabledCommand] { commands }
+}
+
+private actor SuspendedEnabledOutcomeAction {
+    private var called = false
+    private var callWaiters: [CheckedContinuation<Void, Never>] = []
+    private var resultContinuation: CheckedContinuation<SaveReminderOutcome, Never>?
+
+    func execute(_ command: SetReminderEnabledCommand) async -> SaveReminderOutcome {
+        called = true
+        let waiters = callWaiters
+        callWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        return await withCheckedContinuation { continuation in
+            resultContinuation = continuation
+        }
+    }
+
+    func waitUntilCalled() async {
+        guard !called else { return }
+        await withCheckedContinuation { continuation in
+            callWaiters.append(continuation)
+        }
+    }
+
+    func resolve(_ outcome: SaveReminderOutcome) {
+        resultContinuation?.resume(returning: outcome)
+        resultContinuation = nil
+    }
 }
 
 private enum ReminderManagementActionProbeError: Error {

@@ -28,7 +28,6 @@ private struct Task14UITestFixtureComposition {
     static func make(arguments: [String]) -> Self {
         let scenario = scenarioName(in: arguments)
         let fixture = fixture(for: scenario)
-        let listModel = ReminderListModel(items: fixture.items)
         let enabledCapacityAction = Task14EnabledCapacityAction()
         let actionCoordinator = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -40,6 +39,14 @@ private struct Task14UITestFixtureComposition {
                 },
                 delete: { _ in }
             )
+        )
+        let listModel = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: fixture.items,
+                availableTags: []
+            ),
+            actions: actionCoordinator
         )
         let createForm: @MainActor @Sendable () -> ReminderFormModel? =
             if scenario == "empty-list" {

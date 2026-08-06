@@ -35,8 +35,6 @@ struct ReminderListView: View {
             )
         }
         .listStyle(.insetGrouped)
-        .onAppear { actions.synchronize(with: model.items) }
-        .onChange(of: model.items) { _, items in actions.synchronize(with: items) }
         .navigationTitle("reminder.list.title")
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
