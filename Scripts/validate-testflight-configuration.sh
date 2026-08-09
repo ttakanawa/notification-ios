@@ -10,6 +10,7 @@ project_file="$repository_root/NotificationManager.xcodeproj/project.pbxproj"
 asset_catalog="$repository_root/NotificationManager/Resources/Assets.xcassets"
 app_icon_set="$asset_catalog/AppIcon.appiconset"
 app_icon="$app_icon_set/AppIcon-1024.png"
+privacy_manifest="$repository_root/NotificationManager/Resources/PrivacyInfo.xcprivacy"
 
 fail() {
     echo "TestFlight configuration error: $1" >&2
@@ -67,6 +68,18 @@ icon_metadata=$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$app_icon")
 printf '%s' "$icon_metadata" | rg 'pixelWidth: 1024' >/dev/null || fail "AppIcon width must be 1024"
 printf '%s' "$icon_metadata" | rg 'pixelHeight: 1024' >/dev/null || fail "AppIcon height must be 1024"
 printf '%s' "$icon_metadata" | rg 'hasAlpha: no' >/dev/null || fail "AppIcon must not have an alpha channel"
+
+[ -f "$privacy_manifest" ] || fail "PrivacyInfo.xcprivacy is missing"
+privacy_json=$(plutil -convert json -o - "$privacy_manifest")
+printf '%s' "$privacy_json" | jq -e '.NSPrivacyTracking == false' >/dev/null \
+    || fail "privacy manifest must declare tracking false"
+printf '%s' "$privacy_json" | jq -e '.NSPrivacyTrackingDomains == []' >/dev/null \
+    || fail "privacy manifest must not declare tracking domains"
+printf '%s' "$privacy_json" | jq -e '.NSPrivacyCollectedDataTypes == []' >/dev/null \
+    || fail "privacy manifest must not declare collected data"
+printf '%s' "$privacy_json" | jq -e \
+    '.NSPrivacyAccessedAPITypes == [{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryUserDefaults","NSPrivacyAccessedAPITypeReasons":["CA92.1"]}]' >/dev/null \
+    || fail "privacy manifest must declare only UserDefaults reason CA92.1"
 
 if rg -n 'registerForRemoteNotifications|didRegisterForRemoteNotifications|didFailToRegisterForRemoteNotifications' \
     "$repository_root/NotificationManager" "$repository_root/Packages" >/dev/null; then
