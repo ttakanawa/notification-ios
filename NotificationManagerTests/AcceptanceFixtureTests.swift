@@ -177,7 +177,7 @@ private struct AcceptanceHarness {
             createdAt: date("2026-05-01T00:00:00Z"),
             updatedAt: date("2026-05-01T00:00:00Z")
         )
-        let evaluationNow = date("2026-05-31T00:00:00Z")
+        let evaluationNow = date("2026-06-01T14:00:00Z")
         let plan = try LogicalNotificationPlanner().plan(PlannerInput(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             evaluationNow: evaluationNow,
@@ -430,7 +430,7 @@ private struct AcceptanceHarness {
                 day: 1,
                 hour: 9,
                 minute: 30,
-                timeZoneIdentifier: "Etc/UTC"
+                timeZoneIdentifier: "America/New_York"
             ),
             rule: .none,
             end: .never,

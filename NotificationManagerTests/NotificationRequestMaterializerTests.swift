@@ -116,9 +116,20 @@ struct NotificationRequestMaterializerTests {
     }
 
     @Test func oneShotUsesFullUTCGregorianComponentsAndExactNextDate() throws {
-        let instant = date("2040-08-31T13:30:45Z")
+        let instant = date("2040-08-31T13:30:00Z")
+        let defaultBase = occurrence("2040-08-31T13:30:00Z", day: 31)
         let request = try testMaterializer().materialize(
-            oneShotRequest(alertInstant: instant),
+            oneShotRequest(
+                alertInstant: instant,
+                reasons: [EffectiveAlert(
+                    kind: .main,
+                    baseOccurrence: BaseOccurrence(
+                        instant: instant,
+                        sourceComponents: defaultBase.sourceComponents
+                    ),
+                    alertInstant: instant
+                )]
+            ),
             input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
         )
         let trigger = calendarTrigger(request)
@@ -131,7 +142,7 @@ struct NotificationRequestMaterializerTests {
         #expect(components.day == 31)
         #expect(components.hour == 13)
         #expect(components.minute == 30)
-        #expect(components.second == 45)
+        #expect(components.second == 0)
         #expect(trigger.repeats == false)
         #expect(trigger.nextTriggerDate() == instant)
     }
@@ -262,11 +273,23 @@ struct NotificationRequestMaterializerTests {
 
         let english = try testMaterializer().materialize(
             logical,
-            input: MaterializationInput(reminder: reminder(notes: "Trip."), locale: Locale(identifier: "en_US"))
+            input: MaterializationInput(
+                reminder: reminder(
+                    notes: "Trip.",
+                    schedule: validScheduleState(early: EarlyReminder(value: 1, unit: .days))
+                ),
+                locale: Locale(identifier: "en_US")
+            )
         ).content.body
         let japanese = try testMaterializer().materialize(
             logical,
-            input: MaterializationInput(reminder: reminder(notes: "旅行。"), locale: Locale(identifier: "ja_JP"))
+            input: MaterializationInput(
+                reminder: reminder(
+                    notes: "旅行。",
+                    schedule: validScheduleState(early: EarlyReminder(value: 1, unit: .days))
+                ),
+                locale: Locale(identifier: "ja_JP")
+            )
         ).content.body
 
         #expect(english.hasSuffix("At the scheduled time for August 31, 2040 at 9:30\u{202F}AM. Also early for September 1, 2040 at 9:30\u{202F}AM."))
@@ -852,49 +875,19 @@ struct NotificationRequestMaterializerTests {
     }
 
     @Test func productionTriggerVerificationHasOneLiveFutureSmokeCheck() throws {
-        let minute = 60.0
-        let future = Date(
-            timeIntervalSince1970: (Date().timeIntervalSince1970 / minute).rounded(.up) * minute
-                + (7 * 24 * 60 * 60)
-        )
-        let timeZone = TimeZone(identifier: "Etc/UTC")!
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = timeZone
-        let components = calendar.dateComponents(
-            [.year, .month, .day, .hour, .minute, .second, .weekday],
-            from: future
-        )
-        let source = SourceWallClock(
-            year: components.year!,
-            month: components.month!,
-            day: components.day!,
-            hour: components.hour!,
-            minute: components.minute!,
-            timeZoneIdentifier: timeZone.identifier
-        )
-        let schedule = ScheduleDefinition(
-            source: source,
-            rule: .none,
-            end: .never,
-            early: nil
-        )
-        let base = BaseOccurrence(instant: future, sourceComponents: components)
-        let request = try oneShotRequest(
-            alertInstant: future,
-            reasons: [EffectiveAlert(kind: .main, baseOccurrence: base, alertInstant: future)]
-        )
-        let input = MaterializationInput(
-            reminder: reminder(schedule: .valid(
-                schedule,
-                sourceVersion: 1,
-                originalData: Data([1])
-            )),
-            locale: Locale(identifier: "en_US")
+        let request = try oneShotRequest()
+        let materialized = try NotificationRequestMaterializer().materialize(
+            request,
+            input: MaterializationInput(
+                reminder: reminder(),
+                locale: Locale(identifier: "en_US")
+            )
         )
 
-        let materialized = try NotificationRequestMaterializer().materialize(request, input: input)
-
-        #expect(calendarTrigger(materialized).nextTriggerDate() == future)
+        #expect(
+            calendarTrigger(materialized).nextTriggerDate()
+                == date("2040-08-31T13:30:00Z")
+        )
     }
 
     private let reminderID = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
