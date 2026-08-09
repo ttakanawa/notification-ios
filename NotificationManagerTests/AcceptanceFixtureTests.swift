@@ -1,7 +1,6 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
-import NotificationManagerPersistence
 import Testing
 import UserNotifications
 @testable import NotificationManager
@@ -535,8 +534,8 @@ private struct AcceptanceHarness {
         )
         do {
             _ = try await SaveReminderUseCase(
-                repository: try SwiftDataReminderRepository.inMemory(),
-                scheduleCodec: SchedulePayloadCodec(),
+                repository: AcceptanceReminderRepository(),
+                scheduleCodec: AcceptanceScheduleCodec(),
                 preferenceStore: AcceptancePreferenceStore(),
                 authorizationState: { .allowed },
                 reconcileRequester: AcceptanceReconcileRequester(),
@@ -635,6 +634,67 @@ private enum AcceptanceFixtureError: Error {
     case unexpectedTrigger
     case missingDateComponent
     case missingValue
+    case unsupportedRepositoryOperation
+}
+
+private actor AcceptanceReminderRepository: ReminderRepository {
+    private var reminders: [UUID: ReminderSnapshot] = [:]
+
+    func fetchCompleteSnapshot() -> CompleteReminderSnapshot {
+        CompleteReminderSnapshot(
+            reminders: reminders.values.sorted { $0.id.uuidString < $1.id.uuidString },
+            tags: []
+        )
+    }
+
+    func reminder(id: UUID) -> ReminderSnapshot? {
+        reminders[id]
+    }
+
+    func save(_ mutation: EncodedReminderMutation) throws -> ReminderSnapshot {
+        let schedule: ScheduleReadState
+        switch mutation.command {
+        case let .create(scheduleData), let .replaceSchedule(scheduleData):
+            schedule = .corrupt(originalData: scheduleData)
+        case .updateMetadataPreservingCurrentSchedule:
+            schedule = reminders[mutation.id]?.schedule ?? .corrupt(originalData: Data())
+        }
+        let reminder = ReminderSnapshot(
+            id: mutation.id,
+            title: mutation.title,
+            notes: mutation.notes,
+            urlString: mutation.urlString,
+            enabled: mutation.enabled,
+            schedule: schedule,
+            tagIDs: mutation.tagIDs,
+            createdAt: mutation.createdAt,
+            updatedAt: mutation.updatedAt
+        )
+        reminders[reminder.id] = reminder
+        return reminder
+    }
+
+    func delete(id: UUID) {
+        reminders[id] = nil
+    }
+
+    func saveTag(_ mutation: EncodedTagMutation) throws -> TagSnapshot {
+        throw AcceptanceFixtureError.unsupportedRepositoryOperation
+    }
+
+    func deleteTag(id: UUID) throws {
+        throw AcceptanceFixtureError.unsupportedRepositoryOperation
+    }
+}
+
+private struct AcceptanceScheduleCodec: SchedulePayloadCoding {
+    func decode(_ data: Data) -> ScheduleReadState {
+        .corrupt(originalData: data)
+    }
+
+    func encodeCurrent(_ definition: ScheduleDefinition) -> Data {
+        Data("acceptance-schedule".utf8)
+    }
 }
 
 private struct AcceptancePreferenceStore: DeviceNotificationPreferenceStore {

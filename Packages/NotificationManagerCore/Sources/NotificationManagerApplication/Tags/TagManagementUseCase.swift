@@ -3,6 +3,7 @@ import NotificationManagerDomain
 
 public enum TagManagementError: Error, Sendable, Equatable {
     case tagNotFound(UUID)
+    case duplicateNormalizedName(String)
 }
 
 public struct TagManagementUseCase: Sendable {

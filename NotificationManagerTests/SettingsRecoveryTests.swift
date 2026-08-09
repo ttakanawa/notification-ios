@@ -1,7 +1,6 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
-import NotificationManagerPersistence
 import Testing
 import UserNotifications
 @testable import NotificationManager
@@ -301,7 +300,7 @@ struct RecoveryPrivacyBoundaryTests {
 struct TagManagementPresentationTests {
     @MainActor
     @Test func createUsesTask11NormalizationAndSurfacesRepositoryDuplicateWithoutLosingTags() async throws {
-        let (model, _) = try makeTagModel()
+        let (model, _) = makeTagModel()
         await model.load()
 
         let created = await model.create(name: "  ＷＯＲＫ  ")
@@ -316,18 +315,18 @@ struct TagManagementPresentationTests {
 
     @MainActor
     @Test func whitespaceOnlyCreateSurfacesStableEmptyIdentityWithoutPersistence() async throws {
-        let (model, repository) = try makeTagModel()
+        let (model, repository) = makeTagModel()
 
         let created = await model.create(name: "\u{2003}\u{00A0}")
 
         #expect(created == nil)
         #expect(model.actionError == .emptyName)
-        #expect(try await repository.fetchCompleteSnapshot().tags.isEmpty)
+        #expect(await repository.fetchCompleteSnapshot().tags.isEmpty)
     }
 
     @MainActor
     @Test func renameAndDeleteUseTask11IdentityPreservingMutations() async throws {
-        let (model, _) = try makeTagModel()
+        let (model, _) = makeTagModel()
         let created = try #require(await model.create(name: "Travel"))
 
         let renamed = await model.rename(tagID: created.id, name: "Trips")
@@ -342,7 +341,7 @@ struct TagManagementPresentationTests {
 
     @MainActor
     @Test func missingRenameMapsToStableNotFoundIdentity() async throws {
-        let (model, _) = try makeTagModel()
+        let (model, _) = makeTagModel()
         let missing = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
 
         let renamed = await model.rename(tagID: missing, name: "Missing")
@@ -430,14 +429,14 @@ struct TagManagementPresentationTests {
     }
 
     @MainActor
-    private func makeTagModel() throws -> (
+    private func makeTagModel() -> (
         TagManagementModel,
-        SwiftDataReminderRepository
+        TagPresentationRepository
     ) {
-        let repository = try SwiftDataReminderRepository.inMemory()
+        let repository = TagPresentationRepository()
         let useCase = TagManagementUseCase(
             repository: repository,
-            normalizer: TagNameNormalizerV1(),
+            normalizer: TagPresentationNormalizer(),
             now: { Date(timeIntervalSince1970: 1_786_003_200) }
         )
         return (
@@ -455,7 +454,7 @@ struct TagManagementPresentationTests {
             repository: repository,
             useCase: TagManagementUseCase(
                 repository: repository,
-                normalizer: TagNameNormalizerV1(),
+                normalizer: TagPresentationNormalizer(),
                 now: { Date(timeIntervalSince1970: 1_786_003_200) }
             ),
             initialTags: initialTags
@@ -783,6 +782,82 @@ private actor BlockingRetryAction {
 private enum ControlledTagSnapshotRepositoryError: Error {
     case fetchFailed
     case unsupportedMutation
+}
+
+private struct TagPresentationNormalizer: TagNameNormalizing {
+    func normalize(_ name: String) throws -> String {
+        switch name {
+        case "  ＷＯＲＫ  ", "work":
+            return "work"
+        case "\u{2003}\u{00A0}":
+            throw TagValidationIssue.normalizedNameEmpty
+        default:
+            return name.lowercased()
+        }
+    }
+}
+
+private enum TagPresentationRepositoryError: Error {
+    case unsupportedReminderMutation
+}
+
+private actor TagPresentationRepository: ReminderRepository {
+    private var tags: [UUID: TagSnapshot] = [:]
+
+    func fetchCompleteSnapshot() -> CompleteReminderSnapshot {
+        CompleteReminderSnapshot(
+            reminders: [],
+            tags: tags.values.sorted {
+                if $0.normalizedName != $1.normalizedName {
+                    return $0.normalizedName < $1.normalizedName
+                }
+                return $0.id.uuidString < $1.id.uuidString
+            }
+        )
+    }
+
+    func reminder(id: UUID) -> ReminderSnapshot? { nil }
+
+    func save(_ mutation: EncodedReminderMutation) throws -> ReminderSnapshot {
+        throw TagPresentationRepositoryError.unsupportedReminderMutation
+    }
+
+    func delete(id: UUID) throws {
+        throw TagPresentationRepositoryError.unsupportedReminderMutation
+    }
+
+    func saveTag(_ mutation: EncodedTagMutation) throws -> TagSnapshot {
+        switch mutation.command {
+        case .create:
+            guard tags[mutation.id] == nil else {
+                throw TagManagementError.duplicateNormalizedName(mutation.normalizedName)
+            }
+        case .update:
+            guard tags[mutation.id] != nil else {
+                throw TagManagementError.tagNotFound(mutation.id)
+            }
+        }
+        guard !tags.values.contains(where: {
+            $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+        }) else {
+            throw TagManagementError.duplicateNormalizedName(mutation.normalizedName)
+        }
+        let tag = TagSnapshot(
+            id: mutation.id,
+            name: mutation.name,
+            normalizedName: mutation.normalizedName,
+            normalizationVersion: mutation.normalizationVersion,
+            createdAt: mutation.createdAt,
+            updatedAt: mutation.updatedAt
+        )
+        tags[tag.id] = tag
+        return tag
+    }
+
+    func deleteTag(id: UUID) throws {
+        guard tags[id] != nil else { throw TagManagementError.tagNotFound(id) }
+        tags[id] = nil
+    }
 }
 
 private actor ControlledTagSnapshotRepository: ReminderRepository {

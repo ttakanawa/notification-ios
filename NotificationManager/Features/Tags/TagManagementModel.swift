@@ -125,6 +125,7 @@ final class TagManagementModel {
         if let error = error as? TagManagementError {
             switch error {
             case .tagNotFound: return .notFound
+            case .duplicateNormalizedName: return .duplicateName
             }
         }
         if let error = error as? PersistenceError {

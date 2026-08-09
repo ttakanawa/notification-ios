@@ -11,7 +11,6 @@
 		A10000000000000000000002 /* NotificationManagerApplication in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000002 /* NotificationManagerApplication */; };
 		A10000000000000000000003 /* NotificationManagerPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000003 /* NotificationManagerPersistence */; };
 		A10000000000000000000004 /* NotificationManagerPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000003 /* NotificationManagerPersistence */; };
-		A10000000000000000000005 /* NotificationManagerPersistence in Frameworks */ = {isa = PBXBuildFile; productRef = A20000000000000000000003 /* NotificationManagerPersistence */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -84,7 +83,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		A50000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000005 /* NotificationManagerPersistence in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
+		A50000000000000000000002 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 		A50000000000000000000003 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (A10000000000000000000004 /* NotificationManagerPersistence in Frameworks */); runOnlyForDeploymentPostprocessing = 0; };
 		A50000000000000000000004 /* Frameworks */ = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
 /* End PBXFrameworksBuildPhase section */
@@ -148,7 +147,6 @@
 			dependencies = (A70000000000000000000005 /* PBXTargetDependency */);
 			fileSystemSynchronizedGroups = (A40000000000000000000002 /* NotificationManagerTests */);
 			name = NotificationManagerTests;
-			packageProductDependencies = (A20000000000000000000003 /* NotificationManagerPersistence */);
 			productName = NotificationManagerTests;
 			productReference = A30000000000000000000002 /* NotificationManagerTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
