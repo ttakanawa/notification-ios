@@ -7,7 +7,7 @@ struct LocalizedTextProvider: Sendable {
         String(
             localized: String.LocalizationValue(key),
             table: "Localizable",
-            bundle: .main,
+            bundle: bundle(for: locale),
             locale: locale
         )
     }
@@ -20,5 +20,21 @@ struct LocalizedTextProvider: Sendable {
 
     func value(for key: String, locale: Locale) -> String {
         lookup(key, locale)
+    }
+
+    private static func bundle(for locale: Locale) -> Bundle {
+        guard let localization = Bundle.preferredLocalizations(
+            from: Bundle.main.localizations,
+            forPreferences: [locale.identifier]
+        ).first,
+        let languageBundleURL = Bundle.main.url(
+                  forResource: localization,
+                  withExtension: "lproj"
+              ),
+        let languageBundle = Bundle(url: languageBundleURL)
+        else {
+            return .main
+        }
+        return languageBundle
     }
 }

@@ -8,9 +8,9 @@ struct LocalizedRepeatFormatterTests {
         let fixtures: [(RepeatRule, String, String)] = [
             (.none, "One time.", "1回のみです。"),
             (.hourly(interval: 1), "Every hour.", "毎時繰り返します。"),
-            (.hourly(interval: 9_999), "Every 9999 hours.", "9999時間ごとに繰り返します。"),
+            (.hourly(interval: 9_999), "Every 9,999 hours.", "9,999時間ごとに繰り返します。"),
             (.daily(interval: 1), "Every day.", "毎日繰り返します。"),
-            (.daily(interval: 9_999), "Every 9999 days.", "9999日ごとに繰り返します。"),
+            (.daily(interval: 9_999), "Every 9,999 days.", "9,999日ごとに繰り返します。"),
             (
                 .weekly(
                     interval: 1,
@@ -26,8 +26,8 @@ struct LocalizedRepeatFormatterTests {
                     weekdaySetKind: .explicit,
                     weekdays: [.monday, .friday]
                 ),
-                "Every 9999 weeks on Monday and Friday.",
-                "9999週間ごとの月曜日、金曜日に繰り返します。"
+                "Every 9,999 weeks on Monday and Friday.",
+                "9,999週間ごとの月曜日、金曜日に繰り返します。"
             ),
             (
                 .weekly(
@@ -54,8 +54,8 @@ struct LocalizedRepeatFormatterTests {
             ),
             (
                 .monthly(interval: 9_999, selector: .anchorDay),
-                "Every 9999 months on day 31.",
-                "9999か月ごとの31日に繰り返します。"
+                "Every 9,999 months on day 31.",
+                "9,999か月ごとの31日に繰り返します。"
             ),
             (
                 .monthly(interval: 1, selector: .dayOfMonth(21)),
@@ -106,8 +106,8 @@ struct LocalizedRepeatFormatterTests {
             ),
             (
                 .yearly(interval: 9_999, month: nil, selector: .anchorMonthDay),
-                "Every 9999 years on August 31.",
-                "9999年ごとの8月31日に繰り返します。"
+                "Every 9,999 years on August 31.",
+                "9,999年ごとの8月31日に繰り返します。"
             ),
             (
                 .yearly(interval: 1, month: 2, selector: .dayOfMonth(29)),
