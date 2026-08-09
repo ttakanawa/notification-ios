@@ -310,9 +310,9 @@ private struct NotificationContractHarness {
     private func weekdaySchedule() -> ScheduleDefinition {
         ScheduleDefinition(
             source: SourceWallClock(
-                year: 2040,
-                month: 6,
-                day: 4,
+                year: 2039,
+                month: 11,
+                day: 28,
                 hour: 9,
                 minute: 30,
                 timeZoneIdentifier: "America/New_York"
