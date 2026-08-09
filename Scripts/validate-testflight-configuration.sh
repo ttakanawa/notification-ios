@@ -55,6 +55,17 @@ assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw
 assert_equal "2" "$(count_project_setting 'CLOUDKIT_CONTAINER_IDENTIFIER = iCloud\.org\.tknw\.punctual;')" "CloudKit build setting count"
 assert_equal "2" "$(count_project_setting 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;')" "AppIcon build setting count"
 
+# The file-system-synchronized app group automatically includes resources. Keep the
+# target Info.plist out of that membership: Xcode must process it only through
+# INFOPLIST_FILE, while still discovering legitimate resources automatically.
+info_plist_membership_exception_id="A90000000000000000000009"
+rg -U -q \
+    "${info_plist_membership_exception_id} /\\* Exceptions for .* = \\{\\n\\s*isa = PBXFileSystemSynchronizedBuildFileExceptionSet;\\n\\s*membershipExceptions = \\(\\n\\s*SupportingFiles/Info\\.plist,\\n\\s*\\);\\n\\s*target = A70000000000000000000001 /\\* NotificationManager \\*/;" \
+    "$project_file" || fail "app Info.plist must be excluded from file-system-synchronized resource membership"
+rg -U -q \
+    "A40000000000000000000001 /\\* NotificationManager \\*/ = \\{\\n\\s*isa = PBXFileSystemSynchronizedRootGroup;\\n\\s*exceptions = \\(\\n\\s*${info_plist_membership_exception_id} /\\* Exceptions for" \
+    "$project_file" || fail "NotificationManager synchronized group must reference the Info.plist membership exception"
+
 [ -f "$asset_catalog/Contents.json" ] || fail "Assets.xcassets/Contents.json is missing"
 [ -f "$app_icon_set/Contents.json" ] || fail "AppIcon.appiconset/Contents.json is missing"
 [ -f "$app_icon" ] || fail "AppIcon-1024.png is missing"
