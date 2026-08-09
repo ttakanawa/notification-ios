@@ -101,6 +101,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     private var foregroundTimerTask: Task<Void, Never>?
     private var retryTimerToken: UInt64 = 0
     private var foregroundTimerToken: UInt64 = 0
+    private var statePublicationRevision: UInt64 = 0
     private var retryAttempt = 0
 
     public init(
@@ -152,7 +153,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             }
             enqueue(reason)
         }
-        await stateStore.setReconcileInProgressOrQueued(true)
+        let revision = nextStatePublicationRevision()
+        await stateStore.setReconcileInProgressOrQueued(true, revision: revision)
     }
 
     func requestForegroundReconcile(
@@ -162,10 +164,20 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         guard permit.isValidAtWorkerIngress() else { return }
         isForeground = true
         finishForegroundReconcileLinearization()
-        await stateStore.setReconcileInProgressOrQueued(true)
+        let revision = nextStatePublicationRevision()
+        await stateStore.setReconcileInProgressOrQueued(true, revision: revision)
     }
 
-    public func enterBackground() {
+    func enterBackground(ifValid permit: BackgroundReconcilePermit) {
+        guard permit.isValidAtWorkerIngress() else { return }
+        finishBackgroundTransition()
+    }
+
+    func enterBackground() {
+        finishBackgroundTransition()
+    }
+
+    private func finishBackgroundTransition() {
         isForeground = false
         invalidateRetryTimer()
         invalidateForegroundTimer()
@@ -202,7 +214,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     }
 
     private func runLoop() async {
-        await stateStore.setReconcileInProgressOrQueued(true)
+        var revision = nextStatePublicationRevision()
+        await stateStore.setReconcileInProgressOrQueued(true, revision: revision)
         while true {
             while !pendingReasons.isEmpty {
                 pendingReasons.removeAll()
@@ -210,9 +223,11 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
                     pendingReasons.insert(.foreground)
                 }
             }
-            await stateStore.setReconcileInProgressOrQueued(false)
+            revision = nextStatePublicationRevision()
+            await stateStore.setReconcileInProgressOrQueued(false, revision: revision)
             guard pendingReasons.isEmpty else {
-                await stateStore.setReconcileInProgressOrQueued(true)
+                revision = nextStatePublicationRevision()
+                await stateStore.setReconcileInProgressOrQueued(true, revision: revision)
                 continue
             }
             isLoopRunning = false
@@ -221,6 +236,11 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             waiters.forEach { $0.resume() }
             return
         }
+    }
+
+    private func nextStatePublicationRevision() -> UInt64 {
+        statePublicationRevision &+= 1
+        return statePublicationRevision
     }
 
     /// Returns true when dispatch crossed a one-shot boundary and the latest state must be planned.

@@ -45,6 +45,7 @@ struct AppLifecycleNotificationNames: Sendable {
 final class AppLifecycleCoordinator {
     typealias Reconcile = @Sendable (ReconcileReason) async -> Void
     typealias ForegroundReconcile = @Sendable (ForegroundReconcilePermit) async -> Void
+    typealias EnterBackground = @Sendable (BackgroundReconcilePermit) async -> Void
     typealias AsyncAction = @Sendable () async -> Void
 
     private let eligibilityIndexStore: ForegroundEligibilityIndexStore
@@ -52,7 +53,7 @@ final class AppLifecycleCoordinator {
     private let notificationNames: AppLifecycleNotificationNames
     private let requestReconcile: Reconcile
     private let requestForegroundReconcile: ForegroundReconcile
-    private let enterBackgroundAction: AsyncAction
+    private let enterBackgroundAction: EnterBackground
     private let refreshDeviceState: AsyncAction
     private let refreshModelSnapshot: AsyncAction
     private let foregroundPermitAuthority = ForegroundReconcilePermitAuthority()
@@ -66,7 +67,7 @@ final class AppLifecycleCoordinator {
         notificationNames: AppLifecycleNotificationNames = .system,
         requestReconcile: @escaping Reconcile,
         requestForegroundReconcile: @escaping ForegroundReconcile,
-        enterBackground: @escaping AsyncAction,
+        enterBackground: @escaping EnterBackground,
         refreshDeviceState: @escaping AsyncAction = {},
         refreshModelSnapshot: @escaping AsyncAction = {}
     ) {
@@ -94,14 +95,14 @@ final class AppLifecycleCoordinator {
             await requestForegroundReconcile(permit)
         case .background:
             sceneIsForeground = false
-            foregroundPermitAuthority.invalidateForegroundEpoch()
+            let permit = foregroundPermitAuthority.beginBackgroundEpoch()
             _ = beginSceneTransition()
-            await enterBackgroundAction()
+            await enterBackgroundAction(permit)
         case .backgroundRefresh:
             sceneIsForeground = false
-            foregroundPermitAuthority.invalidateForegroundEpoch()
+            let permit = foregroundPermitAuthority.beginBackgroundEpoch()
             let generation = beginSceneTransition()
-            await enterBackgroundAction()
+            await enterBackgroundAction(permit)
             guard generation == sceneGeneration else { return }
             eligibilityIndexStore.markStale()
             await refreshModelSnapshot()

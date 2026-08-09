@@ -37,7 +37,7 @@ struct AppLifecycleReconcileTests {
             requestForegroundReconcile: { _ in
                 await trace.record(.reconcile(.foreground))
             },
-            enterBackground: {
+            enterBackground: { _ in
                 await trace.record(.backgroundEntered)
             },
             refreshDeviceState: {
@@ -77,8 +77,8 @@ struct AppLifecycleReconcileTests {
                 await ingressGate.wait()
                 await worker.requestForegroundReconcile(ifValid: permit)
             },
-            enterBackground: {
-                await worker.enterBackground()
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
             }
         )
         let foreground = Task { @MainActor in
@@ -117,8 +117,8 @@ struct AppLifecycleReconcileTests {
                 await firstIngressGate.wait()
                 await worker.requestForegroundReconcile(ifValid: permit)
             },
-            enterBackground: {
-                await worker.enterBackground()
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
             }
         )
         let olderForeground = Task { @MainActor in
@@ -132,6 +132,82 @@ struct AppLifecycleReconcileTests {
         await worker.waitUntilIdle()
 
         #expect(await snapshotLoader.callCount == 1)
+    }
+
+    @MainActor
+    @Test(arguments: [
+        AppLifecycleTrigger.background,
+        .backgroundRefresh
+    ])
+    func newerForegroundMakesOlderBackgroundWorkerIngressANoop(
+        trigger: AppLifecycleTrigger
+    ) async {
+        let backgroundIngressGate = LifecycleBackgroundIngressGate()
+        let worker = makeFailingWorker()
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: { permit in
+                await backgroundIngressGate.wait()
+                await worker.enterBackground(ifValid: permit)
+            }
+        )
+        await coordinator.handle(.foreground)
+        await worker.waitUntilIdle()
+        let olderBackground = Task { @MainActor in
+            await coordinator.handle(trigger)
+        }
+        await backgroundIngressGate.waitUntilEntered()
+
+        await coordinator.handle(.foreground)
+        await worker.waitUntilIdle()
+        #expect((await worker.timerState()).retryScheduled)
+
+        await backgroundIngressGate.release()
+        await olderBackground.value
+
+        #expect((await worker.timerState()).retryScheduled)
+        await worker.enterBackground()
+    }
+
+    @MainActor
+    @Test(arguments: [
+        AppLifecycleTrigger.background,
+        .backgroundRefresh
+    ])
+    func validBackgroundBeforeNewerForegroundLeavesForegroundLatest(
+        trigger: AppLifecycleTrigger
+    ) async {
+        let worker = makeFailingWorker()
+        let coordinator = AppLifecycleCoordinator(
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
+            }
+        )
+        await coordinator.handle(.foreground)
+        await worker.waitUntilIdle()
+
+        await coordinator.handle(trigger)
+        await worker.waitUntilIdle()
+        #expect(!(await worker.timerState()).retryScheduled)
+
+        await coordinator.handle(.foreground)
+        await worker.waitUntilIdle()
+
+        #expect((await worker.timerState()).retryScheduled)
+        await worker.enterBackground()
     }
 
     @MainActor
@@ -157,8 +233,8 @@ struct AppLifecycleReconcileTests {
                 await secondIngressGate.wait()
                 await worker.requestForegroundReconcile(ifValid: permit)
             },
-            enterBackground: {
-                await worker.enterBackground()
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
             }
         )
         await coordinator.handle(.foreground)
@@ -243,7 +319,7 @@ struct AppLifecycleReconcileTests {
             requestForegroundReconcile: { _ in
                 await trace.record(.reconcile(.foreground))
             },
-            enterBackground: {},
+            enterBackground: { _ in },
             refreshDeviceState: {
                 await gate.refresh()
             },
@@ -287,7 +363,7 @@ struct AppLifecycleReconcileTests {
                 eligibilityIndexStore: index,
                 requestReconcile: { _ in },
                 requestForegroundReconcile: { _ in },
-                enterBackground: {},
+                enterBackground: { _ in },
                 refreshDeviceState: {},
                 refreshModelSnapshot: {
                     await observed.record(index.snapshot())
@@ -392,7 +468,7 @@ struct AppLifecycleReconcileTests {
             notificationNames: names,
             requestReconcile: { _ in },
             requestForegroundReconcile: { _ in },
-            enterBackground: {}
+            enterBackground: { _ in }
         )
         coordinator.startObservingSystemChanges()
 
@@ -415,9 +491,9 @@ struct AppLifecycleReconcileTests {
 
         await observer.start()
         await recorder.waitForCount(1)
-        await stateStore.setReconcileInProgressOrQueued(true)
+        await stateStore.setReconcileInProgressOrQueued(true, revision: 1)
         await stateStore.publishFailure(.inventory)
-        await stateStore.setReconcileInProgressOrQueued(false)
+        await stateStore.setReconcileInProgressOrQueued(false, revision: 2)
         await recorder.waitForFinalFailureState()
         observer.stop()
 
@@ -426,6 +502,22 @@ struct AppLifecycleReconcileTests {
         #expect(snapshots.last?.generation == 1)
         #expect(snapshots.last?.reconcileInProgressOrQueued == false)
         #expect(snapshots.last?.globalFailure == .inventory)
+    }
+
+    @Test func newerIdleStateRejectsDelayedOlderBusyState() async {
+        let stateStore = DeviceSchedulingStateStore()
+        let olderBusyGate = LifecycleStateWriteGate()
+        let olderBusy = Task {
+            await olderBusyGate.wait()
+            await stateStore.setReconcileInProgressOrQueued(true, revision: 1)
+        }
+        await olderBusyGate.waitUntilEntered()
+
+        await stateStore.setReconcileInProgressOrQueued(false, revision: 2)
+        await olderBusyGate.release()
+        await olderBusy.value
+
+        #expect(await stateStore.snapshot().reconcileInProgressOrQueued == false)
     }
 
     @MainActor
@@ -648,7 +740,7 @@ struct AppLifecycleReconcileTests {
             requestForegroundReconcile: { _ in
                 await trace.record(.reconcile(.foreground))
             },
-            enterBackground: {
+            enterBackground: { _ in
                 await trace.record(.backgroundEntered)
             },
             refreshDeviceState: {
@@ -679,6 +771,22 @@ struct AppLifecycleReconcileTests {
                 reminderStatuses: [:]
             )),
             retryDelays: []
+        )
+    }
+
+    private func makeFailingWorker() -> NotificationReconcileWorker {
+        NotificationReconcileWorker(
+            snapshotLoader: LifecycleFailingSnapshotLoader(),
+            preferenceStore: LifecyclePreferenceStore(),
+            authorizationProvider: LifecycleAuthorizationProvider(),
+            notificationCenter: LifecycleNotificationCenter(),
+            eligibilityIndexStore: ForegroundEligibilityIndexStore(),
+            stateStore: DeviceSchedulingStateStore(),
+            clock: NotificationReconcileClock(
+                now: { Date(timeIntervalSince1970: 2_200_000_000) },
+                sleep: { _ in try await Task.sleep(for: .seconds(3_600)) }
+            ),
+            retryDelays: [1]
         )
     }
 
@@ -798,6 +906,54 @@ private actor LifecycleForegroundIngressGate {
         await withCheckedContinuation { continuation in
             entryWaiters.append(continuation)
         }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+private actor LifecycleBackgroundIngressGate {
+    private var entered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        entered = true
+        let waiters = entryWaiters
+        entryWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { releaseContinuation = $0 }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
+private actor LifecycleStateWriteGate {
+    private var entered = false
+    private var entryWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    func wait() async {
+        entered = true
+        let waiters = entryWaiters
+        entryWaiters.removeAll()
+        waiters.forEach { $0.resume() }
+        await withCheckedContinuation { releaseContinuation = $0 }
+    }
+
+    func waitUntilEntered() async {
+        guard !entered else { return }
+        await withCheckedContinuation { entryWaiters.append($0) }
     }
 
     func release() {
@@ -939,6 +1095,12 @@ private actor LifecycleCountingSnapshotLoader: CompleteSchedulingSnapshotLoading
     func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
         callCount += 1
         return CompleteReminderSnapshot(reminders: [], tags: [])
+    }
+}
+
+private struct LifecycleFailingSnapshotLoader: CompleteSchedulingSnapshotLoading {
+    func loadCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+        throw CompleteSchedulingSnapshotLoadError.fetch
     }
 }
 

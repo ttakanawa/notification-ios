@@ -233,8 +233,8 @@ final class AppEnvironment {
             requestForegroundReconcile: { permit in
                 await worker.requestForegroundReconcile(ifValid: permit)
             },
-            enterBackground: {
-                await worker.enterBackground()
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
             },
             refreshDeviceState: {
                 await settingsModel.load()

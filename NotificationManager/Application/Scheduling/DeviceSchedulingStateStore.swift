@@ -68,6 +68,7 @@ public actor DeviceSchedulingStateStore {
     private var updateContinuations: [
         UUID: AsyncStream<DeviceSchedulingStateSnapshot>.Continuation
     ] = [:]
+    private var reconcileStateRevision: UInt64 = 0
 
     public init() {}
 
@@ -89,7 +90,12 @@ public actor DeviceSchedulingStateStore {
         current.outcomes[groupID]
     }
 
-    func setReconcileInProgressOrQueued(_ value: Bool) {
+    func setReconcileInProgressOrQueued(
+        _ value: Bool,
+        revision: UInt64
+    ) {
+        guard revision > reconcileStateRevision else { return }
+        reconcileStateRevision = revision
         current = DeviceSchedulingStateSnapshot(
             generation: current.generation,
             reconcileInProgressOrQueued: value,

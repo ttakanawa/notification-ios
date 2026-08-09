@@ -60,7 +60,7 @@ struct NotificationApplicationDelegateTests {
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             requestReconcile: { await reconciles.record($0) },
             requestForegroundReconcile: { _ in await reconciles.record(.foreground) },
-            enterBackground: { await Task.yield() }
+            enterBackground: { _ in await Task.yield() }
         )
         await lifecycle.handle(.foreground)
         await reconciles.reset()
@@ -715,7 +715,7 @@ struct NotificationApplicationDelegateTests {
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             requestReconcile: { await reconciles.record($0) },
             requestForegroundReconcile: { _ in await reconciles.record(.foreground) },
-            enterBackground: {}
+            enterBackground: { _ in }
         )
         await lifecycle.handle(.foreground)
         await reconciles.reset()
