@@ -7,6 +7,9 @@ repository_root=$(CDPATH= cd -- "$script_directory/.." && pwd)
 info_plist="$repository_root/NotificationManager/SupportingFiles/Info.plist"
 entitlements="$repository_root/NotificationManager/SupportingFiles/NotificationManager.entitlements"
 project_file="$repository_root/NotificationManager.xcodeproj/project.pbxproj"
+asset_catalog="$repository_root/NotificationManager/Resources/Assets.xcassets"
+app_icon_set="$asset_catalog/AppIcon.appiconset"
+app_icon="$app_icon_set/AppIcon-1024.png"
 
 fail() {
     echo "TestFlight configuration error: $1" >&2
@@ -49,6 +52,21 @@ assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw
 assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw\.punctual\.integrationtests;')" "integration-test bundle setting count"
 assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw\.punctual\.uitests;')" "UI-test bundle setting count"
 assert_equal "2" "$(count_project_setting 'CLOUDKIT_CONTAINER_IDENTIFIER = iCloud\.org\.tknw\.punctual;')" "CloudKit build setting count"
+assert_equal "2" "$(count_project_setting 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;')" "AppIcon build setting count"
+
+[ -f "$asset_catalog/Contents.json" ] || fail "Assets.xcassets/Contents.json is missing"
+[ -f "$app_icon_set/Contents.json" ] || fail "AppIcon.appiconset/Contents.json is missing"
+[ -f "$app_icon" ] || fail "AppIcon-1024.png is missing"
+
+app_icon_json=$(plutil -convert json -o - "$app_icon_set/Contents.json")
+printf '%s' "$app_icon_json" | jq -e \
+    '.images == [{"filename":"AppIcon-1024.png","idiom":"universal","platform":"ios","size":"1024x1024"}]' >/dev/null \
+    || fail "AppIcon Contents.json must contain one standard iOS 1024x1024 image"
+
+icon_metadata=$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$app_icon")
+printf '%s' "$icon_metadata" | rg 'pixelWidth: 1024' >/dev/null || fail "AppIcon width must be 1024"
+printf '%s' "$icon_metadata" | rg 'pixelHeight: 1024' >/dev/null || fail "AppIcon height must be 1024"
+printf '%s' "$icon_metadata" | rg 'hasAlpha: no' >/dev/null || fail "AppIcon must not have an alpha channel"
 
 if rg -n 'registerForRemoteNotifications|didRegisterForRemoteNotifications|didFailToRegisterForRemoteNotifications' \
     "$repository_root/NotificationManager" "$repository_root/Packages" >/dev/null; then
