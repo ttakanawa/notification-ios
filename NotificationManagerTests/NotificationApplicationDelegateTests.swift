@@ -1313,8 +1313,9 @@ private actor LifecycleReconcileReasonRecorder {
 }
 
 private extension Array {
+    @MainActor
     func asyncMap<T: Sendable>(
-        _ transform: (Element) async -> T
+        _ transform: @MainActor (Element) async -> T
     ) async -> [T] {
         var result: [T] = []
         for element in self {

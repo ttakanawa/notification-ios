@@ -1352,7 +1352,7 @@ private actor CountingAuthorizationProvider: NotificationAuthorizationProviding 
     }
 }
 
-private actor NotificationCenterClientSpy: NotificationCenterClient {
+private actor NotificationCenterClientSpy: @preconcurrency NotificationCenterClient {
     private var calls: [String] = []
 
     private var pending: [NotificationInventoryItem]
@@ -1425,7 +1425,7 @@ private actor NotificationCenterClientSpy: NotificationCenterClient {
     func addedTitles() -> [String] { addedRequests.map(\.content.title) }
 }
 
-private actor BlockingSecondPendingNotificationCenter: NotificationCenterClient {
+private actor BlockingSecondPendingNotificationCenter: @preconcurrency NotificationCenterClient {
     private var pendingCallCount = 0
     private var secondPendingStarted = false
     private var secondPendingStartWaiters: [CheckedContinuation<Void, Never>] = []
