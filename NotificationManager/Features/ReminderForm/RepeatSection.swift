@@ -119,14 +119,18 @@ struct RepeatSection: View {
     private var repeatEndBinding: Binding<Bool> {
         Binding(
             get: { model.repeatEndsOnDate },
-            set: model.setRepeatEndsOnDate
+            set: { enabled in
+                model.setRepeatEndsOnDate(enabled)
+            }
         )
     }
 
     private var repeatEndDateBinding: Binding<String> {
         Binding(
             get: { model.repeatEndDateText },
-            set: model.updateRepeatEndDateText
+            set: { input in
+                model.updateRepeatEndDateText(input)
+            }
         )
     }
 }

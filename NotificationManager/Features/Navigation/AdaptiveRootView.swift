@@ -58,7 +58,9 @@ struct AdaptiveRootView: View {
     private var compactPathBinding: Binding<[AppRouterDestination]> {
         Binding(
             get: { router.compactPath },
-            set: router.setCompactPathFromSystem
+            set: { path in
+                router.setCompactPathFromSystem(path)
+            }
         )
     }
 

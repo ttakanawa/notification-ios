@@ -67,14 +67,18 @@ struct DateTimeSection: View {
     private var dateBinding: Binding<String> {
         Binding(
             get: { model.sourceDateText },
-            set: model.updateSourceDateText
+            set: { input in
+                model.updateSourceDateText(input)
+            }
         )
     }
 
     private var timeBinding: Binding<String> {
         Binding(
             get: { model.sourceTimeText },
-            set: model.updateSourceTimeText
+            set: { input in
+                model.updateSourceTimeText(input)
+            }
         )
     }
 

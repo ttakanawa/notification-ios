@@ -55,7 +55,9 @@ struct CustomRepeatField: View {
     private var customTextBinding: Binding<String> {
         Binding(
             get: { model.customRepeatText },
-            set: model.updateCustomRepeatText
+            set: { input in
+                model.updateCustomRepeatText(input)
+            }
         )
     }
 

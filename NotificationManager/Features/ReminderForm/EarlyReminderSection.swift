@@ -52,14 +52,18 @@ struct EarlyReminderSection: View {
     private var earlyChoiceBinding: Binding<EarlyReminderChoice> {
         Binding(
             get: { model.earlyReminderChoice },
-            set: model.applyEarlyReminderChoice
+            set: { choice in
+                model.applyEarlyReminderChoice(choice)
+            }
         )
     }
 
     private var earlyValueBinding: Binding<String> {
         Binding(
             get: { model.earlyReminderValueText },
-            set: model.updateEarlyReminderValueText
+            set: { input in
+                model.updateEarlyReminderValueText(input)
+            }
         )
     }
 
