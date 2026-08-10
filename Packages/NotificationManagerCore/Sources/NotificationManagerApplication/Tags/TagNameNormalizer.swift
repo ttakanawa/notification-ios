@@ -1,4 +1,3 @@
-import NotificationManagerApplication
 import NotificationManagerDomain
 
 public struct TagNameNormalizerV1: TagNameNormalizing, Sendable {

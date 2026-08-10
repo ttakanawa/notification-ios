@@ -1,11 +1,6 @@
 import Foundation
 import NotificationManagerDomain
 
-public enum TagManagementError: Error, Sendable, Equatable {
-    case tagNotFound(UUID)
-    case duplicateNormalizedName(String)
-}
-
 public struct TagManagementUseCase: Sendable {
     private let repository: any ReminderRepository
     private let normalizer: any TagNameNormalizing
@@ -39,7 +34,7 @@ public struct TagManagementUseCase: Sendable {
         let normalizedName = try normalizer.normalize(name)
         let snapshot = try await repository.fetchCompleteSnapshot()
         guard let current = snapshot.tags.first(where: { $0.id == tagID }) else {
-            throw TagManagementError.tagNotFound(tagID)
+            throw TagRepositoryError.notFound(tagID)
         }
         return try await repository.saveTag(EncodedTagMutation(
             id: current.id,

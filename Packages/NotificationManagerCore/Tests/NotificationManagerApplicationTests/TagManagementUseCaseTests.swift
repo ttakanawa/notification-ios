@@ -56,7 +56,7 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:00:00Z") }
         )
 
-        await #expect(throws: RepositoryTestError.duplicateNormalizedTagName("work")) {
+        await #expect(throws: TagRepositoryError.duplicateNormalizedName("work")) {
             try await useCase.create(name: "WORK", id: TestApplicationValues.tagID)
         }
         #expect(await repository.savedTagMutations.isEmpty)
@@ -107,7 +107,7 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:30:00Z") }
         )
 
-        await #expect(throws: RepositoryTestError.duplicateNormalizedTagName("work")) {
+        await #expect(throws: TagRepositoryError.duplicateNormalizedName("work")) {
             try await useCase.rename(tagID: existing.id, name: "WORK")
         }
         #expect(await repository.storedTag(id: existing.id) == existing)
@@ -121,7 +121,7 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:30:00Z") }
         )
 
-        await #expect(throws: TagManagementError.tagNotFound(TestApplicationValues.tagID)) {
+        await #expect(throws: TagRepositoryError.notFound(TestApplicationValues.tagID)) {
             try await useCase.rename(tagID: TestApplicationValues.tagID, name: "Missing")
         }
         #expect(await repository.savedTagMutations.isEmpty)
@@ -143,7 +143,7 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:30:00Z") }
         )
 
-        await #expect(throws: RepositoryTestError.tagNotFound(existing.id)) {
+        await #expect(throws: TagRepositoryError.notFound(existing.id)) {
             try await useCase.rename(tagID: existing.id, name: "Trips")
         }
 

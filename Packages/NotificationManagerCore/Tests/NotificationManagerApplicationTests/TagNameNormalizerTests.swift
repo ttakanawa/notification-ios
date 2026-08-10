@@ -1,8 +1,7 @@
 import Foundation
-import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
-@testable import NotificationManagerPersistence
+@testable import NotificationManagerApplication
 
 @Suite struct TagNameNormalizerTests {
     private let normalizer = TagNameNormalizerV1()

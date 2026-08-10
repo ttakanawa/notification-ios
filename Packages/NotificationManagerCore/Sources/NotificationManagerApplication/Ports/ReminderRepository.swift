@@ -91,6 +91,14 @@ public struct EncodedTagMutation: Sendable, Equatable {
     }
 }
 
+public enum TagRepositoryError: Error, Sendable, Equatable {
+    case notFound(UUID)
+    case duplicateID(UUID)
+    case duplicateNormalizedName(String)
+    case invalid(TagValidationIssue)
+    case unavailable
+}
+
 public protocol ReminderRepository: Sendable {
     func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot
     func reminder(id: UUID) async throws -> ReminderSnapshot?

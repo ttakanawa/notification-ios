@@ -436,7 +436,7 @@ struct TagManagementPresentationTests {
         let repository = TagPresentationRepository()
         let useCase = TagManagementUseCase(
             repository: repository,
-            normalizer: TagPresentationNormalizer(),
+            normalizer: TagNameNormalizerV1(),
             now: { Date(timeIntervalSince1970: 1_786_003_200) }
         )
         return (
@@ -454,7 +454,7 @@ struct TagManagementPresentationTests {
             repository: repository,
             useCase: TagManagementUseCase(
                 repository: repository,
-                normalizer: TagPresentationNormalizer(),
+                normalizer: TagNameNormalizerV1(),
                 now: { Date(timeIntervalSince1970: 1_786_003_200) }
             ),
             initialTags: initialTags
@@ -784,19 +784,6 @@ private enum ControlledTagSnapshotRepositoryError: Error {
     case unsupportedMutation
 }
 
-private struct TagPresentationNormalizer: TagNameNormalizing {
-    func normalize(_ name: String) throws -> String {
-        switch name {
-        case "  ＷＯＲＫ  ", "work":
-            return "work"
-        case "\u{2003}\u{00A0}":
-            throw TagValidationIssue.normalizedNameEmpty
-        default:
-            return name.lowercased()
-        }
-    }
-}
-
 private enum TagPresentationRepositoryError: Error {
     case unsupportedReminderMutation
 }
@@ -830,17 +817,17 @@ private actor TagPresentationRepository: ReminderRepository {
         switch mutation.command {
         case .create:
             guard tags[mutation.id] == nil else {
-                throw TagManagementError.duplicateNormalizedName(mutation.normalizedName)
+                throw TagRepositoryError.duplicateID(mutation.id)
             }
         case .update:
             guard tags[mutation.id] != nil else {
-                throw TagManagementError.tagNotFound(mutation.id)
+                throw TagRepositoryError.notFound(mutation.id)
             }
         }
         guard !tags.values.contains(where: {
             $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
         }) else {
-            throw TagManagementError.duplicateNormalizedName(mutation.normalizedName)
+            throw TagRepositoryError.duplicateNormalizedName(mutation.normalizedName)
         }
         let tag = TagSnapshot(
             id: mutation.id,
@@ -855,7 +842,7 @@ private actor TagPresentationRepository: ReminderRepository {
     }
 
     func deleteTag(id: UUID) throws {
-        guard tags[id] != nil else { throw TagManagementError.tagNotFound(id) }
+        guard tags[id] != nil else { throw TagRepositoryError.notFound(id) }
         tags[id] = nil
     }
 }

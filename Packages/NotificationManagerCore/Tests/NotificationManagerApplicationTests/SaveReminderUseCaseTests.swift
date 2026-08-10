@@ -783,8 +783,6 @@ enum RepositoryTestError: Error, Equatable {
     case duplicateReminderID(UUID)
     case scheduleReplacementNotAllowed(UUID)
     case tagNotFound(UUID)
-    case duplicateTagID(UUID)
-    case duplicateNormalizedTagName(String)
 }
 
 actor InMemoryReminderRepository: ReminderRepository {
@@ -892,17 +890,17 @@ actor InMemoryReminderRepository: ReminderRepository {
         switch mutation.command {
         case .create:
             guard tagsByID[mutation.id] == nil else {
-                throw RepositoryTestError.duplicateTagID(mutation.id)
+                throw TagRepositoryError.duplicateID(mutation.id)
             }
         case .update:
             guard tagsByID[mutation.id] != nil else {
-                throw RepositoryTestError.tagNotFound(mutation.id)
+                throw TagRepositoryError.notFound(mutation.id)
             }
         }
         if tagsByID.values.contains(where: {
             $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
         }) {
-            throw RepositoryTestError.duplicateNormalizedTagName(mutation.normalizedName)
+            throw TagRepositoryError.duplicateNormalizedName(mutation.normalizedName)
         }
         trace?.record(.tagSaved)
         let tag = TagSnapshot(
@@ -919,7 +917,7 @@ actor InMemoryReminderRepository: ReminderRepository {
     }
 
     func deleteTag(id: UUID) async throws {
-        guard tagsByID[id] != nil else { throw RepositoryTestError.tagNotFound(id) }
+        guard tagsByID[id] != nil else { throw TagRepositoryError.notFound(id) }
         trace?.record(.tagDeleted)
         tagsByID[id] = nil
         reminders = reminders.mapValues { reminder in

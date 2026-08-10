@@ -405,7 +405,7 @@ import Testing
         )
         try await repository.deleteTag(id: TestValues.tagID)
 
-        await #expect(throws: PersistenceError.tagNotFound(TestValues.tagID)) {
+        await #expect(throws: TagRepositoryError.notFound(TestValues.tagID)) {
             try await repository.saveTag(staleUpdate)
         }
 
@@ -416,11 +416,50 @@ import Testing
         let repository = try SwiftDataReminderRepository.inMemory()
         let original = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Travel"))
 
-        await #expect(throws: PersistenceError.duplicateTagID(TestValues.tagID)) {
+        await #expect(throws: TagRepositoryError.duplicateID(TestValues.tagID)) {
             try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Collision"))
         }
 
         #expect(try await repository.fetchCompleteSnapshot().tags == [original])
+    }
+
+    @Test func invalidTagFailureIsSemanticAndRollsBackWithoutPublishingARecord() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory()
+        let invalid = EncodedTagMutation(
+            id: TestValues.tagID,
+            name: "Work",
+            normalizedName: "wrong",
+            normalizationVersion: TagLimits.normalizationVersion,
+            createdAt: TestValues.created,
+            updatedAt: TestValues.created,
+            command: .create
+        )
+
+        await #expect(throws: TagRepositoryError.invalid(.normalizedNameMismatch)) {
+            try await repository.saveTag(invalid)
+        }
+
+        #expect(try await repository.fetchCompleteSnapshot().tags.isEmpty)
+    }
+
+    @Test func unavailableTagSaveRollsBackWithoutPublishingARecord() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory(saveFailure: .diskFull)
+
+        await #expect(throws: TagRepositoryError.unavailable) {
+            try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Work"))
+        }
+
+        #expect(try await repository.fetchCompleteSnapshot().tags.isEmpty)
+    }
+
+    @Test func missingTagDeleteIsSemanticAndLeavesTheSnapshotUnchanged() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory()
+
+        await #expect(throws: TagRepositoryError.notFound(TestValues.tagID)) {
+            try await repository.deleteTag(id: TestValues.tagID)
+        }
+
+        #expect(try await repository.fetchCompleteSnapshot().tags.isEmpty)
     }
 
     @Test func failedSaveRollsBackWithoutPublishingPartialSnapshot() async throws {
@@ -448,7 +487,7 @@ import Testing
         let repository = try SwiftDataReminderRepository.inMemory()
         let first = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "ＴｅＳＴ"))
 
-        await #expect(throws: PersistenceError.duplicateNormalizedTagName("test")) {
+        await #expect(throws: TagRepositoryError.duplicateNormalizedName("test")) {
             try await repository.saveTag(.fixture(id: TestValues.otherTagID, name: "test"))
         }
 
@@ -807,7 +846,7 @@ private final class LockedCounter: @unchecked Sendable {
 private enum TagSaveOutcome: Sendable, Equatable {
     case saved(UUID)
     case duplicate(String)
-    case otherPersistenceError(PersistenceError)
+    case otherTagRepositoryError(TagRepositoryError)
     case unexpectedError
 
     var isSaved: Bool {
@@ -821,10 +860,10 @@ private func tagSaveOutcome(
 ) async -> TagSaveOutcome {
     do {
         return .saved(try await repository.saveTag(mutation).id)
-    } catch let PersistenceError.duplicateNormalizedTagName(name) {
+    } catch let TagRepositoryError.duplicateNormalizedName(name) {
         return .duplicate(name)
-    } catch let error as PersistenceError {
-        return .otherPersistenceError(error)
+    } catch let error as TagRepositoryError {
+        return .otherTagRepositoryError(error)
     } catch {
         return .unexpectedError
     }

@@ -1,7 +1,6 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
-import NotificationManagerPersistence
 import Observation
 
 enum TagActionErrorIdentity: Sendable, Equatable {
@@ -122,22 +121,13 @@ final class TagManagementModel {
         if let issue = error as? TagValidationIssue {
             return errorIdentity(for: issue)
         }
-        if let error = error as? TagManagementError {
+        if let error = error as? TagRepositoryError {
             switch error {
-            case .tagNotFound: return .notFound
+            case .notFound: return .notFound
             case .duplicateNormalizedName: return .duplicateName
-            }
-        }
-        if let error = error as? PersistenceError {
-            switch error {
-            case .tagNotFound:
-                return .notFound
-            case .duplicateNormalizedTagName:
-                return .duplicateName
-            case let .invalidTag(issue):
+            case let .invalid(issue):
                 return errorIdentity(for: issue)
-            default:
-                return .storeUnavailable
+            case .duplicateID, .unavailable: return .storeUnavailable
             }
         }
         return .storeUnavailable

@@ -264,8 +264,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
-        try storeCoordinator.withCriticalSection {
-            try saveTagCoordinated(mutation)
+        do {
+            return try storeCoordinator.withCriticalSection {
+                try saveTagCoordinated(mutation)
+            }
+        } catch let error as PersistenceError {
+            throw Self.tagRepositoryError(error)
         }
     }
 
@@ -322,8 +326,27 @@ public actor SwiftDataReminderRepository: ReminderRepository {
     }
 
     public func deleteTag(id: UUID) async throws {
-        try storeCoordinator.withCriticalSection {
-            try deleteTagCoordinated(id: id)
+        do {
+            try storeCoordinator.withCriticalSection {
+                try deleteTagCoordinated(id: id)
+            }
+        } catch let error as PersistenceError {
+            throw Self.tagRepositoryError(error)
+        }
+    }
+
+    private static func tagRepositoryError(_ error: PersistenceError) -> TagRepositoryError {
+        switch error {
+        case let .tagNotFound(id):
+            .notFound(id)
+        case let .duplicateTagID(id):
+            .duplicateID(id)
+        case let .duplicateNormalizedTagName(name):
+            .duplicateNormalizedName(name)
+        case let .invalidTag(issue):
+            .invalid(issue)
+        default:
+            .unavailable
         }
     }
 
