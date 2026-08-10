@@ -5,7 +5,7 @@ struct OrganizationSection: View {
     let tags: [ReminderTagPresentation]
 
     var body: some View {
-        Section("reminder.form.section.organization") {
+        Section {
             Toggle("reminder.field.enabled", isOn: $model.enabled)
                 .accessibilityIdentifier("reminder-form.enabled")
 
@@ -25,9 +25,15 @@ struct OrganizationSection: View {
             }
 
             if model.canDelete {
-                Button("reminder.action.delete", role: .destructive) {
+                Button(role: .destructive) {
                     model.requestDeleteConfirmation()
+                } label: {
+                    Text("reminder.action.delete")
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                        .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .foregroundStyle(.red)
                 .disabled(model.saveState == .saving)
                 .accessibilityIdentifier("reminder-form.delete")
             }
@@ -41,9 +47,15 @@ struct OrganizationSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.delete-error")
             }
+        } header: {
+            Text("reminder.form.section.organization")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.section.organization"
+                    )
+                }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("reminder-form.section.organization")
     }
 
     private func tagBinding(_ id: UUID) -> Binding<Bool> {

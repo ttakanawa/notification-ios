@@ -69,7 +69,9 @@ struct SettingsView: View {
         .navigationTitle("settings.title")
         .task { await model.load() }
         .announcesAccessibilityErrors(accessibilityErrors)
-        .accessibilityIdentifier("settings.root")
+        .background {
+            AccessibilityIdentifierContainer(identifier: "settings.root")
+        }
     }
 
     private var notificationsEnabledBinding: Binding<Bool> {

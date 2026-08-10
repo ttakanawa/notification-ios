@@ -1,6 +1,21 @@
 import SwiftUI
 import UIKit
 
+struct AccessibilityIdentifierContainer: UIViewRepresentable {
+    let identifier: String
+
+    func makeUIView(context: Context) -> UIView {
+        let view = UIView()
+        view.isAccessibilityElement = false
+        view.accessibilityIdentifier = identifier
+        return view
+    }
+
+    func updateUIView(_ uiView: UIView, context: Context) {
+        uiView.accessibilityIdentifier = identifier
+    }
+}
+
 struct AccessibilityErrorAnnouncementModifier: ViewModifier {
     @Environment(\.locale) private var locale
     @State private var previousIdentities: [AccessibilityErrorIdentity] = []

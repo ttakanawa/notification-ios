@@ -5,11 +5,15 @@ struct DateTimeSection: View {
     @Bindable var model: ReminderFormModel
 
     var body: some View {
-        Section("reminder.form.section.date-time") {
+        Section {
             if case let .readOnly(reason) = model.scheduleAccess {
                 Label(reason.semanticKey, systemImage: "lock")
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.schedule-read-only")
+                    .background {
+                        AccessibilityIdentifierContainer(
+                            identifier: "reminder-form.schedule-read-only"
+                        )
+                    }
             }
 
             TextField("reminder.field.date-placeholder", text: dateBinding)
@@ -59,9 +63,15 @@ struct DateTimeSection: View {
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.schedule-repair")
             }
+        } header: {
+            Text("reminder.form.section.date-time")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.section.date-time"
+                    )
+                }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("reminder-form.section.date-time")
     }
 
     private var dateBinding: Binding<String> {

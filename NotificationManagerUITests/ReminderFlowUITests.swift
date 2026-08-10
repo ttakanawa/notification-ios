@@ -106,12 +106,19 @@ final class ReminderFlowUITests: XCTestCase {
         XCTAssertFalse(app.textFields["reminder-form.time-zone"].isEnabled)
 
         app.buttons["reminder-form.delete"].tap()
-        XCTAssertTrue(app.buttons["reminder-form.delete-confirm"].waitForExistence(timeout: 1))
-        app.buttons["reminder-form.delete-cancel"].tap()
+        var alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        XCTAssertTrue(
+            alert.buttons["reminder-form.delete-confirm"].firstMatch
+                .waitForExistence(timeout: 1)
+        )
+        alert.buttons["reminder-form.delete-cancel"].firstMatch.tap()
         XCTAssertTrue(app.otherElements["reminder-form.root"].exists)
 
         app.buttons["reminder-form.delete"].tap()
-        let confirm = app.buttons["reminder-form.delete-confirm"]
+        alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        let confirm = alert.buttons["reminder-form.delete-confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 1))
         confirm.tap()
         XCTAssertTrue(app.otherElements["reminder-list.root"].waitForExistence(timeout: 1))
@@ -131,7 +138,12 @@ final class ReminderFlowUITests: XCTestCase {
             app.otherElements["reminder-form.capacity-confirmation"].waitForExistence(timeout: 1)
         )
         app.buttons["reminder-form.capacity-confirm"].tap()
-        XCTAssertTrue(app.buttons["reminder-form.expired-confirm"].waitForExistence(timeout: 1))
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        XCTAssertTrue(
+            alert.buttons["reminder-form.expired-confirm"].firstMatch
+                .waitForExistence(timeout: 1)
+        )
         XCTAssertTrue(title.value as? String == "Capacity edit updated")
     }
 
@@ -183,6 +195,23 @@ final class ReminderFlowUITests: XCTestCase {
         )
         app.buttons["reminder-form.capacity-confirm"].tap()
         XCTAssertTrue(app.otherElements["reminder-detail.root"].exists)
+    }
+
+    @MainActor
+    func testDetailEnabledLabelUsesTheSameCapacityCoordinator() {
+        let app = launch(scenario: "enabled-capacity")
+        app.buttons["reminder-row.ffffffff-ffff-ffff-ffff-ffffffffffff"].tap()
+        let toggle = app.switches["reminder-detail.enabled"]
+        XCTAssertTrue(toggle.waitForExistence(timeout: 1))
+
+        app.coordinate(withNormalizedOffset: .zero)
+            .withOffset(CGVector(dx: 60, dy: toggle.frame.midY))
+            .tap()
+
+        XCTAssertTrue(
+            app.otherElements["reminder-form.capacity-confirmation"]
+                .waitForExistence(timeout: 1)
+        )
     }
 
     @MainActor

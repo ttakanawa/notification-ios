@@ -78,7 +78,7 @@ struct TagManagementView: View {
         .task { await model.load() }
         .alert("tags.action.rename", isPresented: renamePresented) {
             TextField("tags.field.name", text: $renameName)
-            Button("tags.action.rename") {
+            Button {
                 guard let renameTagID else { return }
                 let value = renameName
                 Task {
@@ -86,22 +86,26 @@ struct TagManagementView: View {
                         self.renameTagID = nil
                     }
                 }
+            } label: {
+                Text("tags.action.rename")
+                    .accessibilityIdentifier("tags.management.rename-confirm")
             }
-            .accessibilityIdentifier("tags.management.rename-confirm")
             Button("reminder.action.cancel", role: .cancel) {
                 renameTagID = nil
             }
         }
         .alert("tags.delete-confirmation.title", isPresented: deletePresented) {
-            Button("tags.action.delete", role: .destructive) {
+            Button(role: .destructive) {
                 guard let deleteTagID else { return }
                 Task {
                     if await model.delete(tagID: deleteTagID) {
                         self.deleteTagID = nil
                     }
                 }
+            } label: {
+                Text("tags.action.delete")
+                    .accessibilityIdentifier("tags.management.delete-confirm")
             }
-            .accessibilityIdentifier("tags.management.delete-confirm")
             Button("reminder.action.cancel", role: .cancel) {
                 deleteTagID = nil
             }
@@ -111,7 +115,9 @@ struct TagManagementView: View {
         .announcesAccessibilityErrors(
             model.actionError.map { [$0.accessibilityIdentity] } ?? []
         )
-        .accessibilityIdentifier("tags.management.root")
+        .background {
+            AccessibilityIdentifierContainer(identifier: "tags.management.root")
+        }
     }
 
     private var renamePresented: Binding<Bool> {

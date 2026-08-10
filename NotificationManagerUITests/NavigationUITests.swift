@@ -27,8 +27,11 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(app.switches["reminder-detail.enabled"].waitForExistence(timeout: 1))
         app.buttons["reminder-detail.delete"].tap()
 
-        XCTAssertTrue(app.buttons["reminder-detail.delete-confirm"].waitForExistence(timeout: 1))
-        app.buttons["reminder-detail.delete-confirm"].tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        let confirm = alert.buttons["reminder-detail.delete-confirm"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 1))
+        confirm.tap()
         XCTAssertTrue(app.otherElements["reminder-list.root"].waitForExistence(timeout: 1))
         XCTAssertFalse(app.otherElements["reminder-detail.root"].exists)
     }
@@ -59,7 +62,9 @@ final class NavigationUITests: XCTestCase {
         XCTAssertTrue(app.otherElements["adaptive-root.regular-split"].waitForExistence(timeout: 2))
         row.tap()
         app.buttons["reminder-detail.delete"].tap()
-        let confirm = app.buttons["reminder-detail.delete-confirm"]
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        let confirm = alert.buttons["reminder-detail.delete-confirm"].firstMatch
         XCTAssertTrue(confirm.waitForExistence(timeout: 1))
         confirm.tap()
 

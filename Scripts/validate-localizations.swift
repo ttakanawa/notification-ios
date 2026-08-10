@@ -301,7 +301,12 @@ private struct LocalizationValidator {
     }
 
     private static func excludingAccessibilityIdentifierCalls(from source: String) -> String {
-        let marker = ".accessibilityIdentifier"
+        [".accessibilityIdentifier", "AccessibilityIdentifierContainer"].reduce(source) {
+            excludingCalls(named: $1, from: $0)
+        }
+    }
+
+    private static func excludingCalls(named marker: String, from source: String) -> String {
         var output = ""
         var cursor = source.startIndex
 

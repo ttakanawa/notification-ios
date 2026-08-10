@@ -44,12 +44,9 @@ struct DataUnavailableView: View {
                         Label("data_unavailable.remove-pending", systemImage: "bell.slash")
                     }
                     .disabled(actions.isWorking)
+                    .accessibilityLabel("data_unavailable.remove-pending")
+                    .accessibilityHint("data_unavailable.remove-pending.explanation")
                     .accessibilityIdentifier("data-unavailable.remove-pending")
-
-                    Text("data_unavailable.remove-pending.explanation")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
 
                     Button {
                         openNotificationSettings()
@@ -57,6 +54,12 @@ struct DataUnavailableView: View {
                         Label("settings.open-os-settings", systemImage: "gear")
                     }
                     .accessibilityIdentifier("data-unavailable.open-os-settings")
+
+                    Text("data_unavailable.remove-pending.explanation")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityHidden(true)
 
                     if let error = actions.actionError {
                         Label(error.semanticKey, systemImage: "exclamationmark.triangle")

@@ -6,12 +6,16 @@ struct RepeatSection: View {
     @Bindable var model: ReminderFormModel
 
     var body: some View {
-        Section("reminder.form.section.repeat") {
+        Section {
             if let summary = model.currentLocalizedRepeatSummary {
                 LabeledContent("reminder.form.repeat.current-value") {
                     Text(verbatim: summary)
                 }
-                .accessibilityIdentifier("reminder-form.custom.current-summary")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.custom.current-summary"
+                    )
+                }
 
                 if let disclosure = model.canonicalEnglishDisclosure {
                     DisclosureGroup("reminder.form.custom.canonical-disclosure") {
@@ -92,9 +96,15 @@ struct RepeatSection: View {
                 .fixedSize(horizontal: false, vertical: true)
                 .accessibilityIdentifier("reminder-form.early-past-warning")
             }
+        } header: {
+            Text("reminder.form.section.repeat")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.section.repeat"
+                    )
+                }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("reminder-form.section.repeat")
     }
 
     private var repeatPresetBinding: Binding<RepeatChoice> {

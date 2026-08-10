@@ -13,6 +13,7 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertTrue(
             app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].exists
         )
+        XCTAssertTrue(app.otherElements["reminder-list.section.upcoming"].exists)
     }
 
     @MainActor

@@ -4,7 +4,7 @@ struct BasicInformationSection: View {
     @Bindable var model: ReminderFormModel
 
     var body: some View {
-        Section("reminder.form.section.basic-information") {
+        Section {
             TextField("reminder.field.title", text: $model.title)
                 .textInputAutocapitalization(.sentences)
                 .accessibilityIdentifier("reminder-form.title")
@@ -36,9 +36,15 @@ struct BasicInformationSection: View {
             if let issue = model.urlFieldIssue {
                 fieldError(issue, identifier: "reminder-form.url-error")
             }
+        } header: {
+            Text("reminder.form.section.basic-information")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.section.basic-information"
+                    )
+                }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("reminder-form.section.basic-information")
     }
 
     private func optionalTextBinding(

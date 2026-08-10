@@ -5,10 +5,12 @@ struct EarlyReminderSection: View {
     @Bindable var model: ReminderFormModel
 
     var body: some View {
-        Section("reminder.form.section.early-reminder") {
+        Section {
             Picker("reminder.field.early-reminder", selection: earlyChoiceBinding) {
                 ForEach(EarlyReminderChoice.allCases) { choice in
-                    Text(choice.semanticKey).tag(choice)
+                    Text(choice.semanticKey)
+                        .accessibilityIdentifier(choice.accessibilityIdentifier)
+                        .tag(choice)
                 }
             }
                 .disabled(!model.scheduleFieldsAreEditable)
@@ -44,9 +46,15 @@ struct EarlyReminderSection: View {
                     .disabled(!model.scheduleFieldsAreEditable)
                     .accessibilityIdentifier("reminder-form.main-enabled")
             }
+        } header: {
+            Text("reminder.form.section.early-reminder")
+                .background {
+                    AccessibilityIdentifierContainer(
+                        identifier: "reminder-form.section.early-reminder"
+                    )
+                }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("reminder-form.section.early-reminder")
     }
 
     private var earlyChoiceBinding: Binding<EarlyReminderChoice> {
@@ -87,6 +95,15 @@ struct EarlyReminderSection: View {
 }
 
 private extension EarlyReminderChoice {
+    var accessibilityIdentifier: String {
+        switch self {
+        case .none: "reminder.early.none"
+        case .oneMinute: "reminder.early.one-minute-before"
+        case .fiveMinutes: "reminder.early.five-minutes-before"
+        case .custom: "reminder.early.custom"
+        }
+    }
+
     var semanticKey: LocalizedStringKey {
         switch self {
         case .none: "reminder.early.none"

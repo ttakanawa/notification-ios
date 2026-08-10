@@ -25,9 +25,24 @@ struct ReminderDetailView: View {
                         .accessibilityIdentifier("reminder-detail.secondary-lifecycle-status")
                 }
 
-                Toggle("reminder.field.enabled", isOn: enabledBinding)
+                HStack {
+                    Button {
+                        enabledBinding.wrappedValue.toggle()
+                    } label: {
+                        Text("reminder.field.enabled")
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
                     .disabled(actions.isWorking(model.id))
-                    .accessibilityIdentifier("reminder-detail.enabled")
+                    .accessibilityHidden(true)
+
+                    Toggle("reminder.field.enabled", isOn: enabledBinding)
+                        .labelsHidden()
+                        .disabled(actions.isWorking(model.id))
+                        .accessibilityLabel("reminder.field.enabled")
+                        .accessibilityIdentifier("reminder-detail.enabled")
+                }
 
                 if actions.state == .failed(model.id, .enabledChange) {
                     Label("reminder.action.enabled-change-failed", systemImage: "exclamationmark.triangle")
@@ -152,23 +167,23 @@ struct ReminderDetailView: View {
             "reminder.form.delete-confirmation.title",
             isPresented: deleteConfirmationPresented
         ) {
-            Button("reminder.form.delete-confirmation.confirm", role: .destructive) {
-                guard actions.consumeDeleteConfirmation(model.id) else { return }
-                Task {
-                    await router.performReminderDeletion(model.id) {
-                        await actions.performConfirmedDelete(model.id)
-                    }
-                }
+            Button(role: .destructive, action: confirmDelete) {
+                Text("reminder.form.delete-confirmation.confirm")
+                    .accessibilityIdentifier("reminder-detail.delete-confirm")
             }
-            .accessibilityIdentifier("reminder-detail.delete-confirm")
-            Button("reminder.action.cancel", role: .cancel) {
+            Button(role: .cancel) {
                 actions.cancelDelete(model.id)
+            } label: {
+                Text("reminder.action.cancel")
+                    .accessibilityIdentifier("reminder-detail.delete-cancel")
             }
         } message: {
             Text("reminder.form.delete-confirmation.message")
         }
         .announcesAccessibilityErrors(actionAccessibilityErrors)
-        .accessibilityIdentifier("reminder-detail.root")
+        .background {
+            AccessibilityIdentifierContainer(identifier: "reminder-detail.root")
+        }
     }
 
     private var enabledBinding: Binding<Bool> {
@@ -193,6 +208,15 @@ struct ReminderDetailView: View {
                 if !presented { actions.cancelDelete(model.id) }
             }
         )
+    }
+
+    private func confirmDelete() {
+        guard actions.consumeDeleteConfirmation(model.id) else { return }
+        Task {
+            await router.performReminderDeletion(model.id) {
+                await actions.performConfirmedDelete(model.id)
+            }
+        }
     }
 
     private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {

@@ -41,6 +41,33 @@ final class LocalizationAccessibilityUITests: XCTestCase {
     }
 
     @MainActor
+    func testMaximumDynamicTypeKeepsDestructiveConfirmationActionsReachable() {
+        let app = launch(
+            scenario: "navigation",
+            extraArguments: [
+                "-UIPreferredContentSizeCategoryName",
+                "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge"
+            ]
+        )
+
+        app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()
+        let delete = app.buttons["reminder-detail.delete"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 2))
+        delete.tap()
+
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        for identifier in [
+            "reminder-detail.delete-confirm",
+            "reminder-detail.delete-cancel"
+        ] {
+            let action = alert.buttons[identifier].firstMatch
+            XCTAssertTrue(action.waitForExistence(timeout: 1))
+            XCTAssertTrue(action.isHittable)
+        }
+    }
+
+    @MainActor
     func testPseudoLocalizationAndForcedRTLKeepLogicalActionsDiscoverable() {
         let app = launch(
             scenario: "data-unavailable",
@@ -61,6 +88,7 @@ final class LocalizationAccessibilityUITests: XCTestCase {
         XCTAssertTrue(removePending.waitForExistence(timeout: 1))
         XCTAssertTrue(openSettings.waitForExistence(timeout: 1))
         XCTAssertLessThan(removePending.frame.minY, openSettings.frame.minY)
+        XCTAssertFalse(openSettings.label.localizedCaseInsensitiveContains("pending"))
         assertHorizontallyContained(removePending, in: root)
         assertHorizontallyContained(openSettings, in: root)
 

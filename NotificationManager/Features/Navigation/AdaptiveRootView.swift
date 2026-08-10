@@ -4,8 +4,16 @@ struct AdaptiveRootView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Bindable var router: AppRouter
     @Bindable var listModel: ReminderListModel
+    @Bindable private var actions: ReminderActionCoordinator
+
+    init(router: AppRouter, listModel: ReminderListModel) {
+        self.router = router
+        self.listModel = listModel
+        actions = router.actions
+    }
 
     var body: some View {
+        let capacityConfirmation = actions.enabledCapacityConfirmation
         Group {
             if horizontalSizeClass == .regular {
                 NavigationSplitView {
@@ -30,18 +38,18 @@ struct AdaptiveRootView: View {
         .onAppear { synchronizeRouter() }
         .onChange(of: horizontalSizeClass) { _, _ in synchronizeRouter() }
         .sheet(isPresented: enabledCapacityConfirmationPresented) {
-            if let confirmation = router.actions.enabledCapacityConfirmation {
+            if let confirmation = capacityConfirmation {
                 CapacityConfirmationView(
                     warning: confirmation.warning,
                     onConfirm: {
                         Task {
-                            await router.actions.confirmEnabledCapacityChange(
+                            await actions.confirmEnabledCapacityChange(
                                 confirmation.reminderID
                             )
                         }
                     },
                     onCancel: {
-                        router.actions.cancelEnabledCapacityChange(
+                        actions.cancelEnabledCapacityChange(
                             confirmation.reminderID
                         )
                     }
@@ -66,14 +74,14 @@ struct AdaptiveRootView: View {
 
     private var enabledCapacityConfirmationPresented: Binding<Bool> {
         Binding(
-            get: { router.actions.enabledCapacityConfirmation != nil },
+            get: { actions.enabledCapacityConfirmation != nil },
             set: { presented in
                 guard !presented,
-                      let confirmation = router.actions.enabledCapacityConfirmation
+                      let confirmation = actions.enabledCapacityConfirmation
                 else {
                     return
                 }
-                router.actions.cancelEnabledCapacityChange(confirmation.reminderID)
+                actions.cancelEnabledCapacityChange(confirmation.reminderID)
             }
         )
     }

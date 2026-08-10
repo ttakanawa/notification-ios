@@ -31,7 +31,11 @@ struct CapacityConfirmationView: View {
                 .frame(maxWidth: .infinity)
             }
             .padding()
-            .accessibilityIdentifier("reminder-form.capacity-confirmation")
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.capacity-confirmation"
+                )
+            }
         }
     }
 }

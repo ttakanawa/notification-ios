@@ -55,7 +55,9 @@ struct ReminderListView: View {
             }
         }
         .announcesAccessibilityErrors(actionAccessibilityErrors)
-        .accessibilityIdentifier("reminder-list.root")
+        .background {
+            AccessibilityIdentifierContainer(identifier: "reminder-list.root")
+        }
     }
 
     @ViewBuilder
@@ -64,7 +66,7 @@ struct ReminderListView: View {
         identifier: String,
         items: [ReminderListItemPresentation]
     ) -> some View {
-        Section(title) {
+        Section {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
                     HStack(alignment: .center, spacing: 12) {
@@ -99,8 +101,12 @@ struct ReminderListView: View {
                     }
                 }
             }
+        } header: {
+            Text(title)
+                .background {
+                    AccessibilityIdentifierContainer(identifier: identifier)
+                }
         }
-        .accessibilityIdentifier(identifier)
     }
 
     private func enabledBinding(for item: ReminderListItemPresentation) -> Binding<Bool> {

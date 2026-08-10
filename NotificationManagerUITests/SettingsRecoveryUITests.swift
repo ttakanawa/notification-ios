@@ -31,7 +31,12 @@ final class SettingsRecoveryUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["日本 Travel"].waitForExistence(timeout: 1))
         app.buttons["tags.management.delete.11111111-1111-1111-1111-111111111111"].tap()
-        XCTAssertTrue(app.buttons["tags.management.delete-confirm"].waitForExistence(timeout: 1))
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 1))
+        XCTAssertTrue(
+            alert.buttons["tags.management.delete-confirm"].firstMatch
+                .waitForExistence(timeout: 1)
+        )
         XCTAssertTrue(
             app.staticTexts[
                 "Deleting this tag removes it from reminders but does not delete any reminder."
