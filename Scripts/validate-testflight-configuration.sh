@@ -79,14 +79,20 @@ info_plist_membership_exception_id=$(printf '%s' "$project_json" | jq -r --arg a
 ')
 [ -n "$info_plist_membership_exception_id" ] || fail "app Info.plist must be excluded from file-system-synchronized resource membership"
 
-printf '%s' "$project_json" | jq -e --arg info_plist_membership_exception_id "$info_plist_membership_exception_id" '
-    .objects
-    | to_entries
-    | any(
-        .value.isa == "PBXFileSystemSynchronizedRootGroup"
-        and .value.path == "NotificationManager"
-        and .value.exceptions == [$info_plist_membership_exception_id]
-    )
+printf '%s' "$project_json" | jq -e \
+    --arg app_target_id "$app_target_id" \
+    --arg info_plist_membership_exception_id "$info_plist_membership_exception_id" '
+    .objects as $objects
+    | [
+        $objects[$app_target_id].fileSystemSynchronizedGroups[]? as $group_id
+        | $objects[$group_id]
+        | select(
+            .isa == "PBXFileSystemSynchronizedRootGroup"
+            and .path == "NotificationManager"
+            and .exceptions == [$info_plist_membership_exception_id]
+        )
+    ]
+    | length == 1
 ' >/dev/null || fail "NotificationManager synchronized group must reference the Info.plist membership exception"
 
 printf '%s' "$project_json" | jq -e '
