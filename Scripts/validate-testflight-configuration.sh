@@ -31,6 +31,7 @@ count_project_setting() {
 
 info_json=$(plutil -convert json -o - "$info_plist")
 entitlements_json=$(plutil -convert json -o - "$entitlements")
+project_json=$(plutil -convert json -o - "$project_file")
 
 assert_equal "Punctual" "$(printf '%s' "$info_json" | jq -r '.CFBundleDisplayName')" "CFBundleDisplayName"
 assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$info_json" | jq -r '.CFBundleShortVersionString')" "CFBundleShortVersionString"
@@ -58,13 +59,83 @@ assert_equal "2" "$(count_project_setting 'ASSETCATALOG_COMPILER_APPICON_NAME = 
 # The file-system-synchronized app group automatically includes resources. Keep the
 # target Info.plist out of that membership: Xcode must process it only through
 # INFOPLIST_FILE, while still discovering legitimate resources automatically.
-info_plist_membership_exception_id="A90000000000000000000009"
-rg -U -q \
-    "${info_plist_membership_exception_id} /\\* Exceptions for .* = \\{\\n\\s*isa = PBXFileSystemSynchronizedBuildFileExceptionSet;\\n\\s*membershipExceptions = \\(\\n\\s*SupportingFiles/Info\\.plist,\\n\\s*\\);\\n\\s*target = A70000000000000000000001 /\\* NotificationManager \\*/;" \
-    "$project_file" || fail "app Info.plist must be excluded from file-system-synchronized resource membership"
-rg -U -q \
-    "A40000000000000000000001 /\\* NotificationManager \\*/ = \\{\\n\\s*isa = PBXFileSystemSynchronizedRootGroup;\\n\\s*exceptions = \\(\\n\\s*${info_plist_membership_exception_id} /\\* Exceptions for" \
-    "$project_file" || fail "NotificationManager synchronized group must reference the Info.plist membership exception"
+app_target_id=$(printf '%s' "$project_json" | jq -r '
+    .objects
+    | to_entries
+    | map(select(.value.isa == "PBXNativeTarget" and .value.name == "NotificationManager"))
+    | if length == 1 then .[0].key else empty end
+')
+[ -n "$app_target_id" ] || fail "project must contain one NotificationManager target"
+
+info_plist_membership_exception_id=$(printf '%s' "$project_json" | jq -r --arg app_target_id "$app_target_id" '
+    .objects
+    | to_entries
+    | map(select(
+        .value.isa == "PBXFileSystemSynchronizedBuildFileExceptionSet"
+        and .value.target == $app_target_id
+        and ((.value.membershipExceptions // []) | index("SupportingFiles/Info.plist"))
+    ))
+    | if length == 1 then .[0].key else empty end
+')
+[ -n "$info_plist_membership_exception_id" ] || fail "app Info.plist must be excluded from file-system-synchronized resource membership"
+
+printf '%s' "$project_json" | jq -e --arg info_plist_membership_exception_id "$info_plist_membership_exception_id" '
+    .objects
+    | to_entries
+    | any(
+        .value.isa == "PBXFileSystemSynchronizedRootGroup"
+        and .value.path == "NotificationManager"
+        and ((.value.exceptions // []) | index($info_plist_membership_exception_id))
+    )
+' >/dev/null || fail "NotificationManager synchronized group must reference the Info.plist membership exception"
+
+printf '%s' "$project_json" | jq -e '
+    .objects as $objects
+    | [
+        $objects
+        | to_entries[]
+        | select(
+            .value.isa == "PBXNativeTarget"
+            and .value.productType == "com.apple.product-type.bundle.unit-test"
+        )
+        | [
+            .value.buildPhases[]? as $build_phase_id
+            | select($objects[$build_phase_id].isa == "PBXFrameworksBuildPhase")
+        ]
+        | length == 1
+    ]
+    | length > 0 and all
+' >/dev/null || fail "each hosted unit-test target must contain one Frameworks build phase"
+
+printf '%s' "$project_json" | jq -e '
+    .objects as $objects
+    | $objects
+    | to_entries[]
+    | select(
+        .value.isa == "PBXNativeTarget"
+        and .value.productType == "com.apple.product-type.bundle.unit-test"
+    )
+    | .value.buildPhases[]? as $build_phase_id
+    | $objects[$build_phase_id]
+    | select(.isa == "PBXFrameworksBuildPhase")
+    | .files[]? as $build_file_id
+    | $objects[$build_file_id].productRef? as $product_reference_id
+    | $objects[$product_reference_id]
+    | select(.isa == "XCSwiftPackageProductDependency")
+' >/dev/null && fail "hosted unit-test Frameworks phases must not link Swift package products"
+
+printf '%s' "$project_json" | jq -e '
+    .objects as $objects
+    | $objects
+    | to_entries[]
+    | select(
+        .value.isa == "PBXNativeTarget"
+        and .value.productType == "com.apple.product-type.bundle.unit-test"
+    )
+    | .value.packageProductDependencies[]? as $product_reference_id
+    | $objects[$product_reference_id]
+    | select(.isa == "XCSwiftPackageProductDependency")
+' >/dev/null && fail "hosted unit-test targets must resolve Swift package products through their app host"
 
 [ -f "$asset_catalog/Contents.json" ] || fail "Assets.xcassets/Contents.json is missing"
 [ -f "$app_icon_set/Contents.json" ] || fail "AppIcon.appiconset/Contents.json is missing"
