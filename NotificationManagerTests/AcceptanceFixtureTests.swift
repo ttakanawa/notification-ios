@@ -73,9 +73,9 @@ struct AcceptanceFixtureTests {
     }
 
     @Test func saveUsesFreshTimeInsteadOfAnEarlierPreview() async throws {
-        let error = await AcceptanceHarness().freshSaveError()
+        let requiresConfirmation = await AcceptanceHarness().freshSaveRequiresExpiredConfirmation()
 
-        #expect(error == .newReminderHasNoFutureNotification)
+        #expect(requiresConfirmation)
     }
 }
 
@@ -510,7 +510,7 @@ private struct AcceptanceHarness {
         )
     }
 
-    func freshSaveError() async -> SaveReminderError? {
+    func freshSaveRequiresExpiredConfirmation() async -> Bool {
         let alertInstant = date("2040-06-03T13:30:00Z")
         let schedule = ScheduleDefinition(
             source: SourceWallClock(
@@ -532,8 +532,7 @@ private struct AcceptanceHarness {
             createdAt: date("2040-06-01T00:00:00Z"),
             updatedAt: date("2040-06-01T00:00:00Z")
         )
-        do {
-            _ = try await SaveReminderUseCase(
+        guard let outcome = try? await SaveReminderUseCase(
                 repository: AcceptanceReminderRepository(),
                 scheduleCodec: AcceptanceScheduleCodec(),
                 preferenceStore: AcceptancePreferenceStore(),
@@ -542,12 +541,11 @@ private struct AcceptanceHarness {
                 now: { alertInstant },
                 recurrenceEnvironment: environment
             ).execute(draft: draft)
-            return nil
-        } catch let error as SaveReminderError {
-            return error
-        } catch {
-            return nil
+        else {
+            return false
         }
+        if case .requiresExpiredScheduleConfirmation = outcome { return true }
+        return false
     }
 
     private func notifications(

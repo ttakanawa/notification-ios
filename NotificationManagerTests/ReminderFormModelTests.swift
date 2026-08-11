@@ -190,6 +190,45 @@ struct ReminderFormModelTests {
         #expect(!model.showsPastEarlyWarning)
     }
 
+    @Test func expiredNewReminderCanSaveAfterExpiredScheduleConfirmation() async {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let recorder = SaveActionRecorder(outcomes: [
+            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                reminderID: id,
+                evaluationNow: date("2040-08-01T00:00:00Z")
+            )),
+            .saved(id)
+        ])
+        let model = ReminderFormModel(
+            newReminderID: id,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, capacityConsent, expiredConsent in
+                    try await recorder.save(
+                        draft: draft,
+                        capacityConsent: capacityConsent,
+                        expiredConsent: expiredConsent
+                    )
+                },
+                delete: { _ in }
+            )
+        )
+        model.title = "Expired one-shot reminder"
+        model.sourceDate = SourceDate(year: 2040, month: 7, day: 31)
+        model.sourceTime = SourceTime(hour: 9, minute: 30)
+        model.timeZoneIdentifier = "America/New_York"
+
+        #expect(model.previewNotifications.isEmpty)
+        #expect(model.canSave)
+
+        await model.save()
+        #expect(await model.confirmExpiredSave())
+        #expect(await recorder.recordedCalls().map(\.expiredConsent) == [
+            .notProvided,
+            .acknowledged
+        ])
+    }
+
     @Test func previewWarnsWhenEarlyAlertAlreadyPassed() {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,

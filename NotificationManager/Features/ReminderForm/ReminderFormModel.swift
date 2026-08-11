@@ -490,9 +490,6 @@ final class ReminderFormModel {
         }
         if canSaveWithoutReplacingSchedule { return true }
         guard case .replace = detachedDraft.scheduleChange else { return false }
-        if detachedDraft.originalScheduleData == nil && previewNotifications.isEmpty {
-            return false
-        }
         return (try? ReminderDraftValidator().validate(
             detachedDraft,
             replacementScheduleData: Data([1])

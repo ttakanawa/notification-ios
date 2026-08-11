@@ -123,25 +123,37 @@ struct SaveReminderUseCaseTests {
         #expect(await repository.savedMutations.count == 1)
     }
 
-    @Test func saveEvaluationRejectsANewReminderWhoseCachedPreviewHasPassed() async throws {
-        let repository = InMemoryReminderRepository()
+    @Test func newExpiredReminderRequiresConsentBeforeCreate() async throws {
+        let repository = InMemoryReminderRepository(snapshot: .init(reminders: [], tags: []))
         let useCase = makeSaveUseCase(
             repository: repository,
-            clock: SequenceDateSource([testDate("2026-08-06T12:00:00Z")]),
+            clock: SequenceDateSource([
+                testDate("2026-08-06T12:00:00Z"),
+                testDate("2026-08-06T12:00:01Z"),
+                testDate("2026-08-06T12:00:02Z")
+            ]),
             deviceEnabled: false
         )
         let draft = replacementDraft(
             id: TestApplicationValues.reminderID,
-            schedule: oneShotSchedule("2026-08-06T12:00:00Z")
+            schedule: oneShotSchedule("2026-08-05T12:00:00Z")
         )
 
-        await #expect(throws: SaveReminderError.newReminderHasNoFutureNotification) {
-            try await useCase.execute(draft: draft)
-        }
+        #expect(try await useCase.execute(draft: draft) ==
+            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                reminderID: draft.id,
+                evaluationNow: testDate("2026-08-06T12:00:00Z")
+            )))
         #expect(await repository.savedMutations.isEmpty)
+
+        #expect(try await useCase.execute(
+            draft: draft,
+            expiredScheduleConsent: .acknowledged
+        ) == .saved(draft.id))
+        #expect(await repository.savedMutations.count == 1)
     }
 
-    @Test func commitBoundaryRejectsANewReminderWhoseOnlyAlertJustPassed() async throws {
+    @Test func commitBoundaryRequestsExpiredConsentForANewReminderWhoseOnlyAlertJustPassed() async throws {
         let repository = InMemoryReminderRepository()
         let reconciler = RecordingReconcileRequester()
         let clock = SequenceDateSource([
@@ -162,9 +174,11 @@ struct SaveReminderUseCaseTests {
             schedule: oneShotSchedule("2026-08-06T12:00:00Z")
         )
 
-        await #expect(throws: SaveReminderError.newReminderHasNoFutureNotification) {
-            try await useCase.execute(draft: draft, capacityConsent: .acknowledged)
-        }
+        #expect(try await useCase.execute(draft: draft, capacityConsent: .acknowledged) ==
+            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                reminderID: draft.id,
+                evaluationNow: testDate("2026-08-06T12:00:00Z")
+            )))
         #expect(await repository.reminders.isEmpty)
         #expect(await reconciler.reasons.isEmpty)
     }

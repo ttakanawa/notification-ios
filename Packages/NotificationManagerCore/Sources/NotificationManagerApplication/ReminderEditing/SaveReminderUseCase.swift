@@ -40,7 +40,6 @@ public enum SaveReminderOutcome: Sendable, Equatable {
 }
 
 public enum SaveReminderError: Error, Sendable, Equatable {
-    case newReminderHasNoFutureNotification
     case existingReminderNotFound(UUID)
 }
 
@@ -86,8 +85,6 @@ public struct SaveReminderUseCase: Sendable {
             draft,
             replacementScheduleData: replacementData
         )
-        let existingReminder = draft.originalScheduleData != nil
-
         let saveEvaluationNow: Date?
         if let replacementSchedule {
             let evaluationNow = now()
@@ -96,16 +93,11 @@ public struct SaveReminderUseCase: Sendable {
                 reminderID: draft.id,
                 schedule: replacementSchedule,
                 evaluationNow: evaluationNow
-            ) {
-                if !existingReminder {
-                    throw SaveReminderError.newReminderHasNoFutureNotification
-                }
-                if expiredScheduleConsent == .notProvided {
-                    return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
-                        reminderID: draft.id,
-                        evaluationNow: evaluationNow
-                    ))
-                }
+            ), expiredScheduleConsent == .notProvided {
+                return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                    reminderID: draft.id,
+                    evaluationNow: evaluationNow
+                ))
             }
         } else {
             saveEvaluationNow = nil
@@ -146,17 +138,13 @@ public struct SaveReminderUseCase: Sendable {
                reminderID: draft.id,
                schedule: replacementSchedule,
                evaluationNow: commitNow
-           )
+           ),
+           expiredScheduleConsent == .notProvided
         {
-            if !existingReminder {
-                throw SaveReminderError.newReminderHasNoFutureNotification
-            }
-            if expiredScheduleConsent == .notProvided {
-                return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
-                    reminderID: draft.id,
-                    evaluationNow: commitNow
-                ))
-            }
+            return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                reminderID: draft.id,
+                evaluationNow: commitNow
+            ))
         }
 
         var committingDraft = draft
