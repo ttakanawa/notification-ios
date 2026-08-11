@@ -2107,6 +2107,9 @@
         }
       }
     },
+    "reminder.form.capacity-confirmation.message %lld" : {
+
+    },
     "reminder.form.capacity-confirmation.title" : {
       "comment" : "User-facing text for the semantic key reminder.form.capacity-confirmation.title.",
       "extractionState" : "manual",
