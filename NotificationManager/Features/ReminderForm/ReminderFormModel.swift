@@ -155,13 +155,38 @@ final class ReminderFormModel {
         now: Date,
         actions: ReminderFormActions,
         availableTags: [ReminderTagPresentation] = [],
+        defaultTimeZone: TimeZone = .current,
         recurrenceEnvironment: any RecurrenceEnvironment = FoundationRecurrenceEnvironment(),
         assistedRepeatInterpreter: any AssistedRepeatInterpreting = NoAssistedRepeatInterpreter(),
         localizedRepeatSummary: @escaping @Sendable (ScheduleDefinition) -> String = {
             CanonicalRepeatFormatter().string(for: $0.rule)
         }
     ) {
-        detachedDraft = ReminderDraft(id: newReminderID, now: now)
+        let timeZone = TimeZone.knownTimeZoneIdentifiers.contains(defaultTimeZone.identifier)
+            ? defaultTimeZone
+            : TimeZone(identifier: "GMT")!
+        let adapter = SourceWallClockDateAdapter(timeZone: timeZone)
+        guard let source = adapter.nextWholeHour(after: now) else {
+            preconditionFailure("Foundation could not find the next whole hour")
+        }
+        let schedule = ScheduleDefinition(
+            source: source,
+            rule: .none,
+            end: .never,
+            early: nil
+        )
+        let initialDraft = ReminderDraft(
+            id: newReminderID,
+            source: source,
+            rule: .none,
+            end: .never,
+            scheduleChange: .replace(schedule),
+            createdAt: now,
+            updatedAt: now
+        )
+        detachedDraft = initialDraft
+        sourceDateText = Self.format(initialDraft.date)
+        sourceTimeText = Self.format(initialDraft.time)
         scheduleAccess = .editable
         canDelete = false
         self.availableTags = availableTags
@@ -171,6 +196,7 @@ final class ReminderFormModel {
         self.assistedRepeatInterpreter = assistedRepeatInterpreter
         self.localizedRepeatSummary = localizedRepeatSummary
         requiresReplacementBeforeSave = true
+        refreshPreview()
     }
 
     init(

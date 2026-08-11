@@ -6,27 +6,77 @@ import Testing
 
 @MainActor
 struct ReminderFormModelTests {
-    @Test func newDraftKeepsFixedIdentityAndStartsWithFiveBlankScheduleSections() {
+    @Test func newDraftStartsAtTheNextWholeHourInTheInjectedTimeZone() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let model = ReminderFormModel(
             newReminderID: id,
-            now: date("2040-08-01T00:00:00Z"),
-            actions: .inert
+            now: date("2040-08-01T02:30:45Z"),
+            actions: .inert,
+            defaultTimeZone: TimeZone(identifier: "Asia/Tokyo")!
         )
 
         #expect(model.detachedDraft.id == id)
-        #expect(model.sections == [
-            .basicInformation,
-            .dateAndTime,
-            .repeatRule,
-            .earlyReminder,
-            .organization
-        ])
-        #expect(model.sourceDate == nil)
-        #expect(model.sourceTime == nil)
-        #expect(model.timeZoneIdentifier == nil)
-        #expect(model.repeatRule == .none)
-        #expect(!model.canSave)
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 8, day: 1))
+        #expect(model.sourceTime == SourceTime(hour: 12, minute: 0))
+        #expect(model.timeZoneIdentifier == "Asia/Tokyo")
+        #expect(model.previewNotifications.count == 1)
+        #expect(model.detachedDraft.scheduleChange == .replace(ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2040, month: 8, day: 1, hour: 12, minute: 0,
+                timeZoneIdentifier: "Asia/Tokyo"
+            ),
+            rule: .none,
+            end: .never,
+            early: nil
+        )))
+    }
+
+    @Test func newDraftAdvancesAnExactHourAndRollsAcrossMidnight() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let timeZone = TimeZone(identifier: "Asia/Tokyo")!
+        let exactHour = ReminderFormModel(
+            newReminderID: id,
+            now: date("2040-08-01T02:00:00Z"),
+            actions: .inert,
+            defaultTimeZone: timeZone
+        )
+        #expect(exactHour.sourceDate == SourceDate(year: 2040, month: 8, day: 1))
+        #expect(exactHour.sourceTime == SourceTime(hour: 12, minute: 0))
+
+        let rollover = ReminderFormModel(
+            newReminderID: id,
+            now: date("2040-08-01T14:30:00Z"),
+            actions: .inert,
+            defaultTimeZone: timeZone
+        )
+        #expect(rollover.sourceDate == SourceDate(year: 2040, month: 8, day: 2))
+        #expect(rollover.sourceTime == SourceTime(hour: 0, minute: 0))
+    }
+
+    @Test func newDraftSkipsTheNewYorkSpringForwardGap() {
+        let model = ReminderFormModel(
+            newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            now: date("2040-03-11T06:30:00Z"),
+            actions: .inert,
+            defaultTimeZone: TimeZone(identifier: "America/New_York")!
+        )
+
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 3, day: 11))
+        #expect(model.sourceTime == SourceTime(hour: 3, minute: 0))
+        #expect(model.timeZoneIdentifier == "America/New_York")
+    }
+
+    @Test func newDraftFallsBackToGMTForAnUnknownInjectedTimeZoneIdentifier() {
+        let model = ReminderFormModel(
+            newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            now: date("2040-08-01T02:30:45Z"),
+            actions: .inert,
+            defaultTimeZone: TimeZone(identifier: "UTC")!
+        )
+
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 8, day: 1))
+        #expect(model.sourceTime == SourceTime(hour: 3, minute: 0))
+        #expect(model.timeZoneIdentifier == "GMT")
     }
 
     @Test func existingLocalizedCustomRuleDoesNotPopulateEditableEnglish() {
