@@ -5,6 +5,56 @@ import Testing
 @testable import NotificationManager
 
 struct ReminderListProjectionTests {
+    @Test func listPresentationProvidesTrimmedNonemptyNotes() {
+        let withNotes = ReminderListItemPresentation(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            title: "London Fix",
+            notes: "  ロンドンフィックス\n",
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
+            deviceSchedulingStatus: .scheduled,
+            nextPresentation: nil,
+            updatedAt: .distantPast
+        )
+        let blankNotes = ReminderListItemPresentation(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            title: "Tokyo Fix",
+            notes: " \n\t ",
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
+            deviceSchedulingStatus: .scheduled,
+            nextPresentation: nil,
+            updatedAt: .distantPast
+        )
+
+        #expect(withNotes.displayNotes == "ロンドンフィックス")
+        #expect(blankNotes.displayNotes == nil)
+    }
+
+    @Test func repeatSummaryDisplaysOnlyForRecurringSchedules() {
+        let oneTime = ReminderListItemPresentation(
+            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            title: "Visa renewal",
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
+            deviceSchedulingStatus: .scheduled,
+            nextPresentation: nil,
+            localizedRepeatSummary: "One time.",
+            isRepeating: false,
+            updatedAt: .distantPast
+        )
+        let recurring = ReminderListItemPresentation(
+            id: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!,
+            title: "London Fix",
+            reminderStatus: ReminderStatus(primary: .active, secondary: []),
+            deviceSchedulingStatus: .scheduled,
+            nextPresentation: nil,
+            localizedRepeatSummary: "  Every weekday.\n",
+            isRepeating: true,
+            updatedAt: .distantPast
+        )
+
+        #expect(oneTime.displayRepeatSummary == nil)
+        #expect(recurring.displayRepeatSummary == "Every weekday.")
+    }
+
     @Test func activeCapacityFailureRemainsUpcoming() {
         let item = ReminderListItemPresentation(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,

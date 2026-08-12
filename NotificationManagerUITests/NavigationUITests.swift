@@ -14,14 +14,13 @@ final class NavigationUITests: XCTestCase {
     }
 
     @MainActor
-    func testEnabledAndDeleteControlsAreReachable() throws {
+    func testHomeRowOmitsEnabledToggleAndDetailControlsRemainReachable() throws {
         guard UIDevice.current.userInterfaceIdiom == .phone else { throw XCTSkip("iPhone journey") }
         let app = launch()
         let id = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 
-        let enabled = app.switches["reminder-row.enabled.\(id)"]
-        XCTAssertTrue(enabled.waitForExistence(timeout: 2))
-        XCTAssertTrue(enabled.isEnabled)
+        XCTAssertTrue(app.buttons["reminder-row.\(id)"].waitForExistence(timeout: 2))
+        XCTAssertFalse(app.switches["reminder-row.enabled.\(id)"].exists)
 
         app.buttons["reminder-row.\(id)"].tap()
         XCTAssertTrue(app.switches["reminder-detail.enabled"].waitForExistence(timeout: 1))

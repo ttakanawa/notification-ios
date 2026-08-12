@@ -77,12 +77,14 @@ enum ReminderNextPresentation: Sendable, Equatable {
 struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     let id: UUID
     let title: String
+    let notes: String?
     let reminderStatus: ReminderStatus
     let deviceSchedulingStatus: DeviceSchedulingStatus
     let nextPresentation: ReminderNextPresentation?
     let nextReason: AlertKind?
     let sourceWallClock: SourceWallClock?
     let localizedRepeatSummary: String?
+    let isRepeating: Bool
     let tags: [ReminderTagPresentation]
     let enabled: Bool
     let scheduledThrough: Date?
@@ -92,12 +94,14 @@ struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     init(
         id: UUID,
         title: String,
+        notes: String? = nil,
         reminderStatus: ReminderStatus,
         deviceSchedulingStatus: DeviceSchedulingStatus,
         nextPresentation: ReminderNextPresentation?,
         nextReason: AlertKind? = nil,
         sourceWallClock: SourceWallClock? = nil,
         localizedRepeatSummary: String? = nil,
+        isRepeating: Bool = false,
         tags: [ReminderTagPresentation] = [],
         enabled: Bool = true,
         scheduledThrough: Date? = nil,
@@ -106,17 +110,31 @@ struct ReminderListItemPresentation: Sendable, Equatable, Identifiable {
     ) {
         self.id = id
         self.title = title
+        self.notes = notes
         self.reminderStatus = reminderStatus
         self.deviceSchedulingStatus = deviceSchedulingStatus
         self.nextPresentation = nextPresentation
         self.nextReason = nextReason
         self.sourceWallClock = sourceWallClock
         self.localizedRepeatSummary = localizedRepeatSummary
+        self.isRepeating = isRepeating
         self.tags = tags
         self.enabled = enabled
         self.scheduledThrough = scheduledThrough
         self.earliestGroupOutcome = earliestGroupOutcome
         self.updatedAt = updatedAt
+    }
+
+    var displayNotes: String? {
+        let trimmed = notes?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
+    }
+
+    var displayRepeatSummary: String? {
+        guard isRepeating else { return nil }
+        let trimmed = localizedRepeatSummary?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed?.isEmpty == false ? trimmed : nil
     }
 
     var lifecycleStatus: LifecycleStatus { reminderStatus.primary }

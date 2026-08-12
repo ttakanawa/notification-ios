@@ -3,75 +3,37 @@ import SwiftUI
 
 struct ReminderRowView: View {
     @Environment(\.locale) private var locale
+    @Environment(\.timeZone) private var deviceTimeZone
     let item: ReminderListItemPresentation
 
-    private let sourceFormatter = SourceDateTimePresentationFormatter()
+    private let scheduleFormatter = CompactScheduleTimeFormatter()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
-                Text(verbatim: item.title)
-                    .font(.headline)
-                    .multilineTextAlignment(.leading)
-                Spacer(minLength: 12)
-                if item.lifecycleStatus != .active && item.lifecycleStatus != .disabled {
-                    lifecycleLabel
-                }
-            }
+        VStack(alignment: .leading, spacing: 4) {
+            Text(verbatim: item.title)
+                .font(.headline)
+                .multilineTextAlignment(.leading)
 
-            nextAlert
-
-            if let source = item.sourceWallClock {
-                Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityLabel("reminder.row.source-time")
-                    .accessibilityValue(
-                        Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
-                    )
-            }
-
-            if let summary = item.localizedRepeatSummary {
-                Text(verbatim: summary)
+            if let notes = item.displayNotes {
+                Text(verbatim: notes)
                     .font(.subheadline)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-row.repeat-summary")
-            }
-
-            if !item.tags.isEmpty {
-                Label {
-                    Text(verbatim: item.tags.map(\.name).joined(separator: ", "))
-                } icon: {
-                    Image(systemName: "tag")
-                }
-                    .font(.caption)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("reminder-row.notes")
             }
 
-            if let scheduledThrough = item.scheduledThrough {
-                LabeledContent("reminder.scheduling.scheduled-through") {
-                    Text(scheduledThrough, format: .dateTime)
-                }
-                .font(.caption)
-            }
-
-            if item.deviceSchedulingStatus != .notApplicable {
-                Label(
-                    item.deviceSchedulingStatus.semanticKey,
-                    systemImage: item.deviceSchedulingStatus.systemImage
+            if item.nextPresentation != nil || item.displayRepeatSummary != nil {
+                CompactScheduleLineView(
+                    presentation: item.nextPresentation.map { nextPresentation in
+                        scheduleFormatter.presentation(
+                            for: nextPresentation.authoritativeAlertInstant,
+                            sourceTimeZoneIdentifier: item.sourceWallClock?.timeZoneIdentifier,
+                            locale: locale,
+                            deviceTimeZone: deviceTimeZone
+                        )
+                    },
+                    localizedRepeatSummary: item.displayRepeatSummary
                 )
-                .font(.caption)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("reminder-row.device-status")
-            }
-
-            if let outcome = item.earliestGroupOutcome, outcome != .scheduled {
-                Label(outcome.semanticKey, systemImage: outcome.systemImage)
-                    .font(.caption)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-row.group-outcome")
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -79,58 +41,6 @@ struct ReminderRowView: View {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder
-    private var nextAlert: some View {
-        switch item.nextPresentation {
-        case let .directOSFire(authoritative, _):
-            VStack(alignment: .leading, spacing: 2) {
-                LabeledContent("reminder.next.os-fire") {
-                    Text(authoritative, format: .dateTime)
-                }
-                if let nextReason = item.nextReason {
-                    Label(nextReason.semanticKey, systemImage: "bell")
-                        .font(.caption)
-                }
-            }
-            .font(.subheadline.weight(.semibold))
-            .accessibilityIdentifier("reminder-row.next-os-fire")
-        case let .rolling(notification):
-            VStack(alignment: .leading, spacing: 2) {
-                Text(notification.alertInstant, format: .dateTime)
-                    .font(.subheadline.weight(.semibold))
-                ForEach(Array(notification.reasons.enumerated()), id: \.offset) { _, reason in
-                    LabeledContent(reason.role.semanticKey) {
-                        VStack(alignment: .trailing, spacing: 2) {
-                            Label(reason.kind.semanticKey, systemImage: "bell")
-                            Text(
-                                verbatim: sourceFormatter.instant(
-                                    reason.baseOccurrenceInstant,
-                                    timeZoneIdentifier: notification
-                                        .sourceTimeZoneIdentifier
-                                        ?? TimeZone.current.identifier,
-                                    locale: locale
-                                )
-                            )
-                        }
-                    }
-                    .font(.caption)
-                }
-            }
-            .accessibilityIdentifier("reminder-row.next-rolling")
-        case nil:
-            Text("reminder.next.unavailable")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-        }
-    }
-
-    private var lifecycleLabel: some View {
-        Label(item.lifecycleStatus.semanticKey, systemImage: item.lifecycleStatus.systemImage)
-            .font(.caption.weight(.semibold))
-            .labelStyle(.titleAndIcon)
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("reminder-row.lifecycle-status")
-    }
 }
 
 extension AlertKind {

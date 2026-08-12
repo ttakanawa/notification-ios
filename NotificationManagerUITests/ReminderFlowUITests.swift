@@ -165,22 +165,6 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testListEnabledCapacityConfirmationReplaysAcknowledgedChoice() {
-        let app = launch(scenario: "enabled-capacity")
-        let toggle = app.switches[
-            "reminder-row.enabled.ffffffff-ffff-ffff-ffff-ffffffffffff"
-        ]
-        XCTAssertTrue(toggle.waitForExistence(timeout: 2))
-
-        toggle.tap()
-
-        let confirmation = app.otherElements["reminder-form.capacity-confirmation"]
-        XCTAssertTrue(confirmation.waitForExistence(timeout: 1))
-        app.buttons["reminder-form.capacity-confirm"].tap()
-        XCTAssertTrue(confirmation.waitForNonExistence(timeout: 1))
-    }
-
-    @MainActor
     func testDetailEnabledCapacityConfirmationUsesSharedCoordinator() {
         let app = launch(scenario: "enabled-capacity")
         app.buttons["reminder-row.ffffffff-ffff-ffff-ffff-ffffffffffff"].tap()

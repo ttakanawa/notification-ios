@@ -417,6 +417,7 @@ final class AppEnvironment {
         let item = ReminderListItemPresentation(
             id: reminder.id,
             title: reminder.title,
+            notes: reminder.notes,
             reminderStatus: status,
             deviceSchedulingStatus: deviceStatus,
             nextPresentation: ReminderNextPresentationProjector.project(
@@ -427,6 +428,7 @@ final class AppEnvironment {
             nextReason: next.first?.reasons.first?.kind,
             sourceWallClock: schedule?.source,
             localizedRepeatSummary: repeatSummary,
+            isRepeating: schedule.map { $0.rule != .none } ?? false,
             tags: presentations,
             enabled: reminder.enabled,
             scheduledThrough: deviceState.scheduledThrough[reminder.id],

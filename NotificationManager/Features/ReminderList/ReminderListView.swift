@@ -69,27 +69,16 @@ struct ReminderListView: View {
         Section {
             ForEach(items) { item in
                 VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Button {
-                            router.showReminder(item.id)
-                        } label: {
-                            ReminderRowView(item: item)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
-                        .accessibilityAddTraits(
-                            router.selectedReminderID == item.id ? .isSelected : []
-                        )
-
-                        if item.lifecycleStatus == .active || item.lifecycleStatus == .disabled {
-                            Toggle("reminder.field.enabled", isOn: enabledBinding(for: item))
-                                .labelsHidden()
-                                .disabled(actions.isWorking(item.id))
-                                .accessibilityIdentifier(
-                                    "reminder-row.enabled.\(item.id.uuidString.lowercased())"
-                                )
-                        }
+                    Button {
+                        router.showReminder(item.id)
+                    } label: {
+                        ReminderRowView(item: item)
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
+                    .accessibilityAddTraits(
+                        router.selectedReminderID == item.id ? .isSelected : []
+                    )
 
                     if let failure = actionFailure(for: item.id) {
                         Label(failure.semanticKey, systemImage: "exclamationmark.triangle")
@@ -107,17 +96,6 @@ struct ReminderListView: View {
                     AccessibilityIdentifierContainer(identifier: identifier)
                 }
         }
-    }
-
-    private func enabledBinding(for item: ReminderListItemPresentation) -> Binding<Bool> {
-        Binding(
-            get: { actions.enabledValue(for: item.id, fallback: item.enabled) },
-            set: { enabled in
-                Task {
-                    await actions.setEnabled(enabled, for: item.id, fallback: item.enabled)
-                }
-            }
-        )
     }
 
     private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {

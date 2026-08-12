@@ -44,7 +44,7 @@ private struct Task14UITestFixtureComposition {
             snapshot: ReminderListSnapshot(
                 generation: 1,
                 items: fixture.items,
-                availableTags: []
+                availableTags: fixture.items.flatMap(\.tags)
             ),
             actions: actionCoordinator
         )
@@ -102,6 +102,8 @@ private struct Task14UITestFixtureComposition {
             )
         case "enabled-capacity":
             return enabledCapacityFixture()
+        case "one-time-row":
+            return oneTimeFixture()
         default:
             return editableFixture(
                 id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
@@ -117,17 +119,22 @@ private struct Task14UITestFixtureComposition {
         repeatPresentation: SavedRepeatPresentation,
         actions: ReminderFormActions = inertFormActions
     ) -> Task14ScenarioFixture {
+        let notes = "Renewal documents"
         let snapshot = makeSnapshot(
             id: id,
             title: title,
+            notes: notes,
             schedule: .valid(schedule, sourceVersion: 1, originalData: Data([1]))
         )
         let item = makeListItem(
             id: id,
             title: title,
+            notes: notes,
             lifecycleStatus: .active,
             sourceWallClock: schedule.source,
-            localizedRepeatSummary: repeatPresentation.localizedSummary
+            localizedRepeatSummary: repeatPresentation.localizedSummary,
+            isRepeating: true,
+            tags: [fixtureTag]
         )
         let form = ReminderFormModel(
             snapshot: snapshot,
@@ -178,12 +185,46 @@ private struct Task14UITestFixtureComposition {
             lifecycleStatus: .disabled,
             sourceWallClock: schedule.source,
             localizedRepeatSummary: "Every day",
+            isRepeating: true,
             enabled: false
         )
         return Task14ScenarioFixture(
             items: [item],
             details: [makeDetail(item: item)],
             forms: []
+        )
+    }
+
+    private static func oneTimeFixture() -> Task14ScenarioFixture {
+        let id = uuid("99999999-9999-9999-9999-999999999999")
+        let oneTimeSchedule = ScheduleDefinition(
+            source: schedule.source,
+            rule: .none,
+            end: .never,
+            early: nil
+        )
+        let snapshot = makeSnapshot(
+            id: id,
+            title: "One-time reminder",
+            schedule: .valid(oneTimeSchedule, sourceVersion: 1, originalData: Data([1]))
+        )
+        let item = makeListItem(
+            id: id,
+            title: "One-time reminder",
+            lifecycleStatus: .active,
+            sourceWallClock: oneTimeSchedule.source,
+            localizedRepeatSummary: "One time",
+            isRepeating: false
+        )
+        return Task14ScenarioFixture(
+            items: [item],
+            details: [makeDetail(item: item)],
+            forms: [ReminderFormModel(
+                snapshot: snapshot,
+                savedRepeatPresentation: .standard(localizedSummary: "One time"),
+                now: evaluationNow,
+                actions: inertFormActions
+            )]
         )
     }
 
@@ -198,12 +239,13 @@ private struct Task14UITestFixtureComposition {
     private static func makeSnapshot(
         id: UUID,
         title: String,
+        notes: String? = nil,
         schedule: ScheduleReadState
     ) -> ReminderSnapshot {
         ReminderSnapshot(
             id: id,
             title: title,
-            notes: nil,
+            notes: notes,
             urlString: nil,
             enabled: true,
             schedule: schedule,
@@ -216,14 +258,18 @@ private struct Task14UITestFixtureComposition {
     private static func makeListItem(
         id: UUID,
         title: String,
+        notes: String? = nil,
         lifecycleStatus: LifecycleStatus,
         sourceWallClock: SourceWallClock?,
         localizedRepeatSummary: String?,
+        isRepeating: Bool = false,
+        tags: [ReminderTagPresentation] = [],
         enabled: Bool = true
     ) -> ReminderListItemPresentation {
         ReminderListItemPresentation(
             id: id,
             title: title,
+            notes: notes,
             reminderStatus: ReminderStatus(primary: lifecycleStatus, secondary: []),
             deviceSchedulingStatus: lifecycleStatus == .active ? .scheduled : .notApplicable,
             nextPresentation: lifecycleStatus == .active
@@ -232,6 +278,8 @@ private struct Task14UITestFixtureComposition {
             nextReason: lifecycleStatus == .active ? .main : nil,
             sourceWallClock: sourceWallClock,
             localizedRepeatSummary: localizedRepeatSummary,
+            isRepeating: isRepeating,
+            tags: tags,
             enabled: enabled,
             updatedAt: evaluationNow
         )
@@ -300,6 +348,12 @@ private struct Task14UITestFixtureComposition {
         ),
         end: .never,
         early: nil
+    )
+
+    private static let fixtureTag = ReminderTagPresentation(
+        id: uuid("77777777-7777-7777-7777-777777777777"),
+        name: "Travel",
+        normalizedName: "travel"
     )
 
     private static let evaluationNow = Date(timeIntervalSince1970: 2_225_052_800)
