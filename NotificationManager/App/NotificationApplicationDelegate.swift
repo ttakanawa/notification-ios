@@ -6,12 +6,12 @@ import UIKit
 import UserNotifications
 
 enum NotificationResponseDestination: Sendable, Equatable {
-    case reminderDetail(UUID)
+    case reminderEdit(UUID)
     case notificationUnavailable
 }
 
 enum NotificationResponseOutcome: Sendable, Equatable {
-    case reminderDetail(UUID)
+    case reminderEdit(UUID)
     case openedURL(URL)
     case notificationUnavailable
     case ignored
@@ -308,13 +308,13 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         {
             return .openedURL(url)
         }
-        return .reminderDetail(reminderID)
+        return .reminderEdit(reminderID)
     }
 
     private func apply(_ outcome: NotificationResponseOutcome) {
         switch outcome {
-        case let .reminderDetail(reminderID):
-            routeResponse(.reminderDetail(reminderID))
+        case let .reminderEdit(reminderID):
+            routeResponse(.reminderEdit(reminderID))
         case let .openedURL(url):
             openURL(url)
         case .notificationUnavailable:

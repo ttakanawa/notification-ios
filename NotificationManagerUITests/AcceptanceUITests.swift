@@ -37,7 +37,7 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.repeat-summary"].exists)
 
         row.tap()
-        XCTAssertTrue(app.otherElements["reminder-detail.root"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.otherElements["reminder-form.root"].waitForExistence(timeout: 1))
     }
 
     @MainActor

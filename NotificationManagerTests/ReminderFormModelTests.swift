@@ -121,6 +121,229 @@ struct ReminderFormModelTests {
         #expect(model.canSaveWithoutReplacingSchedule)
     }
 
+    @Test func existingReminderTracksSemanticChangesAndReturnsCleanAtBaseline() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(rule: .daily(interval: 1)),
+            savedRepeatPresentation: .standard(localizedSummary: "Every day."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(!model.hasChanges)
+
+        model.title = "Updated"
+        #expect(model.hasChanges)
+        model.title = "Visa renewal"
+        #expect(!model.hasChanges)
+
+        model.updateSourceDate(from: date("2040-09-01T16:00:00Z"))
+        #expect(model.hasChanges)
+
+        model.updateSourceDate(from: date("2040-08-31T16:00:00Z"))
+        #expect(!model.hasChanges)
+        #expect(model.detachedDraft.scheduleChange != .preserveOriginal)
+    }
+
+    @Test func pickerSelectionsUpdateOnlyTheirOwnWallClockComponents() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let zone = TimeZone(identifier: "Asia/Tokyo")!
+        let model = ReminderFormModel(
+            newReminderID: id,
+            now: date("2040-08-01T02:30:00Z"),
+            actions: .inert,
+            defaultTimeZone: zone
+        )
+
+        model.updateSourceDate(from: date("2040-09-15T03:00:00Z"))
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 9, day: 15))
+        #expect(model.sourceTime == SourceTime(hour: 12, minute: 0))
+
+        model.updateSourceTime(from: date("2001-01-01T09:45:00Z"))
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 9, day: 15))
+        #expect(model.sourceTime == SourceTime(hour: 18, minute: 45))
+    }
+
+    @Test func pickerValuesUseStableUnrelatedComponentsAndPreviewFallback() {
+        let zone = TimeZone(identifier: "Asia/Tokyo")!
+        let model = ReminderFormModel(
+            newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            now: date("2040-08-01T02:30:45Z"),
+            actions: .inert,
+            defaultTimeZone: zone
+        )
+
+        #expect(model.pickerTimeZone == zone)
+        #expect(model.sourceDatePickerValue == date("2040-08-01T03:00:00Z"))
+        #expect(model.sourceTimePickerValue == date("2001-01-01T03:00:00Z"))
+        #expect(model.missingPickerDefaultValue == date("2040-08-01T03:00:00Z"))
+    }
+
+    @Test func changingTimeZoneKeepsWallClockComponentsAndChangesPreviewInstant() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(rule: .none),
+            savedRepeatPresentation: .standard(localizedSummary: "Never."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        let sourceDate = model.sourceDate
+        let sourceTime = model.sourceTime
+
+        #expect(model.previewNotifications.first?.alertInstant == date("2040-08-31T13:30:00Z"))
+
+        model.timeZoneIdentifier = "Asia/Tokyo"
+
+        #expect(model.sourceDate == sourceDate)
+        #expect(model.sourceTime == sourceTime)
+        #expect(model.pickerTimeZone == TimeZone(identifier: "Asia/Tokyo"))
+        #expect(model.previewNotifications.first?.alertInstant == date("2040-08-31T00:30:00Z"))
+    }
+
+    @Test func pickerEditsParticipateInDirtyTrackingAndDiscard() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(rule: .none),
+            savedRepeatPresentation: .standard(localizedSummary: "Never."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        model.updateSourceDate(from: date("2040-09-15T16:00:00Z"))
+        model.updateSourceTime(from: date("2001-01-01T14:45:00Z"))
+
+        #expect(model.hasChanges)
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 9, day: 15))
+        #expect(model.sourceTime == SourceTime(hour: 9, minute: 45))
+
+        model.discardChanges()
+
+        #expect(!model.hasChanges)
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 8, day: 31))
+        #expect(model.sourceTime == SourceTime(hour: 9, minute: 30))
+    }
+
+    @Test func invalidRawInputIsDirtyEvenWhenTheLastParsedValueIsRetained() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                early: EarlyReminder(value: 5, unit: .minutes)
+            ),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        model.updateEarlyReminderValueText("invalid")
+
+        #expect(model.hasChanges)
+        #expect(!model.canSave)
+    }
+
+    @Test func invalidURLRemainsDirtyUntilRestoredToTheRegisteredBaseline() {
+        let model = existingModel()
+
+        model.urlString = "not-a-url"
+
+        #expect(model.hasChanges)
+        #expect(model.urlFieldIssue == .urlInvalid)
+        #expect(!model.canSave)
+
+        model.urlString = nil
+
+        #expect(!model.hasChanges)
+    }
+
+    @Test func invalidCustomRepeatTextIsRetainedUntilChangesAreDiscarded() {
+        let model = existingModel()
+
+        model.beginCustomReplacement()
+        model.updateCustomRepeatText("not a repeat rule")
+
+        #expect(model.customRepeatText == "not a repeat rule")
+        #expect(model.hasChanges)
+        #expect(!model.canSave)
+
+        model.discardChanges()
+
+        #expect(model.customRepeatText.isEmpty)
+        #expect(!model.isReplacingCustomRepeat)
+        #expect(!model.hasChanges)
+    }
+
+    @Test func existingReminderTracksEveryEditableFieldSemantically() {
+        let tagID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+
+        let metadataModel = existingModel()
+        metadataModel.notes = "Note"
+        #expect(metadataModel.hasChanges)
+        metadataModel.notes = nil
+        #expect(!metadataModel.hasChanges)
+        metadataModel.urlString = "https://example.com"
+        #expect(metadataModel.hasChanges)
+        metadataModel.urlString = nil
+        #expect(!metadataModel.hasChanges)
+        metadataModel.enabled = false
+        #expect(metadataModel.hasChanges)
+        metadataModel.enabled = true
+        #expect(!metadataModel.hasChanges)
+        metadataModel.tagIDs = [tagID]
+        #expect(metadataModel.hasChanges)
+        metadataModel.tagIDs = []
+        #expect(!metadataModel.hasChanges)
+
+        let sourceModel = existingModel()
+        sourceModel.sourceDate = SourceDate(year: 2040, month: 9, day: 1)
+        #expect(sourceModel.hasChanges)
+        sourceModel.sourceDate = SourceDate(year: 2040, month: 8, day: 31)
+        #expect(!sourceModel.hasChanges)
+        sourceModel.sourceTime = SourceTime(hour: 10, minute: 45)
+        #expect(sourceModel.hasChanges)
+        sourceModel.sourceTime = SourceTime(hour: 9, minute: 30)
+        #expect(!sourceModel.hasChanges)
+        sourceModel.timeZoneIdentifier = "Asia/Manila"
+        #expect(sourceModel.hasChanges)
+        sourceModel.timeZoneIdentifier = "America/New_York"
+        #expect(!sourceModel.hasChanges)
+
+        let repeatModel = existingModel()
+        repeatModel.repeatRule = .weekly(
+            interval: 1,
+            weekdaySetKind: .explicit,
+            weekdays: [.monday]
+        )
+        #expect(repeatModel.hasChanges)
+        repeatModel.repeatRule = .daily(interval: 1)
+        #expect(!repeatModel.hasChanges)
+        repeatModel.repeatEnd = .onDate(SourceDate(year: 2040, month: 9, day: 30))
+        #expect(repeatModel.hasChanges)
+        repeatModel.repeatEnd = .never
+        #expect(!repeatModel.hasChanges)
+
+        let earlyModel = ReminderFormModel(
+            snapshot: validSnapshot(
+                rule: .daily(interval: 1),
+                early: EarlyReminder(value: 5, unit: .minutes)
+            ),
+            savedRepeatPresentation: .standard(localizedSummary: "Every day."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        earlyModel.earlyReminder = EarlyReminder(value: 1, unit: .minutes)
+        #expect(earlyModel.hasChanges)
+        earlyModel.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
+        #expect(!earlyModel.hasChanges)
+
+        let customReplacementModel = existingModel()
+        customReplacementModel.beginCustomReplacement()
+        #expect(customReplacementModel.hasChanges)
+        customReplacementModel.repeatRule = .daily(interval: 1)
+        #expect(!customReplacementModel.hasChanges)
+
+        let customTextModel = existingModel()
+        customTextModel.beginCustomReplacement()
+        customTextModel.updateCustomRepeatText("every 3 days")
+        #expect(customTextModel.hasChanges)
+        customTextModel.repeatRule = .daily(interval: 1)
+        #expect(!customTextModel.hasChanges)
+    }
+
     @Test(arguments: [OpaqueScheduleFixture.unsupported, .corrupt])
     func opaqueScheduleAllowsMetadataAndDeleteWhilePreservingRawBytes(
         fixture: OpaqueScheduleFixture
@@ -481,7 +704,95 @@ struct ReminderFormModelTests {
         #expect(model.saveState == .idle)
     }
 
-    @Test func partialScheduleInputRemainsVisibleAndCannotBeSaved() {
+    @Test func discardRestoresBaselineAndClearsTransientState() async {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .custom(
+                localizedSummary: "毎週月曜日に繰り返します。",
+                canonicalEnglishDisclosure: "Every Monday"
+            ),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { _, _, _ in throw SaveProbeError.failed },
+                delete: { _ in }
+            )
+        )
+        model.title = "Changed"
+        _ = await model.save()
+        #expect(model.saveState == .failed(.save))
+
+        model.requestDeleteConfirmation()
+        model.discardChanges()
+
+        #expect(model.title == "Visa renewal")
+        #expect(model.saveState == .idle)
+        #expect(!model.isDeleteConfirmationPresented)
+        #expect(!model.hasChanges)
+        #expect(model.currentLocalizedRepeatSummary == "毎週月曜日に繰り返します。")
+        #expect(model.canonicalEnglishDisclosure == "Every Monday")
+    }
+
+    @Test func discardDuringSuspendedSaveDiscardsStaleCapacityOutcome() async {
+        let gate = SuspendedSaveAction()
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in await gate.save(draft: draft) },
+                delete: { _ in }
+            )
+        )
+        model.title = "Changed while saving"
+        let saveTask = Task { await model.save() }
+        await gate.waitUntilCalled()
+
+        model.discardChanges()
+        await gate.resolve(.requiresCapacityConfirmation(CapacityWarning(
+            reminderID: model.detachedDraft.id,
+            earliestGroupID: AlertGroupID(
+                reminderID: model.detachedDraft.id,
+                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
+            ),
+            planningCapacity: 60
+        )))
+        _ = await saveTask.value
+
+        #expect(model.title == "Visa renewal")
+        #expect(model.saveState == .idle)
+        #expect(!model.hasChanges)
+    }
+
+    @Test func discardThenNewSaveKeepsNewSaveActiveWhenEarlierSaveCompletes() async {
+        let gate = SuspendedSaveAction()
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in await gate.save(draft: draft) },
+                delete: { _ in }
+            )
+        )
+        model.title = "First save"
+        let firstSave = Task { await model.save() }
+        await gate.waitUntilCalled()
+
+        model.discardChanges()
+        let secondSave = Task { await model.save() }
+        await gate.waitUntilCalled(times: 2)
+
+        await gate.resolve(.saved(model.detachedDraft.id))
+        await Task.yield()
+
+        #expect(model.saveState == .saving)
+
+        await gate.resolve(.saved(model.detachedDraft.id))
+        _ = await firstSave.value
+        _ = await secondSave.value
+    }
+
+    @Test func partialEarlyReminderInputRemainsVisibleAndCannotBeSaved() {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             now: date("2040-08-01T00:00:00Z"),
@@ -489,14 +800,6 @@ struct ReminderFormModelTests {
         )
         populateSchedule(model, rule: .daily(interval: 1))
 
-        model.updateSourceDateText("2040-")
-
-        #expect(model.sourceDateText == "2040-")
-        #expect(model.sourceDate == nil)
-        #expect(!model.canSave)
-        #expect(model.previewNotifications.isEmpty)
-
-        model.updateSourceDateText("2040-08-31")
         model.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
         #expect(model.canSave)
 
@@ -507,31 +810,7 @@ struct ReminderFormModelTests {
         #expect(model.previewNotifications.isEmpty)
     }
 
-    @Test func clearingExistingRequiredScheduleFieldsKeepsInvalidReplacementIntent() {
-        let dateModel = ReminderFormModel(
-            snapshot: validSnapshot(),
-            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
-            now: date("2040-08-01T00:00:00Z"),
-            actions: .inert
-        )
-        dateModel.updateSourceDateText("")
-
-        #expect(!dateModel.sourceDateTextIsValid)
-        #expect(!dateModel.canSave)
-        #expect(dateModel.detachedDraft.scheduleChange == .preserveOriginal)
-
-        let timeModel = ReminderFormModel(
-            snapshot: validSnapshot(),
-            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
-            now: date("2040-08-01T00:00:00Z"),
-            actions: .inert
-        )
-        timeModel.updateSourceTimeText("")
-
-        #expect(!timeModel.sourceTimeTextIsValid)
-        #expect(!timeModel.canSave)
-        #expect(timeModel.detachedDraft.scheduleChange == .preserveOriginal)
-
+    @Test func clearingExistingRequiredTimeZoneKeepsInvalidReplacementIntent() {
         let zoneModel = ReminderFormModel(
             snapshot: validSnapshot(),
             savedRepeatPresentation: .standard(localizedSummary: "Every week."),
@@ -602,7 +881,7 @@ struct ReminderFormModelTests {
                 }
             )
 
-            model.updateSourceDateText("2040-09-01")
+            model.updateSourceDate(from: date("2040-09-01T16:00:00Z"))
 
             #expect(model.currentLocalizedRepeatSummary == "localized-2040-9-1")
             if case .custom = presentation {
@@ -665,7 +944,7 @@ struct ReminderFormModelTests {
         #expect(model.saveState == .deleted)
     }
 
-    @Test func repeatPresetsAndEndDateUseTheSourceAnchorWithoutLosingPartialInput() {
+    @Test func repeatPresetsUseTheSourceAnchor() {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             now: date("2040-08-01T00:00:00Z"),
@@ -685,7 +964,7 @@ struct ReminderFormModelTests {
             weekdaySetKind: .explicit,
             weekdays: [.friday]
         ))
-        model.updateSourceDateText("2040-09-01")
+        model.updateSourceDate(from: date("2040-09-01T16:00:00Z"))
         #expect(model.repeatRule == .weekly(
             interval: 2,
             weekdaySetKind: .explicit,
@@ -693,18 +972,33 @@ struct ReminderFormModelTests {
         ))
         #expect(model.applyRepeatPreset(.every6Months))
         #expect(model.repeatRule == .monthly(interval: 6, selector: .anchorDay))
+    }
+
+    @Test func repeatEndPickerStoresSourceZoneDate() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        let sourceDate = model.sourceDate
+        let sourceTime = model.sourceTime
+        let timeZoneIdentifier = model.timeZoneIdentifier
+        let repeatRule = model.repeatRule
+        let earlyReminder = model.earlyReminder
 
         model.setRepeatEndsOnDate(true)
-        model.updateRepeatEndDateText("2041-")
-
-        #expect(model.repeatEndDateText == "2041-")
+        #expect(model.repeatEnd == .never)
+        #expect(model.repeatEndDatePickerValue == nil)
         #expect(!model.canSave)
         #expect(model.previewNotifications.isEmpty)
 
-        model.updateRepeatEndDateText("2041-08-31")
+        model.updateRepeatEndDate(from: date("2040-09-30T16:00:00Z"))
 
-        #expect(model.repeatEnd == .onDate(SourceDate(year: 2041, month: 8, day: 31)))
+        #expect(model.repeatEnd == .onDate(SourceDate(year: 2040, month: 9, day: 30)))
+        #expect(model.repeatEndDatePickerValue == date("2040-09-30T16:00:00Z"))
+        #expect(model.repeatEndDateFieldIssue == nil)
         #expect(model.canSave)
+        #expect(model.sourceDate == sourceDate)
+        #expect(model.sourceTime == sourceTime)
+        #expect(model.timeZoneIdentifier == timeZoneIdentifier)
+        #expect(model.repeatRule == repeatRule)
+        #expect(model.earlyReminder == earlyReminder)
     }
 
     @Test func fieldIssuesIdentifyMetadataTimeZoneAndEndDateFailures() {
@@ -731,9 +1025,9 @@ struct ReminderFormModelTests {
 
         model.timeZoneIdentifier = "America/New_York"
         model.setRepeatEndsOnDate(true)
-        model.updateRepeatEndDateText("2040-08-30")
+        model.updateRepeatEndDate(from: date("2040-08-30T16:00:00Z"))
         #expect(model.repeatEndDateFieldIssue == .repeatEndBeforeStart)
-        #expect(!model.repeatEndDateTextIsValid)
+        #expect(!model.canSave)
     }
 
     private func configuredNewModel(recorder: SaveActionRecorder) -> ReminderFormModel {
@@ -755,6 +1049,15 @@ struct ReminderFormModelTests {
         return model
     }
 
+    private func existingModel() -> ReminderFormModel {
+        ReminderFormModel(
+            snapshot: validSnapshot(rule: .daily(interval: 1)),
+            savedRepeatPresentation: .standard(localizedSummary: "Every day."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+    }
+
     private func populateSchedule(_ model: ReminderFormModel, rule: RepeatRule) {
         model.title = "Travel insurance"
         model.sourceDate = SourceDate(year: 2040, month: 8, day: 31)
@@ -769,7 +1072,8 @@ struct ReminderFormModelTests {
             interval: 1,
             weekdaySetKind: .explicit,
             weekdays: [.monday]
-        )
+        ),
+        early: EarlyReminder? = nil
     ) -> ReminderSnapshot {
         let definition = ScheduleDefinition(
             source: SourceWallClock(
@@ -782,7 +1086,7 @@ struct ReminderFormModelTests {
             ),
             rule: rule,
             end: .never,
-            early: nil
+            early: early
         )
         return ReminderSnapshot(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -853,30 +1157,30 @@ private actor SaveActionRecorder {
 }
 
 private actor SuspendedSaveAction {
-    private var called = false
-    private var callWaiters: [CheckedContinuation<Void, Never>] = []
-    private var resultContinuation: CheckedContinuation<SaveReminderOutcome, Never>?
+    private var callCount = 0
+    private var callWaiters: [(times: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    private var resultContinuations: [CheckedContinuation<SaveReminderOutcome, Never>] = []
 
     func save(draft: ReminderDraft) async -> SaveReminderOutcome {
-        called = true
-        let waiters = callWaiters
-        callWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        callCount += 1
+        let readyWaiters = callWaiters.filter { $0.times <= callCount }
+        callWaiters.removeAll { $0.times <= callCount }
+        readyWaiters.forEach { $0.continuation.resume() }
         return await withCheckedContinuation { continuation in
-            resultContinuation = continuation
+            resultContinuations.append(continuation)
         }
     }
 
-    func waitUntilCalled() async {
-        guard !called else { return }
+    func waitUntilCalled(times: Int = 1) async {
+        guard callCount < times else { return }
         await withCheckedContinuation { continuation in
-            callWaiters.append(continuation)
+            callWaiters.append((times: times, continuation: continuation))
         }
     }
 
     func resolve(_ outcome: SaveReminderOutcome) {
-        resultContinuation?.resume(returning: outcome)
-        resultContinuation = nil
+        guard !resultContinuations.isEmpty else { return }
+        resultContinuations.removeFirst().resume(returning: outcome)
     }
 }
 

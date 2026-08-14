@@ -250,7 +250,7 @@ final class AppEnvironment {
                 },
                 routeResponse: { destination in
                     switch destination {
-                    case let .reminderDetail(reminderID):
+                    case let .reminderEdit(reminderID):
                         router.showReminder(reminderID)
                     case .notificationUnavailable:
                         router.showNotificationUnavailable()
@@ -435,26 +435,6 @@ final class AppEnvironment {
             earliestGroupOutcome: displayedEarliestOutcome,
             updatedAt: reminder.updatedAt
         )
-        let url = reminder.urlString
-            .flatMap { try? CanonicalHTTPURL($0) }
-            .flatMap { URL(string: $0.string) }
-        router.register(detail: ReminderDetailModel(
-            item: item,
-            notes: reminder.notes,
-            url: url,
-            sourceTime: next.first?.sourceTime,
-            currentDeviceTime: next.first?.deviceLocalTime,
-            localizedRepeatSummary: repeatSummary,
-            nextNotifications: next,
-            alertGroups: groupValues.map {
-                AlertGroupSchedulingPresentation(groupID: $0.key, outcome: $0.value)
-            },
-            scheduledThrough: deviceState.scheduledThrough[reminder.id],
-            requestDiagnostics: requestDiagnostics(
-                reminderID: reminder.id,
-                state: deviceState
-            )
-        ))
         if router.formModel(for: reminder.id) == nil {
             router.registerFormIfAbsent(ReminderFormModel(
                 snapshot: reminder,
@@ -465,27 +445,6 @@ final class AppEnvironment {
             ))
         }
         return item
-    }
-
-    private func requestDiagnostics(
-        reminderID: UUID,
-        state: DeviceSchedulingStateSnapshot
-    ) -> [MaterializedRequestDiagnosticPresentation] {
-        state.materializedKinds.compactMap { identifier, kind in
-            let classification = NotificationIdentifierCodec().classify(identifier)
-            let identifierReminderID: UUID?
-            switch classification {
-            case let .currentOneShot(id, _), let .currentRepeating(id, _):
-                identifierReminderID = id
-            case .appOwnedStale, .unrelated:
-                identifierReminderID = nil
-            }
-            guard identifierReminderID == reminderID else { return nil }
-            return MaterializedRequestDiagnosticPresentation(
-                identifier: identifier,
-                kind: kind == .oneShot ? .oneShot : .repeating
-            )
-        }.sorted { $0.identifier < $1.identifier }
     }
 
     private static func tagPresentation(_ tag: TagSnapshot) -> ReminderTagPresentation {

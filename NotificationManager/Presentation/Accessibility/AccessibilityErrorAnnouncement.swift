@@ -4,8 +4,6 @@ enum AccessibilityErrorIdentity: String, Sendable, Hashable {
     case reminderNotesTooLarge = "reminder.form.error.notes-too-large"
     case reminderURLInvalid = "reminder.form.error.url-invalid"
     case reminderURLTooLarge = "reminder.form.error.url-too-large"
-    case reminderDateInvalid = "reminder.form.error.invalid-date"
-    case reminderTimeInvalid = "reminder.form.error.invalid-time"
     case reminderTimeZoneRequired = "reminder.form.error.time-zone-required"
     case reminderTimeZoneInvalid = "reminder.form.error.time-zone-invalid"
     case reminderRepeatEndInvalid = "reminder.form.error.invalid-repeat-end-date"

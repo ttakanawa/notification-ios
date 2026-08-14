@@ -3,25 +3,17 @@ import SwiftUI
 struct AppRouterDestinationView: View {
     let destination: AppRouterDestination?
     @Bindable var router: AppRouter
+    let confirmations: ReminderFormConfirmationCoordinator
 
     var body: some View {
         Group {
             switch destination {
-            case let .reminderDetail(id):
-                if let model = router.detailModel(for: id) {
-                    ReminderDetailView(
-                        model: model,
-                        router: router,
-                        actions: router.actions
-                    )
-                } else {
-                    unavailable
-                }
             case let .reminderEdit(id), let .reminderCreate(id):
                 if let model = router.formModel(for: id) {
                     ReminderFormView(
                         model: model,
                         router: router,
+                        confirmations: confirmations,
                         tagModel: router.tagManagementModel
                     )
                 } else {

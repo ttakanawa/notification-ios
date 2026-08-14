@@ -2,6 +2,7 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
+import NotificationManagerPersistence
 import SwiftUI
 
 @MainActor
@@ -48,22 +49,25 @@ private struct Task14UITestFixtureComposition {
             ),
             actions: actionCoordinator
         )
-        let createForm: @MainActor @Sendable () -> ReminderFormModel? =
-            if scenario == "empty-list" {
-                { makeNewForm() }
-            } else {
-                { nil }
-            }
+        let createForm: @MainActor @Sendable () -> ReminderFormModel? = switch scenario {
+        case "empty-list":
+            { makeNewForm() }
+        case "new-expired-schedule":
+            { makeExpiredNewForm() }
+        default:
+            { nil }
+        }
+        let tagModel = scenario == "navigation-with-tags"
+            ? makeTagManagementModel()
+            : nil
         let router = AppRouter(
             actions: actionCoordinator,
+            tagManagementModel: tagModel,
             createForm: createForm
         )
 
-        for detail in fixture.details {
-            router.register(detail: detail)
-        }
         for form in fixture.forms {
-            router.register(form: form)
+            router.registerFormIfAbsent(form)
         }
 
         return Self(router: router, listModel: listModel)
@@ -80,8 +84,8 @@ private struct Task14UITestFixtureComposition {
 
     private static func fixture(for scenario: String) -> Task14ScenarioFixture {
         switch scenario {
-        case "empty-list":
-            return Task14ScenarioFixture(items: [], details: [], forms: [])
+        case "empty-list", "new-expired-schedule":
+            return Task14ScenarioFixture(items: [], forms: [])
         case "localized-custom-rule":
             return editableFixture(
                 id: uuid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"),
@@ -93,6 +97,8 @@ private struct Task14UITestFixtureComposition {
             )
         case "unsupported-schedule":
             return unsupportedFixture()
+        case "one-time-row":
+            return oneTimeFixture()
         case "capacity-and-expired-confirmations":
             return editableFixture(
                 id: uuid("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -102,8 +108,13 @@ private struct Task14UITestFixtureComposition {
             )
         case "enabled-capacity":
             return enabledCapacityFixture()
-        case "one-time-row":
-            return oneTimeFixture()
+        case "slow-persistence":
+            return editableFixture(
+                id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                title: "Visa renewal",
+                repeatPresentation: .standard(localizedSummary: "Every week"),
+                actions: slowPersistenceActions
+            )
         default:
             return editableFixture(
                 id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
@@ -144,7 +155,6 @@ private struct Task14UITestFixtureComposition {
         )
         return Task14ScenarioFixture(
             items: [item],
-            details: [makeDetail(item: item)],
             forms: [form]
         )
     }
@@ -172,7 +182,6 @@ private struct Task14UITestFixtureComposition {
         )
         return Task14ScenarioFixture(
             items: [item],
-            details: [makeDetail(item: item)],
             forms: [form]
         )
     }
@@ -190,7 +199,6 @@ private struct Task14UITestFixtureComposition {
         )
         return Task14ScenarioFixture(
             items: [item],
-            details: [makeDetail(item: item)],
             forms: []
         )
     }
@@ -218,7 +226,6 @@ private struct Task14UITestFixtureComposition {
         )
         return Task14ScenarioFixture(
             items: [item],
-            details: [makeDetail(item: item)],
             forms: [ReminderFormModel(
                 snapshot: snapshot,
                 savedRepeatPresentation: .standard(localizedSummary: "One time"),
@@ -232,8 +239,22 @@ private struct Task14UITestFixtureComposition {
         ReminderFormModel(
             newReminderID: uuid("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
             now: evaluationNow,
-            actions: inertFormActions
+            actions: inertFormActions,
+            defaultTimeZone: fixtureTimeZone
         )
+    }
+
+    private static func makeExpiredNewForm() -> ReminderFormModel {
+        let model = ReminderFormModel(
+            newReminderID: uuid("eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"),
+            now: evaluationNow,
+            actions: expiredCreateActions(),
+            defaultTimeZone: fixtureTimeZone
+        )
+        model.title = "Expired one-shot reminder"
+        model.sourceDate = SourceDate(year: 2040, month: 7, day: 3)
+        model.sourceTime = SourceTime(hour: 9, minute: 30)
+        return model
     }
 
     private static func makeSnapshot(
@@ -285,21 +306,6 @@ private struct Task14UITestFixtureComposition {
         )
     }
 
-    private static func makeDetail(
-        item: ReminderListItemPresentation
-    ) -> ReminderDetailModel {
-        ReminderDetailModel(
-            item: item,
-            sourceTime: item.sourceWallClock == nil ? nil : sourceInstant,
-            currentDeviceTime: item.sourceWallClock == nil ? nil : sourceInstant,
-            localizedRepeatSummary: item.localizedRepeatSummary,
-            nextNotifications: [],
-            alertGroups: [],
-            scheduledThrough: nil,
-            requestDiagnostics: []
-        )
-    }
-
     private static func capacityConfirmationActions() -> ReminderFormActions {
         let capacityInstant = sourceInstant
         let expiredEvaluationNow = evaluationNow
@@ -332,6 +338,46 @@ private struct Task14UITestFixtureComposition {
         delete: { _ in }
     )
 
+    private static func expiredCreateActions() -> ReminderFormActions {
+        let expiredEvaluationNow = evaluationNow
+        return ReminderFormActions(
+            save: { draft, _, expiredScheduleConsent in
+                if expiredScheduleConsent == .notProvided {
+                    return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+                        reminderID: draft.id,
+                        evaluationNow: expiredEvaluationNow
+                    ))
+                }
+                return .saved(draft.id)
+            },
+            delete: { _ in }
+        )
+    }
+
+    private static let slowPersistenceActions = ReminderFormActions(
+        save: { draft, _, _ in
+            try? await Task.sleep(for: .seconds(2))
+            return .saved(draft.id)
+        },
+        delete: { _ in
+            try? await Task.sleep(for: .seconds(2))
+        }
+    )
+
+    @MainActor
+    private static func makeTagManagementModel() -> TagManagementModel {
+        let repository = try! SwiftDataReminderRepository.inMemory()
+        let now = Date(timeIntervalSince1970: 2_225_052_800)
+        return TagManagementModel(
+            repository: repository,
+            useCase: TagManagementUseCase(
+                repository: repository,
+                normalizer: TagNameNormalizerV1(),
+                now: { now }
+            )
+        )
+    }
+
     private static let schedule = ScheduleDefinition(
         source: SourceWallClock(
             year: 2040,
@@ -358,6 +404,7 @@ private struct Task14UITestFixtureComposition {
 
     private static let evaluationNow = Date(timeIntervalSince1970: 2_225_052_800)
     private static let sourceInstant = Date(timeIntervalSince1970: 2_228_349_000)
+    private static let fixtureTimeZone = TimeZone(identifier: "Africa/Abidjan")!
 
     private static func uuid(_ value: String) -> UUID {
         guard let id = UUID(uuidString: value) else {
@@ -386,7 +433,6 @@ private actor Task14EnabledCapacityAction {
 @MainActor
 private struct Task14ScenarioFixture {
     let items: [ReminderListItemPresentation]
-    let details: [ReminderDetailModel]
     let forms: [ReminderFormModel]
 }
 #endif

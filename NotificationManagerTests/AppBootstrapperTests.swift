@@ -193,7 +193,7 @@ struct AppBootstrapperTests {
         #expect(staleRoutes.activationCount == 0)
         #expect(staleRoutes.destinations.isEmpty)
         #expect(winningRoutes.activationCount == 1)
-        #expect(winningRoutes.destinations == [.reminderDetail(Self.reminderID)])
+        #expect(winningRoutes.destinations == [.reminderEdit(Self.reminderID)])
     }
 
     @MainActor
@@ -248,7 +248,7 @@ struct AppBootstrapperTests {
         )
         await firstRoutes.waitForDestinationCount(1)
 
-        #expect(firstRoutes.destinations == [.reminderDetail(Self.reminderID)])
+        #expect(firstRoutes.destinations == [.reminderEdit(Self.reminderID)])
         #expect(replacementRoutes.destinations.isEmpty)
     }
 

@@ -253,24 +253,6 @@
         }
       }
     },
-    "reminder.field.date-placeholder": {
-      "comment": "User-facing text for the semantic key reminder.field.date-placeholder.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "YYYY-MM-DD"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "YYYY-MM-DD"
-          }
-        }
-      }
-    },
     "reminder.field.early-reminder": {
       "comment": "User-facing text for the semantic key reminder.field.early-reminder.",
       "extractionState": "manual",
@@ -505,24 +487,6 @@
         }
       }
     },
-    "reminder.field.time-placeholder": {
-      "comment": "User-facing text for the semantic key reminder.field.time-placeholder.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "HH:MM"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "HH:MM"
-          }
-        }
-      }
-    },
     "reminder.field.time-zone": {
       "comment": "User-facing text for the semantic key reminder.field.time-zone.",
       "extractionState": "manual",
@@ -537,24 +501,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "タイムゾーン"
-          }
-        }
-      }
-    },
-    "reminder.field.time-zone-placeholder": {
-      "comment": "User-facing text for the semantic key reminder.field.time-zone-placeholder.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Area/Location"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "地域/都市"
           }
         }
       }
@@ -955,24 +901,6 @@
         }
       }
     },
-    "reminder.form.error.invalid-date": {
-      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enter a valid date in YYYY-MM-DD format."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "YYYY-MM-DD 形式で有効な日付を入力してください。"
-          }
-        }
-      }
-    },
     "reminder.form.error.invalid-early-value": {
       "comment": "User-facing error text announced by VoiceOver and also shown visually.",
       "extractionState": "manual",
@@ -1005,24 +933,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "YYYY-MM-DD 形式で有効な繰り返し終了日を入力してください。"
-          }
-        }
-      }
-    },
-    "reminder.form.error.invalid-time": {
-      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enter a valid 24-hour time in HH:MM format."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "HH:MM 形式で有効な24時間表記の時刻を入力してください。"
           }
         }
       }
@@ -1311,24 +1221,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "通知なしで保存しますか？"
-          }
-        }
-      }
-    },
-    "reminder.form.next-notifications": {
-      "comment": "User-facing text for the semantic key reminder.form.next-notifications.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Next Notifications"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "次の通知"
           }
         }
       }

@@ -5,6 +5,7 @@ struct AdaptiveRootView: View {
     @Bindable var router: AppRouter
     @Bindable var listModel: ReminderListModel
     @Bindable private var actions: ReminderActionCoordinator
+    @State private var reminderConfirmations = ReminderFormConfirmationCoordinator()
 
     init(router: AppRouter, listModel: ReminderListModel) {
         self.router = router
@@ -21,7 +22,8 @@ struct AdaptiveRootView: View {
                 } detail: {
                     AppRouterDestinationView(
                         destination: router.regularDestination,
-                        router: router
+                        router: router,
+                        confirmations: reminderConfirmations
                     )
                 }
                 .accessibilityIdentifier("adaptive-root.regular-split")
@@ -29,7 +31,11 @@ struct AdaptiveRootView: View {
                 NavigationStack(path: compactPathBinding) {
                     ReminderListView(model: listModel, router: router)
                         .navigationDestination(for: AppRouterDestination.self) { destination in
-                            AppRouterDestinationView(destination: destination, router: router)
+                            AppRouterDestinationView(
+                                destination: destination,
+                                router: router,
+                                confirmations: reminderConfirmations
+                            )
                         }
                 }
                 .accessibilityIdentifier("adaptive-root.compact-stack")
@@ -56,6 +62,29 @@ struct AdaptiveRootView: View {
                 )
                 .presentationDetents([.medium])
             }
+        }
+        .sheet(
+            isPresented: reminderCapacityConfirmationPresented,
+            onDismiss: reminderConfirmations.capacitySheetDidDismiss
+        ) {
+            if let warning = reminderConfirmations.capacityWarning {
+                CapacityConfirmationView(
+                    warning: warning,
+                    isPersistenceOperationInFlight: reminderConfirmations
+                        .isPersistenceOperationInFlight,
+                    onConfirm: reminderConfirmations.confirmCapacity,
+                    onCancel: reminderConfirmations.cancelCapacity
+                )
+                .presentationDetents([.medium])
+            }
+        }
+        .alert(
+            reminderConfirmationAlertTitle,
+            isPresented: reminderAlertPresented
+        ) {
+            reminderConfirmationAlertActions
+        } message: {
+            reminderConfirmationAlertMessage
         }
     }
 
@@ -84,5 +113,129 @@ struct AdaptiveRootView: View {
                 actions.cancelEnabledCapacityChange(confirmation.reminderID)
             }
         )
+    }
+
+    private var reminderCapacityConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { reminderConfirmations.capacityWarning != nil },
+            set: { presented in
+                if !presented {
+                    reminderConfirmations.dismissCapacityFromSystem()
+                }
+            }
+        )
+    }
+
+    private var reminderAlertPresented: Binding<Bool> {
+        Binding(
+            get: { reminderConfirmations.alertKind != nil },
+            set: { presented in
+                if !presented {
+                    reminderConfirmations.dismissAlertFromSystem()
+                }
+            }
+        )
+    }
+
+    private var reminderConfirmationAlertTitle: Text {
+        switch reminderConfirmations.alertKind {
+        case .expiredSchedule:
+            Text(LocalizedStringResource(
+                "reminder.form.expired-confirmation.title",
+                table: "ReminderForm"
+            ))
+        case .delete:
+            Text(LocalizedStringResource(
+                "reminder.form.delete-confirmation.title",
+                table: "ReminderForm"
+            ))
+        case .discardChanges:
+            Text(LocalizedStringResource(
+                "reminder.form.discard-confirmation.title",
+                table: "ReminderForm"
+            ))
+        case nil:
+            Text("")
+        }
+    }
+
+    private var reminderConfirmationAlertMessage: Text {
+        switch reminderConfirmations.alertKind {
+        case .expiredSchedule:
+            Text(LocalizedStringResource(
+                "reminder.form.expired-confirmation.message",
+                table: "ReminderForm"
+            ))
+        case .delete:
+            Text(LocalizedStringResource(
+                "reminder.form.delete-confirmation.message",
+                table: "ReminderForm"
+            ))
+        case .discardChanges:
+            Text(LocalizedStringResource(
+                "reminder.form.discard-confirmation.message",
+                table: "ReminderForm"
+            ))
+        case nil:
+            Text("")
+        }
+    }
+
+    @ViewBuilder
+    private var reminderConfirmationAlertActions: some View {
+        switch reminderConfirmations.alertKind {
+        case .expiredSchedule:
+            Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.form.expired-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
+                    .accessibilityIdentifier("reminder-form.expired-confirm")
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+            Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ))
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+        case .delete:
+            Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.form.delete-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
+                    .accessibilityIdentifier("reminder-form.delete-confirm")
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+            Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ))
+                    .accessibilityIdentifier("reminder-form.delete-cancel")
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+        case .discardChanges:
+            Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.form.discard-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
+                    .accessibilityIdentifier("reminder-form.discard-confirm")
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+            Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
+                Text(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ))
+                    .accessibilityIdentifier("reminder-form.discard-cancel")
+            }
+            .disabled(reminderConfirmations.isPersistenceOperationInFlight)
+        case nil:
+            EmptyView()
+        }
     }
 }

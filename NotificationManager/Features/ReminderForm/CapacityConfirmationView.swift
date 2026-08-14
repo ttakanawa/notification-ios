@@ -3,10 +3,23 @@ import SwiftUI
 
 struct CapacityConfirmationView: View {
     let warning: CapacityWarning
+    let isPersistenceOperationInFlight: Bool
     let onConfirm: @MainActor () -> Void
     let onCancel: @MainActor () -> Void
 
     @Environment(\.locale) private var locale
+
+    init(
+        warning: CapacityWarning,
+        isPersistenceOperationInFlight: Bool = false,
+        onConfirm: @escaping @MainActor () -> Void,
+        onCancel: @escaping @MainActor () -> Void
+    ) {
+        self.warning = warning
+        self.isPersistenceOperationInFlight = isPersistenceOperationInFlight
+        self.onConfirm = onConfirm
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         NavigationStack {
@@ -31,6 +44,7 @@ struct CapacityConfirmationView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
+                .disabled(isPersistenceOperationInFlight)
                 .accessibilityIdentifier("reminder-form.capacity-confirm")
 
                 Button(LocalizedStringResource(
@@ -40,6 +54,7 @@ struct CapacityConfirmationView: View {
                     onCancel()
                 }
                 .frame(maxWidth: .infinity)
+                .disabled(isPersistenceOperationInFlight)
             }
             .padding()
             .background {

@@ -4,19 +4,39 @@ import SwiftUI
 struct ReminderFormView: View {
     @Bindable var model: ReminderFormModel
     @Bindable var router: AppRouter
+    @Bindable var confirmations: ReminderFormConfirmationCoordinator
     let tagModel: TagManagementModel?
 
     init(
         model: ReminderFormModel,
         router: AppRouter,
+        confirmations: ReminderFormConfirmationCoordinator,
         tagModel: TagManagementModel? = nil
     ) {
         self.model = model
         self.router = router
+        self.confirmations = confirmations
         self.tagModel = tagModel
     }
 
     var body: some View {
+        reminderForm
+            .navigationTitle(Text(LocalizedStringResource(
+                model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title",
+                table: "ReminderForm"
+            )))
+            .navigationBarTitleDisplayMode(.inline)
+            .navigationBarBackButtonHidden(model.canDelete)
+            .toolbar {
+                formToolbar
+            }
+            .announcesAccessibilityErrors(accessibilityErrors)
+            .background {
+                AccessibilityIdentifierContainer(identifier: "reminder-form.root")
+            }
+    }
+
+    private var reminderForm: some View {
         ScrollViewReader { proxy in
             Form {
                 BasicInformationSection(model: model)
@@ -36,6 +56,14 @@ struct ReminderFormView: View {
                 if let tagModel {
                     TagPickerView(model: tagModel, selectedTagIDs: $model.tagIDs)
                 }
+                if model.canDelete {
+                    DeleteReminderSection(
+                        model: model,
+                        isPersistenceOperationInFlight: confirmations
+                            .isPersistenceOperationInFlight,
+                        onRequestDelete: requestDelete
+                    )
+                }
             }
             .onChange(of: model.earlyReminderChoice) { _, choice in
                 guard choice == .custom else { return }
@@ -44,123 +72,55 @@ struct ReminderFormView: View {
                 }
             }
         }
-        .navigationTitle(Text(LocalizedStringResource(
-            model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title",
-            table: "ReminderForm"
-        )))
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
+    }
+
+    @ToolbarContentBuilder
+    private var formToolbar: some ToolbarContent {
+        if model.canDelete {
+            ToolbarItem(placement: .cancellationAction) {
+                Button(action: attemptDismiss) {
+                    Label {
+                        Text(LocalizedStringResource(
+                            "reminder.action.back",
+                            table: "Reminder"
+                        ))
+                    } icon: {
+                        Image(systemName: "chevron.backward")
+                    }
+                }
+                .disabled(
+                    confirmations.isPersistenceOperationInFlight
+                        || model.saveState == .saving
+                )
+                .accessibilityIdentifier("reminder-form.back")
+            }
+            if model.hasChanges {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(action: save) {
+                        Image(systemName: "checkmark")
+                    }
+                    .disabled(
+                        confirmations.isPersistenceOperationInFlight || !model.canSave
+                    )
+                    .accessibilityLabel(Text(LocalizedStringResource(
+                        "reminder.action.save",
+                        table: "Reminder"
+                    )))
+                    .accessibilityIdentifier("reminder-form.save")
+                }
+            }
+        } else {
             ToolbarItem(placement: .confirmationAction) {
                 Button(LocalizedStringResource(
                     "reminder.action.save",
                     table: "Reminder"
-                )) {
-                    let reminderID = model.detachedDraft.id
-                    Task {
-                        await router.performReminderSave(reminderID) {
-                            await model.save()
-                        }
-                    }
-                }
-                .disabled(!model.canSave)
-                .accessibilityIdentifier("reminder-form.save")
+                ), action: save)
+                    .disabled(
+                        confirmations.isPersistenceOperationInFlight || !model.canSave
+                    )
+                    .accessibilityIdentifier("reminder-form.save")
             }
         }
-        .sheet(isPresented: capacityConfirmationPresented) {
-            if case let .requiresCapacityConfirmation(warning) = model.saveState {
-                CapacityConfirmationView(
-                    warning: warning,
-                    onConfirm: {
-                        let reminderID = model.detachedDraft.id
-                        Task {
-                            await router.performReminderSave(reminderID) {
-                                await model.confirmCapacitySave()
-                            }
-                        }
-                    },
-                    onCancel: model.dismissPendingConfirmation
-                )
-                .presentationDetents([.medium])
-            }
-        }
-        .alert(
-            LocalizedStringResource(
-                "reminder.form.expired-confirmation.title",
-                table: "ReminderForm"
-            ),
-            isPresented: expiredConfirmationPresented
-        ) {
-            Button(role: .destructive) {
-                let reminderID = model.detachedDraft.id
-                guard model.consumeExpiredScheduleConfirmation() else { return }
-                Task {
-                    await router.performReminderSave(reminderID) {
-                        await model.performConfirmedExpiredScheduleSave()
-                    }
-                }
-            } label: {
-                Text(LocalizedStringResource(
-                    "reminder.form.expired-confirmation.confirm",
-                    table: "ReminderForm"
-                ))
-                    .accessibilityIdentifier("reminder-form.expired-confirm")
-            }
-            Button(LocalizedStringResource(
-                "reminder.action.cancel",
-                table: "Reminder"
-            ), role: .cancel) {
-                model.dismissPendingConfirmation()
-            }
-        } message: {
-            Text(LocalizedStringResource(
-                "reminder.form.expired-confirmation.message",
-                table: "ReminderForm"
-            ))
-        }
-        .alert(
-            LocalizedStringResource(
-                "reminder.form.delete-confirmation.title",
-                table: "ReminderForm"
-            ),
-            isPresented: deleteConfirmationPresented
-        ) {
-            Button(role: .destructive, action: confirmDelete) {
-                Text(LocalizedStringResource(
-                    "reminder.form.delete-confirmation.confirm",
-                    table: "ReminderForm"
-                ))
-                    .accessibilityIdentifier("reminder-form.delete-confirm")
-            }
-            Button(role: .cancel, action: model.cancelDeleteConfirmation) {
-                Text(LocalizedStringResource(
-                    "reminder.action.cancel",
-                    table: "Reminder"
-                ))
-                    .accessibilityIdentifier("reminder-form.delete-cancel")
-            }
-        } message: {
-            Text(LocalizedStringResource(
-                "reminder.form.delete-confirmation.message",
-                table: "ReminderForm"
-            ))
-        }
-        .announcesAccessibilityErrors(accessibilityErrors)
-        .background {
-            AccessibilityIdentifierContainer(identifier: "reminder-form.root")
-        }
-    }
-
-    private var capacityConfirmationPresented: Binding<Bool> {
-        Binding(
-            get: {
-                if case .requiresCapacityConfirmation = model.saveState { true } else { false }
-            },
-            set: { presented in
-                if !presented, case .requiresCapacityConfirmation = model.saveState {
-                    model.dismissPendingConfirmation()
-                }
-            }
-        )
     }
 
     private static let earlyReminderScrollID = "reminder-form.early-reminder.scroll-target"
@@ -172,36 +132,23 @@ struct ReminderFormView: View {
         )
     }
 
-    private func confirmDelete() {
-        let reminderID = model.detachedDraft.id
-        guard model.consumeDeleteConfirmation() else { return }
-        Task {
-            await router.performReminderDeletion(reminderID) {
-                await model.performConfirmedDelete()
-            }
+    private func save() {
+        confirmations.save(model: model, router: router)
+    }
+
+    private func attemptDismiss() {
+        guard !confirmations.isPersistenceOperationInFlight else { return }
+        if model.hasChanges {
+            confirmations.requestDiscard(model: model, router: router)
+        } else {
+            model.discardChanges()
+            router.dismissReminder(model.detachedDraft.id)
         }
     }
 
-    private var expiredConfirmationPresented: Binding<Bool> {
-        Binding(
-            get: {
-                if case .requiresExpiredScheduleConfirmation = model.saveState { true } else { false }
-            },
-            set: { presented in
-                if !presented, case .requiresExpiredScheduleConfirmation = model.saveState {
-                    model.dismissPendingConfirmation()
-                }
-            }
-        )
-    }
-
-    private var deleteConfirmationPresented: Binding<Bool> {
-        Binding(
-            get: { model.isDeleteConfirmationPresented },
-            set: { presented in
-                if !presented { model.cancelDeleteConfirmation() }
-            }
-        )
+    private func requestDelete() {
+        guard !confirmations.isPersistenceOperationInFlight else { return }
+        confirmations.requestDelete(model: model, router: router)
     }
 
     private var accessibilityErrors: [AccessibilityErrorIdentity] {
@@ -209,8 +156,6 @@ struct ReminderFormView: View {
             model.titleFieldIssue?.accessibilityIdentity,
             model.notesFieldIssue?.accessibilityIdentity,
             model.urlFieldIssue?.accessibilityIdentity,
-            model.sourceDateTextIsValid ? nil : .reminderDateInvalid,
-            model.sourceTimeTextIsValid ? nil : .reminderTimeInvalid,
             model.timeZoneFieldIssue?.accessibilityIdentity,
             model.repeatEndDateFieldIssue?.accessibilityIdentity,
             model.earlyReminderValueTextIsValid ? nil : .reminderEarlyValueInvalid

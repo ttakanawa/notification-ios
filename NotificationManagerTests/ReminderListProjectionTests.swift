@@ -271,59 +271,6 @@ struct ReminderListProjectionTests {
         #expect(model.sections.upcoming.isEmpty)
     }
 
-    @Test func detailHidesNotApplicableDeviceRowWithoutDroppingGroupDiagnostics() {
-        let item = ReminderListItemPresentation.fixture(
-            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
-            lifecycleStatus: .invalidSchedule,
-            updatedAt: date("2040-08-01T00:00:00Z")
-        )
-        let group = AlertGroupSchedulingPresentation(
-            groupID: AlertGroupID(
-                reminderID: item.id,
-                baseOccurrenceInstant: date("2040-08-31T13:30:00Z")
-            ),
-            outcome: .unscheduledError
-        )
-        let detail = ReminderDetailModel(
-            item: item,
-            sourceTime: nil,
-            currentDeviceTime: nil,
-            localizedRepeatSummary: nil,
-            nextNotifications: [],
-            alertGroups: [group],
-            scheduledThrough: nil,
-            requestDiagnostics: [.init(identifier: "request", kind: .oneShot)]
-        )
-
-        #expect(detail.deviceSchedulingStatusForDisplay == nil)
-        #expect(detail.alertGroups == [group])
-        #expect(detail.requestDiagnostics.map(\.kind) == [.oneShot])
-    }
-
-    @Test func activeDetailKeepsDeviceStatusSeparateFromLifecycle() {
-        let item = ReminderListItemPresentation(
-            id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
-            title: "Capacity constrained",
-            reminderStatus: ReminderStatus(primary: .active, secondary: []),
-            deviceSchedulingStatus: .unscheduledCapacity,
-            nextPresentation: nil,
-            updatedAt: date("2040-08-01T00:00:00Z")
-        )
-        let detail = ReminderDetailModel(
-            item: item,
-            sourceTime: date("2040-08-31T13:30:00Z"),
-            currentDeviceTime: date("2040-08-31T21:30:00Z"),
-            localizedRepeatSummary: "Every weekday.",
-            nextNotifications: [],
-            alertGroups: [],
-            scheduledThrough: nil,
-            requestDiagnostics: []
-        )
-
-        #expect(detail.lifecycleStatus == .active)
-        #expect(detail.deviceSchedulingStatusForDisplay == .unscheduledCapacity)
-    }
-
     @MainActor
     @Test func managementActionsDriveEnabledAndRequireDeleteConfirmation() async {
         let recorder = ReminderManagementActionRecorder()
@@ -798,41 +745,79 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
-    @Test func deletedReminderClearsRegularDestinationSelectionAndCaches() {
+    @Test func showReminderOpensRegisteredEditDirectlyInCompactLayout() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+
+        router.showReminder(id)
+
+        #expect(router.compactPath == [.reminderEdit(id)])
+        #expect(router.selectedReminderID == id)
+    }
+
+    @MainActor
+    @Test func showReminderIgnoresAnUnregisteredReminder() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = AppRouter(actions: ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            )
+        ))
+
+        router.showReminder(id)
+
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
+    }
+
+    @MainActor
+    @Test func dismissReminderClosesRouteAndRetainsCleanFormSession() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.showReminder(id)
+        let form = router.formModel(for: id)
+
+        router.dismissReminder(id)
+
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
+        #expect(router.formModel(for: id) === form)
+    }
+
+    @MainActor
+    @Test func deletedReminderClearsRegularDestinationSelectionAndFormSession() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.synchronizeLayout(.regular)
         router.showReminder(id)
 
-        #expect(router.regularDestination == .reminderDetail(id))
+        #expect(router.regularDestination == .reminderEdit(id))
         #expect(router.selectedReminderID == id)
-        #expect(router.detailModel(for: id) != nil)
         #expect(router.formModel(for: id) != nil)
 
         router.reminderWasDeleted(id)
 
         #expect(router.regularDestination == nil)
         #expect(router.selectedReminderID == nil)
-        #expect(router.detailModel(for: id) == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
     @MainActor
-    @Test func snapshotPrunesCachedPersistedDetailBeforeInitialListPublication() {
+    @Test func snapshotPrunesCachedPersistedFormBeforeInitialListPublication() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.showReminder(id)
 
         router.prunePersistedReminders(keeping: [])
 
-        #expect(router.detailModel(for: id) == nil)
         #expect(router.formModel(for: id) == nil)
         #expect(router.compactPath.isEmpty)
         #expect(router.selectedReminderID == nil)
     }
 
     @MainActor
-    @Test func snapshotPruningPreservesCreateDraftWithoutPersistedDetail() {
+    @Test func snapshotPruningPreservesCreateDraftWithoutPersistedIdentity() {
         let draftID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
         let router = AppRouter(actions: ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -862,9 +847,8 @@ struct ReminderListProjectionTests {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.showReminder(id)
-        router.showEdit(id)
 
-        #expect(router.compactPath == [.reminderDetail(id), .reminderEdit(id)])
+        #expect(router.compactPath == [.reminderEdit(id)])
 
         router.reminderWasDeleted(id)
         router.synchronizeLayout(.regular)
@@ -875,13 +859,26 @@ struct ReminderListProjectionTests {
     }
 
     @MainActor
+    @Test func staleSystemPathCannotResurrectDeletedReminder() {
+        let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
+        let router = routerWithRegisteredReminder(id: id)
+        router.showReminder(id)
+
+        router.reminderWasDeleted(id)
+        router.setCompactPathFromSystem([.reminderEdit(id)])
+
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
+        #expect(router.formModel(for: id) == nil)
+    }
+
+    @MainActor
     @Test func compactPathBindingPopClearsExitedSelectionBeforeRegularTransition() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.showReminder(id)
-        router.showEdit(id)
 
-        router.setCompactPathFromSystem([.reminderDetail(id)])
+        router.setCompactPathFromSystem([.reminderEdit(id)])
         #expect(router.selectedReminderID == id)
 
         router.setCompactPathFromSystem([])
@@ -915,7 +912,6 @@ struct ReminderListProjectionTests {
         router.synchronizeLayout(.regular)
         #expect(router.regularDestination == nil)
         #expect(router.selectedReminderID == nil)
-        #expect(router.detailModel(for: id) == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
@@ -935,9 +931,8 @@ struct ReminderListProjectionTests {
         }
 
         #expect(!deleted)
-        #expect(router.regularDestination == .reminderDetail(id))
+        #expect(router.regularDestination == .reminderEdit(id))
         #expect(router.selectedReminderID == id)
-        #expect(router.detailModel(for: id) != nil)
         #expect(router.formModel(for: id) != nil)
     }
 
@@ -950,7 +945,6 @@ struct ReminderListProjectionTests {
             formDelete: { reminderID in try await gate.delete(reminderID) }
         )
         router.showReminder(id)
-        router.showEdit(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -970,12 +964,11 @@ struct ReminderListProjectionTests {
         router.synchronizeLayout(.regular)
         #expect(router.regularDestination == nil)
         #expect(router.selectedReminderID == nil)
-        #expect(router.detailModel(for: id) == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
     @MainActor
-    @Test func alertDismissalAfterDetailConfirmationCannotCancelDelete() async {
+    @Test func alertDismissalAfterCoordinatorConfirmationCannotCancelDelete() async {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let recorder = ReminderManagementActionRecorder()
         let router = routerWithRegisteredReminder(
@@ -1006,7 +999,6 @@ struct ReminderListProjectionTests {
             formDelete: { reminderID in await recorder.recordDelete(reminderID) }
         )
         router.showReminder(id)
-        router.showEdit(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1030,7 +1022,6 @@ struct ReminderListProjectionTests {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.showReminder(id)
-        router.showEdit(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1041,7 +1032,8 @@ struct ReminderListProjectionTests {
         }
 
         #expect(saved)
-        #expect(router.compactPath == [.reminderDetail(id)])
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
@@ -1050,7 +1042,7 @@ struct ReminderListProjectionTests {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let router = routerWithRegisteredReminder(id: id)
         router.synchronizeLayout(.regular)
-        router.showEdit(id)
+        router.showReminder(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1062,6 +1054,7 @@ struct ReminderListProjectionTests {
 
         #expect(saved)
         #expect(router.regularDestination == nil)
+        #expect(router.selectedReminderID == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
@@ -1072,7 +1065,7 @@ struct ReminderListProjectionTests {
             id: id,
             formSave: { _, _, _ in throw ReminderManagementActionProbeError.failed }
         )
-        router.showEdit(id)
+        router.showReminder(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1096,7 +1089,6 @@ struct ReminderListProjectionTests {
             formSave: { draft, _, _ in await gate.save(draft) }
         )
         router.showReminder(id)
-        router.showEdit(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1106,11 +1098,12 @@ struct ReminderListProjectionTests {
         }
         await gate.waitUntilCalled()
 
-        router.compactPath = [.reminderDetail(id)]
+        router.setCompactPathFromSystem([])
         await gate.resolve(.saved(id))
 
         #expect(await save.value)
-        #expect(router.compactPath == [.reminderDetail(id)])
+        #expect(router.compactPath.isEmpty)
+        #expect(router.selectedReminderID == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
@@ -1123,7 +1116,7 @@ struct ReminderListProjectionTests {
             formSave: { draft, _, _ in await gate.save(draft) }
         )
         router.synchronizeLayout(.regular)
-        router.showEdit(id)
+        router.showReminder(id)
         guard let form = router.formModel(for: id) else {
             Issue.record("Expected a registered edit form")
             return
@@ -1138,6 +1131,7 @@ struct ReminderListProjectionTests {
 
         #expect(await save.value)
         #expect(router.regularDestination == nil)
+        #expect(router.selectedReminderID == nil)
         #expect(router.formModel(for: id) == nil)
     }
 
@@ -1161,20 +1155,6 @@ struct ReminderListProjectionTests {
             delete: delete
         ))
         let router = AppRouter(actions: coordinator)
-        let item = ReminderListItemPresentation.fixture(
-            id: id.uuidString,
-            lifecycleStatus: .active
-        )
-        router.register(detail: ReminderDetailModel(
-            item: item,
-            sourceTime: nil,
-            currentDeviceTime: nil,
-            localizedRepeatSummary: nil,
-            nextNotifications: [],
-            alertGroups: [],
-            scheduledThrough: nil,
-            requestDiagnostics: []
-        ))
         let schedule = ScheduleDefinition(
             source: SourceWallClock(
                 year: 2040,

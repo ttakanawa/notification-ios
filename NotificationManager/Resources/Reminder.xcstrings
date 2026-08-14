@@ -181,96 +181,6 @@
         }
       }
     },
-    "reminder.detail.section.diagnostics": {
-      "comment": "User-facing text for the semantic key reminder.detail.section.diagnostics.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Diagnostics"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "診断情報"
-          }
-        }
-      }
-    },
-    "reminder.detail.section.next-notifications": {
-      "comment": "User-facing text for the semantic key reminder.detail.section.next-notifications.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Next Notifications"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "次の通知"
-          }
-        }
-      }
-    },
-    "reminder.detail.section.notes": {
-      "comment": "User-facing text for the semantic key reminder.detail.section.notes.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Notes"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "メモ"
-          }
-        }
-      }
-    },
-    "reminder.detail.section.schedule": {
-      "comment": "User-facing text for the semantic key reminder.detail.section.schedule.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Schedule"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "スケジュール"
-          }
-        }
-      }
-    },
-    "reminder.detail.section.status": {
-      "comment": "User-facing text for the semantic key reminder.detail.section.status.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Status"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "状態"
-          }
-        }
-      }
-    },
     "reminder.device-status.authorization-unknown": {
       "comment": "User-facing text for the semantic key reminder.device-status.authorization-unknown.",
       "extractionState": "manual",
@@ -429,24 +339,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "予約中"
-          }
-        }
-      }
-    },
-    "reminder.diagnostics.request-type": {
-      "comment": "User-facing text for the semantic key reminder.diagnostics.request-type.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Request Type"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "リクエストの種類"
           }
         }
       }

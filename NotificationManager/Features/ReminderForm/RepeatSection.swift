@@ -50,11 +50,13 @@ struct RepeatSection: View {
             .accessibilityIdentifier("reminder-form.repeat-picker")
 
             if model.currentRepeatWasCustom && !model.isReplacingCustomRepeat {
-                Button(LocalizedStringResource(
-                    "reminder.form.custom.replace",
-                    table: "ReminderForm"
-                )) {
+                Button {
                     model.beginCustomReplacement()
+                } label: {
+                    Text(LocalizedStringResource(
+                        "reminder.form.custom.replace",
+                        table: "ReminderForm"
+                    ))
                 }
                 .disabled(!model.scheduleFieldsAreEditable)
                 .accessibilityIdentifier("reminder-form.custom.replace")
@@ -84,17 +86,21 @@ struct RepeatSection: View {
                 .accessibilityIdentifier("reminder-form.repeat-end-picker")
 
                 if model.repeatEndsOnDate {
-                    TextField(LocalizedStringResource(
-                        "reminder.field.date-placeholder",
-                        table: "ReminderForm"
-                    ), text: repeatEndDateBinding, prompt: nil)
-                        .keyboardType(.numbersAndPunctuation)
-                        .disabled(!model.scheduleFieldsAreEditable)
-                        .accessibilityLabel(Text(LocalizedStringResource(
+                    ScheduleDatePickerRow(
+                        title: LocalizedStringResource(
                             "reminder.field.repeat-end-date",
                             table: "ReminderForm"
-                        )))
-                        .accessibilityIdentifier("reminder-form.repeat-end-date")
+                        ),
+                        selection: model.repeatEndDatePickerValue,
+                        fallbackSelection: model.sourceDatePickerValue
+                            ?? model.missingPickerDefaultValue,
+                        displayedComponents: .date,
+                        timeZone: model.pickerTimeZone,
+                        accessibilityIdentifier: "reminder-form.repeat-end-date",
+                        accessibilityValue: repeatEndDateAccessibilityValue,
+                        onSelect: model.updateRepeatEndDate
+                    )
+                    .disabled(!model.scheduleFieldsAreEditable)
 
                     if let issue = model.repeatEndDateFieldIssue {
                         Label(
@@ -106,24 +112,6 @@ struct RepeatSection: View {
                         .accessibilityIdentifier("reminder-form.repeat-end-date-error")
                     }
                 }
-            }
-
-            if !model.previewNotifications.isEmpty && !model.isReplacingCustomRepeat {
-                VStack(alignment: .leading, spacing: 8) {
-                    Text(LocalizedStringResource(
-                        "reminder.form.next-notifications",
-                        table: "ReminderForm"
-                    ))
-                        .font(.headline)
-                    ForEach(Array(model.previewNotifications.prefix(3).enumerated()), id: \.offset) {
-                        _, notification in
-                        PhysicalNotificationPreviewView(
-                            notification: notification,
-                            sourceTimeZoneIdentifier: model.timeZoneIdentifier
-                        )
-                    }
-                }
-                .accessibilityIdentifier("reminder-form.preview")
             }
 
             if model.showsPastEarlyWarning {
@@ -179,14 +167,11 @@ struct RepeatSection: View {
         )
     }
 
-    private var repeatEndDateBinding: Binding<String> {
-        Binding(
-            get: { model.repeatEndDateText },
-            set: { input in
-                model.updateRepeatEndDateText(input)
-            }
-        )
+    private var repeatEndDateAccessibilityValue: String? {
+        guard case let .onDate(value) = model.repeatEnd else { return nil }
+        return String(format: "%04d-%02d-%02d", value.year, value.month, value.day)
     }
+
 }
 
 struct PhysicalNotificationPreviewView: View {
@@ -208,7 +193,19 @@ struct PhysicalNotificationPreviewView: View {
             ForEach(Array(notification.reasons.enumerated()), id: \.offset) { index, reason in
                 LabeledContent {
                     VStack(alignment: .trailing, spacing: 2) {
-                        Label(reason.kind.localizedResource, systemImage: "bell")
+                        let reasonResource: LocalizedStringResource = switch reason.kind {
+                        case .main:
+                            LocalizedStringResource(
+                                "reminder.reason.main",
+                                table: "Reminder"
+                            )
+                        case .early:
+                            LocalizedStringResource(
+                                "reminder.reason.early",
+                                table: "Reminder"
+                            )
+                        }
+                        Label(reasonResource, systemImage: "bell")
                         Text(
                             verbatim: sourceFormatter.instant(
                                 reason.baseOccurrence.instant,

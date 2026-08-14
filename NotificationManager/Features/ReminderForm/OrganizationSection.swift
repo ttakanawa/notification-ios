@@ -29,23 +29,6 @@ struct OrganizationSection: View {
                 }
             }
 
-            if model.canDelete {
-                Button(role: .destructive) {
-                    model.requestDeleteConfirmation()
-                } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.action.delete",
-                        table: "Reminder"
-                    ))
-                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .foregroundStyle(.red)
-                .disabled(model.saveState == .saving)
-                .accessibilityIdentifier("reminder-form.delete")
-            }
-
             if model.saveState == .failed(.save) {
                 Label(
                     LocalizedStringResource(

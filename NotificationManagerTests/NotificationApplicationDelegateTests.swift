@@ -102,7 +102,7 @@ struct NotificationApplicationDelegateTests {
     }
 
     @MainActor
-    @Test func defaultTapUsesCurrentStoreAndRoutesCurrentDetailEvenWhenURLExists() async {
+    @Test func defaultTapUsesCurrentStoreAndRoutesCurrentEditEvenWhenURLExists() async {
         let lookup = NotificationLookupRecorder(
             reminder: reminder(urlString: "https://current.example/path")
         )
@@ -115,8 +115,8 @@ struct NotificationApplicationDelegateTests {
             userInfo: routingInfo(payloadURL: "https://stale.example/secret")
         )
 
-        #expect(outcome == .reminderDetail(Self.reminderID))
-        #expect(routes.destinations == [.reminderDetail(Self.reminderID)])
+        #expect(outcome == .reminderEdit(Self.reminderID))
+        #expect(routes.destinations == [.reminderEdit(Self.reminderID)])
         #expect(routes.openedURLs.isEmpty)
         #expect(await lookup.requestedIDs == [Self.reminderID])
     }
@@ -142,7 +142,7 @@ struct NotificationApplicationDelegateTests {
     }
 
     @MainActor
-    @Test func openLinkWithoutACurrentValidURLFallsBackToCurrentDetail() async {
+    @Test func openLinkWithoutACurrentValidURLFallsBackToCurrentEdit() async {
         for urlString in [nil, "not a current URL"] as [String?] {
             let lookup = NotificationLookupRecorder(
                 reminder: reminder(urlString: urlString)
@@ -156,8 +156,8 @@ struct NotificationApplicationDelegateTests {
                 userInfo: routingInfo(payloadURL: "https://stale.example/secret")
             )
 
-            #expect(outcome == .reminderDetail(Self.reminderID))
-            #expect(routes.destinations == [.reminderDetail(Self.reminderID)])
+            #expect(outcome == .reminderEdit(Self.reminderID))
+            #expect(routes.destinations == [.reminderEdit(Self.reminderID)])
             #expect(routes.openedURLs.isEmpty)
         }
     }
@@ -244,10 +244,6 @@ struct NotificationApplicationDelegateTests {
         #expect(recorder.publishedTitles == [["Newer routing value"]])
         #expect(recorder.publishedStates == [2])
         #expect(
-            recorder.router.detailModel(for: Self.reminderID)?.item.title
-                == "Newer routing value"
-        )
-        #expect(
             recorder.router.formModel(for: Self.reminderID)?.title
                 == "Newer routing value"
         )
@@ -257,10 +253,6 @@ struct NotificationApplicationDelegateTests {
 
         #expect(recorder.publishedTitles == [["Newer routing value"]])
         #expect(recorder.publishedStates == [2])
-        #expect(
-            recorder.router.detailModel(for: Self.reminderID)?.item.title
-                == "Newer routing value"
-        )
         #expect(
             recorder.router.formModel(for: Self.reminderID)?.title
                 == "Newer routing value"
@@ -344,10 +336,6 @@ struct NotificationApplicationDelegateTests {
         #expect(routes.destinations.isEmpty)
         #expect(recorder.publishedTitles == [["Newer lifecycle value"]])
         #expect(recorder.publishedStates == [2])
-        #expect(
-            recorder.router.detailModel(for: Self.reminderID)?.item.title
-                == "Newer lifecycle value"
-        )
         #expect(
             recorder.router.formModel(for: Self.reminderID)?.title
                 == "Newer lifecycle value"
@@ -589,7 +577,7 @@ struct NotificationApplicationDelegateTests {
         )
         await Task.yield()
 
-        #expect(routes.destinations == [.reminderDetail(Self.reminderID)])
+        #expect(routes.destinations == [.reminderEdit(Self.reminderID)])
         #expect(await lookup.requestedIDs == [Self.reminderID])
         #expect(routes.openedURLs.isEmpty)
     }
@@ -835,8 +823,18 @@ struct NotificationApplicationDelegateTests {
             delete: { _ in }
         ))
         let router = AppRouter(actions: actions)
+        router.register(form: ReminderFormModel(
+            snapshot: reminder(title: "Selected reminder", urlString: nil),
+            savedRepeatPresentation: nil,
+            now: Date(timeIntervalSince1970: 1),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in .saved(draft.id) },
+                delete: { _ in }
+            )
+        ))
 
         router.showReminder(Self.reminderID)
+        #expect(router.selectedReminderID == Self.reminderID)
         router.showNotificationUnavailable()
         #expect(router.selectedReminderID == nil)
         #expect(router.compactPath.last == .notificationUnavailable)
@@ -1146,27 +1144,6 @@ private final class RoutingSnapshotProjectionRecorder {
     func publish(snapshot: CompleteReminderSnapshot, state: Int) {
         router.prunePersistedReminders(keeping: Set(snapshot.reminders.map(\.id)))
         for reminder in snapshot.reminders {
-            let item = ReminderListItemPresentation(
-                id: reminder.id,
-                title: reminder.title,
-                reminderStatus: ReminderStatus(
-                    primary: .invalidSchedule,
-                    secondary: []
-                ),
-                deviceSchedulingStatus: .notApplicable,
-                nextPresentation: nil,
-                updatedAt: reminder.updatedAt
-            )
-            router.register(detail: ReminderDetailModel(
-                item: item,
-                sourceTime: nil,
-                currentDeviceTime: nil,
-                localizedRepeatSummary: nil,
-                nextNotifications: [],
-                alertGroups: [],
-                scheduledThrough: nil,
-                requestDiagnostics: []
-            ))
             router.registerFormIfAbsent(ReminderFormModel(
                 snapshot: reminder,
                 savedRepeatPresentation: nil,
@@ -1258,7 +1235,7 @@ private final class OrderedNotificationResponseEvents: @unchecked Sendable {
 private extension NotificationResponseDestination {
     var eventReminderID: UUID {
         switch self {
-        case let .reminderDetail(reminderID):
+        case let .reminderEdit(reminderID):
             reminderID
         case .notificationUnavailable:
             UUID(uuidString: "00000000-0000-0000-0000-000000000000")!

@@ -3,16 +3,24 @@ import UIKit
 
 struct AccessibilityIdentifierContainer: UIViewRepresentable {
     let identifier: String
+    let value: String?
+
+    init(identifier: String, value: String? = nil) {
+        self.identifier = identifier
+        self.value = value
+    }
 
     func makeUIView(context: Context) -> UIView {
         let view = UIView()
         view.isAccessibilityElement = false
         view.accessibilityIdentifier = identifier
+        view.accessibilityValue = value
         return view
     }
 
     func updateUIView(_ uiView: UIView, context: Context) {
         uiView.accessibilityIdentifier = identifier
+        uiView.accessibilityValue = value
     }
 }
 

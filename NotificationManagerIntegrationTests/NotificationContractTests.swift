@@ -37,7 +37,7 @@ struct NotificationContractTests {
         let result = try await NotificationContractHarness().routingContract()
 
         #expect(result.presentationRequestedBannerListAndSound)
-        #expect(result.defaultDestination == .reminderDetail(result.reminderID))
+        #expect(result.defaultDestination == .reminderEdit(result.reminderID))
         #expect(result.openedURL == URL(string: "https://example.com/current"))
         #expect(result.missingDestination == .notificationUnavailable)
     }
