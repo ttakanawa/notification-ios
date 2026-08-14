@@ -5,7 +5,12 @@ struct BasicInformationSection: View {
 
     var body: some View {
         Section {
-            TextField("reminder.field.title", text: $model.title)
+            TextField(text: $model.title) {
+                Text(LocalizedStringResource(
+                    "reminder.field.title",
+                    table: "ReminderForm"
+                ))
+            }
                 .textInputAutocapitalization(.sentences)
                 .accessibilityIdentifier("reminder-form.title")
 
@@ -13,11 +18,12 @@ struct BasicInformationSection: View {
                 fieldError(issue, identifier: "reminder-form.title-error")
             }
 
-            TextField(
-                "reminder.field.notes",
-                text: optionalTextBinding(\.notes),
-                axis: .vertical
-            )
+            TextField(text: optionalTextBinding(\.notes), axis: .vertical) {
+                Text(LocalizedStringResource(
+                    "reminder.field.notes",
+                    table: "ReminderForm"
+                ))
+            }
             .lineLimit(3...8)
             .accessibilityIdentifier("reminder-form.notes")
 
@@ -25,10 +31,12 @@ struct BasicInformationSection: View {
                 fieldError(issue, identifier: "reminder-form.notes-error")
             }
 
-            TextField(
-                "reminder.field.url",
-                text: optionalTextBinding(\.urlString)
-            )
+            TextField(text: optionalTextBinding(\.urlString)) {
+                Text(LocalizedStringResource(
+                    "reminder.field.url",
+                    table: "ReminderForm"
+                ))
+            }
             .textInputAutocapitalization(.never)
             .keyboardType(.URL)
             .accessibilityIdentifier("reminder-form.url")
@@ -37,7 +45,10 @@ struct BasicInformationSection: View {
                 fieldError(issue, identifier: "reminder-form.url-error")
             }
         } header: {
-            Text("reminder.form.section.basic-information")
+            Text(LocalizedStringResource(
+                "reminder.form.section.basic-information",
+                table: "ReminderForm"
+            ))
                 .background {
                     AccessibilityIdentifierContainer(
                         identifier: "reminder-form.section.basic-information"
@@ -60,7 +71,7 @@ struct BasicInformationSection: View {
         _ issue: ReminderFormFieldIssue,
         identifier: String
     ) -> some View {
-        Label(issue.semanticKey, systemImage: "exclamationmark.triangle")
+        Label(issue.localizedResource, systemImage: "exclamationmark.triangle")
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier(identifier)
@@ -68,17 +79,35 @@ struct BasicInformationSection: View {
 }
 
 extension ReminderFormFieldIssue {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .titleRequired: "reminder.form.error.title-required"
-        case .titleTooLarge: "reminder.form.error.title-too-large"
-        case .notesTooLarge: "reminder.form.error.notes-too-large"
-        case .urlInvalid: "reminder.form.error.url-invalid"
-        case .urlTooLarge: "reminder.form.error.url-too-large"
-        case .timeZoneRequired: "reminder.form.error.time-zone-required"
-        case .timeZoneInvalid: "reminder.form.error.time-zone-invalid"
-        case .repeatEndInvalid: "reminder.form.error.invalid-repeat-end-date"
-        case .repeatEndBeforeStart: "reminder.form.error.repeat-end-before-start"
+        case .titleRequired:
+            LocalizedStringResource("reminder.form.error.title-required", table: "ReminderForm")
+        case .titleTooLarge:
+            LocalizedStringResource("reminder.form.error.title-too-large", table: "ReminderForm")
+        case .notesTooLarge:
+            LocalizedStringResource("reminder.form.error.notes-too-large", table: "ReminderForm")
+        case .urlInvalid:
+            LocalizedStringResource("reminder.form.error.url-invalid", table: "ReminderForm")
+        case .urlTooLarge:
+            LocalizedStringResource("reminder.form.error.url-too-large", table: "ReminderForm")
+        case .timeZoneRequired:
+            LocalizedStringResource(
+                "reminder.form.error.time-zone-required",
+                table: "ReminderForm"
+            )
+        case .timeZoneInvalid:
+            LocalizedStringResource("reminder.form.error.time-zone-invalid", table: "ReminderForm")
+        case .repeatEndInvalid:
+            LocalizedStringResource(
+                "reminder.form.error.invalid-repeat-end-date",
+                table: "ReminderForm"
+            )
+        case .repeatEndBeforeStart:
+            LocalizedStringResource(
+                "reminder.form.error.repeat-end-before-start",
+                table: "ReminderForm"
+            )
         }
     }
 }

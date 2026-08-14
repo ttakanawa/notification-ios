@@ -12,13 +12,22 @@ struct DataUnavailableView: View {
                 Section {
                     ContentUnavailableView {
                         Label(
-                            "data_unavailable.title",
+                            LocalizedStringResource(
+                                "data_unavailable.title",
+                                table: "Recovery"
+                            ),
                             systemImage: "externaldrive.badge.exclamationmark"
                         )
                     } description: {
                         VStack(spacing: 8) {
-                            Text("data_unavailable.description")
-                            Text("data_unavailable.notifications-may-continue")
+                            Text(LocalizedStringResource(
+                                "data_unavailable.description",
+                                table: "Recovery"
+                            ))
+                            Text(LocalizedStringResource(
+                                "data_unavailable.notifications-may-continue",
+                                table: "Recovery"
+                            ))
                                 .fontWeight(.semibold)
                                 .accessibilityIdentifier(
                                     "data-unavailable.notifications-may-continue"
@@ -28,9 +37,15 @@ struct DataUnavailableView: View {
                     }
                 }
 
-                Section("settings.section.notifications") {
+                Section(LocalizedStringResource(
+                    "settings.section.notifications",
+                    table: "Settings"
+                )) {
                     Toggle(
-                        "settings.notifications.this-device",
+                        LocalizedStringResource(
+                            "settings.notifications.this-device",
+                            table: "Settings"
+                        ),
                         isOn: notificationsEnabledBinding
                     )
                     .disabled(actions.isWorking)
@@ -41,28 +56,52 @@ struct DataUnavailableView: View {
                     Button {
                         Task { await actions.removeAllPending() }
                     } label: {
-                        Label("data_unavailable.remove-pending", systemImage: "bell.slash")
+                        Label(
+                            LocalizedStringResource(
+                                "data_unavailable.remove-pending",
+                                table: "Recovery"
+                            ),
+                            systemImage: "bell.slash"
+                        )
                     }
                     .disabled(actions.isWorking)
-                    .accessibilityLabel("data_unavailable.remove-pending")
-                    .accessibilityHint("data_unavailable.remove-pending.explanation")
+                    .accessibilityLabel(Text(LocalizedStringResource(
+                        "data_unavailable.remove-pending",
+                        table: "Recovery"
+                    )))
+                    .accessibilityHint(Text(LocalizedStringResource(
+                        "data_unavailable.remove-pending.explanation",
+                        table: "Recovery"
+                    )))
                     .accessibilityIdentifier("data-unavailable.remove-pending")
 
                     Button {
                         openNotificationSettings()
                     } label: {
-                        Label("settings.open-os-settings", systemImage: "gear")
+                        Label(
+                            LocalizedStringResource(
+                                "settings.open-os-settings",
+                                table: "Settings"
+                            ),
+                            systemImage: "gear"
+                        )
                     }
                     .accessibilityIdentifier("data-unavailable.open-os-settings")
 
-                    Text("data_unavailable.remove-pending.explanation")
+                    Text(LocalizedStringResource(
+                        "data_unavailable.remove-pending.explanation",
+                        table: "Recovery"
+                    ))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityHidden(true)
 
                     if let error = actions.actionError {
-                        Label(error.semanticKey, systemImage: "exclamationmark.triangle")
+                        Label(
+                            error.localizedResource,
+                            systemImage: "exclamationmark.triangle"
+                        )
                             .foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier("data-unavailable.action-error")
@@ -70,14 +109,20 @@ struct DataUnavailableView: View {
                 }
 
                 Section {
-                    Button("common.retry") {
+                    Button(LocalizedStringResource(
+                        "common.retry",
+                        table: "Common"
+                    )) {
                         Task { await actions.retry() }
                     }
                     .disabled(actions.isRetrying)
                     .accessibilityIdentifier("data-unavailable.retry")
                 }
             }
-            .navigationTitle("data_unavailable.title")
+            .navigationTitle(LocalizedStringResource(
+                "data_unavailable.title",
+                table: "Recovery"
+            ))
         }
         .task { await actions.load() }
         .announcesAccessibilityErrors(accessibilityErrors)

@@ -10,7 +10,13 @@ struct TagFilterView: View {
                 Button {
                     selectedTagID = nil
                 } label: {
-                    filterLabel("reminder.tag-filter.all", selected: selectedTagID == nil)
+                    filterLabel(
+                        LocalizedStringResource(
+                            "reminder.tag-filter.all",
+                            table: "Reminder"
+                        ),
+                        selected: selectedTagID == nil
+                    )
                 }
 
                 ForEach(tags) { tag in
@@ -41,12 +47,16 @@ struct TagFilterView: View {
         guard let selectedTagID,
               let tag = tags.first(where: { $0.id == selectedTagID })
         else {
-            return String(localized: "reminder.tag-filter.all", defaultValue: "All Tags")
+            return String(
+                localized: "reminder.tag-filter.all",
+                defaultValue: "All Tags",
+                table: "Reminder"
+            )
         }
         return tag.name
     }
 
-    private func filterLabel(_ title: LocalizedStringKey, selected: Bool) -> some View {
+    private func filterLabel(_ title: LocalizedStringResource, selected: Bool) -> some View {
         Label(title, systemImage: selected ? "checkmark" : "tag")
     }
 }

@@ -1,0 +1,1770 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "reminder.custom.error.assistance-unavailable": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assisted interpretation is unavailable. Enter a supported English repeat rule or choose a preset."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "入力支援を利用できません。対応する英語の繰り返しルールを入力するか、プリセットを選択してください。"
+          }
+        }
+      }
+    },
+    "reminder.custom.error.generation": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The repeat rule could not be interpreted. Revise the text and try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しルールを解釈できませんでした。入力を修正してもう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.custom.error.safety": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This repeat rule could not be processed safely. Revise the text and try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この繰り返しルールは安全に処理できませんでした。入力を修正してもう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.custom.error.validation": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The interpreted repeat rule is not valid. Revise the text and try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解釈された繰り返しルールが無効です。入力を修正してもう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.early-unit.days": {
+      "comment": "User-facing text for the semantic key reminder.early-unit.days.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Days"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日"
+          }
+        }
+      }
+    },
+    "reminder.early-unit.hours": {
+      "comment": "User-facing text for the semantic key reminder.early-unit.hours.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hours"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時間"
+          }
+        }
+      }
+    },
+    "reminder.early-unit.minutes": {
+      "comment": "User-facing text for the semantic key reminder.early-unit.minutes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Minutes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "分"
+          }
+        }
+      }
+    },
+    "reminder.early-unit.weeks": {
+      "comment": "User-facing text for the semantic key reminder.early-unit.weeks.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weeks"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "週間"
+          }
+        }
+      }
+    },
+    "reminder.early.custom": {
+      "comment": "User-facing text for the semantic key reminder.early.custom.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カスタム"
+          }
+        }
+      }
+    },
+    "reminder.early.five-minutes-before": {
+      "comment": "User-facing text for the semantic key reminder.early.five-minutes-before.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5 Minutes Before"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "5分前"
+          }
+        }
+      }
+    },
+    "reminder.early.none": {
+      "comment": "User-facing text for the semantic key reminder.early.none.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "None"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし"
+          }
+        }
+      }
+    },
+    "reminder.early.one-minute-before": {
+      "comment": "User-facing text for the semantic key reminder.early.one-minute-before.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 Minute Before"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1分前"
+          }
+        }
+      }
+    },
+    "reminder.field.current-device-time": {
+      "comment": "User-facing text for the semantic key reminder.field.current-device-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current Device Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の端末時刻"
+          }
+        }
+      }
+    },
+    "reminder.field.date": {
+      "comment": "User-facing text for the semantic key reminder.field.date.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日付"
+          }
+        }
+      }
+    },
+    "reminder.field.date-placeholder": {
+      "comment": "User-facing text for the semantic key reminder.field.date-placeholder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YYYY-MM-DD"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YYYY-MM-DD"
+          }
+        }
+      }
+    },
+    "reminder.field.early-reminder": {
+      "comment": "User-facing text for the semantic key reminder.field.early-reminder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早期リマインダー"
+          }
+        }
+      }
+    },
+    "reminder.field.early-unit": {
+      "comment": "User-facing text for the semantic key reminder.field.early-unit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "単位"
+          }
+        }
+      }
+    },
+    "reminder.field.early-value": {
+      "comment": "User-facing text for the semantic key reminder.field.early-value.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Amount"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "数量"
+          }
+        }
+      }
+    },
+    "reminder.field.enabled": {
+      "comment": "User-facing text for the semantic key reminder.field.enabled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enabled"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効"
+          }
+        }
+      }
+    },
+    "reminder.field.main-notification": {
+      "comment": "User-facing text for the semantic key reminder.field.main-notification.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notify at the Scheduled Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予定時刻にも通知"
+          }
+        }
+      }
+    },
+    "reminder.field.notes": {
+      "comment": "User-facing text for the semantic key reminder.field.notes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ"
+          }
+        }
+      }
+    },
+    "reminder.field.repeat": {
+      "comment": "User-facing text for the semantic key reminder.field.repeat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返し"
+          }
+        }
+      }
+    },
+    "reminder.field.repeat-end": {
+      "comment": "User-facing text for the semantic key reminder.field.repeat-end.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "End Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しの終了"
+          }
+        }
+      }
+    },
+    "reminder.field.repeat-end-date": {
+      "comment": "User-facing text for the semantic key reminder.field.repeat-end-date.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeat End Date"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しの終了日"
+          }
+        }
+      }
+    },
+    "reminder.field.source-instant": {
+      "comment": "User-facing text for the semantic key reminder.field.source-instant.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resolved Source Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "解決済みの基準時刻"
+          }
+        }
+      }
+    },
+    "reminder.field.source-time": {
+      "comment": "User-facing text for the semantic key reminder.field.source-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基準時刻"
+          }
+        }
+      }
+    },
+    "reminder.field.tags": {
+      "comment": "User-facing text for the semantic key reminder.field.tags.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ"
+          }
+        }
+      }
+    },
+    "reminder.field.time": {
+      "comment": "User-facing text for the semantic key reminder.field.time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "時刻"
+          }
+        }
+      }
+    },
+    "reminder.field.time-placeholder": {
+      "comment": "User-facing text for the semantic key reminder.field.time-placeholder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HH:MM"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HH:MM"
+          }
+        }
+      }
+    },
+    "reminder.field.time-zone": {
+      "comment": "User-facing text for the semantic key reminder.field.time-zone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time Zone"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイムゾーン"
+          }
+        }
+      }
+    },
+    "reminder.field.time-zone-placeholder": {
+      "comment": "User-facing text for the semantic key reminder.field.time-zone-placeholder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Area/Location"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "地域/都市"
+          }
+        }
+      }
+    },
+    "reminder.field.title": {
+      "comment": "User-facing text for the semantic key reminder.field.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトル"
+          }
+        }
+      }
+    },
+    "reminder.field.url": {
+      "comment": "User-facing text for the semantic key reminder.field.url.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL"
+          }
+        }
+      }
+    },
+    "reminder.form.capacity-confirmation.confirm": {
+      "comment": "User-facing text for the semantic key reminder.form.capacity-confirmation.confirm.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Anyway"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このまま保存"
+          }
+        }
+      }
+    },
+    "reminder.form.capacity-confirmation.message": {
+      "comment": "The app planning capacity. The %lld placeholder is the maximum number of notifications Punctual schedules at once.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punctual can schedule up to %lld notifications at once, so this reminder’s earliest notification may not be scheduled. Save anyway?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punctual が一度に予約できる通知は最大%lld件のため、このリマインダーの最初の通知が予約されない可能性があります。このまま保存しますか？"
+          }
+        }
+      }
+    },
+    "reminder.form.capacity-confirmation.title": {
+      "comment": "User-facing text for the semantic key reminder.form.capacity-confirmation.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notification Capacity Reached"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知の上限に達しました"
+          }
+        }
+      }
+    },
+    "reminder.form.create.title": {
+      "comment": "User-facing text for the semantic key reminder.form.create.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新規リマインダー"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.applied": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.applied.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom repeat applied."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カスタムの繰り返しを適用しました。"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apply": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.apply.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apply Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しを適用"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.canonical-disclosure": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.canonical-disclosure.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compatibility Details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "互換性の詳細"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.did-you-mean": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.did-you-mean.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Did you mean?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の内容ですか？"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.placeholder": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.placeholder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "For example, Every Monday"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "例：Every Monday"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.preview": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.preview.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Preview Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しをプレビュー"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.replace": {
+      "comment": "User-facing text for the semantic key reminder.form.custom.replace.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace Custom Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カスタムの繰り返しを置き換える"
+          }
+        }
+      }
+    },
+    "reminder.form.delete-confirmation.confirm": {
+      "comment": "User-facing text for the semantic key reminder.form.delete-confirmation.confirm.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを削除"
+          }
+        }
+      }
+    },
+    "reminder.form.delete-confirmation.message": {
+      "comment": "User-facing text for the semantic key reminder.form.delete-confirmation.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes the reminder from the current local store. Sync and notification removal are not instantaneous."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリマインダーを現在のローカルストアから削除します。同期と通知の削除は即時ではありません。"
+          }
+        }
+      }
+    },
+    "reminder.form.delete-confirmation.title": {
+      "comment": "User-facing text for the semantic key reminder.form.delete-confirmation.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete This Reminder?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリマインダーを削除しますか？"
+          }
+        }
+      }
+    },
+    "reminder.form.delete-failed": {
+      "comment": "User-facing text for the semantic key reminder.form.delete-failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The reminder could not be deleted. Your form values were kept."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを削除できませんでした。フォームの入力内容は保持されています。"
+          }
+        }
+      }
+    },
+    "reminder.form.discard-confirmation.confirm": {
+      "comment": "Destructive action that discards unsaved reminder form changes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard Changes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更を破棄"
+          }
+        }
+      }
+    },
+    "reminder.form.discard-confirmation.message": {
+      "comment": "Warning that unsaved reminder form changes will be lost.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your unsaved changes will be lost."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存していない変更は失われます。"
+          }
+        }
+      }
+    },
+    "reminder.form.discard-confirmation.title": {
+      "comment": "Title asking whether to discard unsaved reminder form changes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Discard Changes?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "変更を破棄しますか？"
+          }
+        }
+      }
+    },
+    "reminder.form.early-already-passed": {
+      "comment": "User-facing text for the semantic key reminder.form.early-already-passed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Some early alerts have already passed and will be skipped."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一部の早期通知はすでに過ぎているためスキップされます。"
+          }
+        }
+      }
+    },
+    "reminder.form.edit.title": {
+      "comment": "User-facing text for the semantic key reminder.form.edit.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを編集"
+          }
+        }
+      }
+    },
+    "reminder.form.error.invalid-date": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid date in YYYY-MM-DD format."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YYYY-MM-DD 形式で有効な日付を入力してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.invalid-early-value": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter an amount from 1 through 9999."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1から9999までの数量を入力してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.invalid-repeat-end-date": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid repeat end date in YYYY-MM-DD format."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "YYYY-MM-DD 形式で有効な繰り返し終了日を入力してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.invalid-time": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid 24-hour time in HH:MM format."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "HH:MM 形式で有効な24時間表記の時刻を入力してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.notes-too-large": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes are too large to save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモが大きすぎるため保存できません。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.repeat-end-before-start": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The repeat end date cannot be before the start date."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しの終了日は開始日より前にできません。"
+          }
+        }
+      }
+    },
+    "reminder.form.time-zone-picker.empty": {
+      "comment": "Message shown when no time zones match the search query.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No matching time zones"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一致するタイムゾーンがありません"
+          }
+        }
+      }
+    },
+    "reminder.form.time-zone-picker.search": {
+      "comment": "Placeholder for searching the time-zone picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Search time zones"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイムゾーンを検索"
+          }
+        }
+      }
+    },
+    "reminder.form.time-zone-picker.title": {
+      "comment": "Navigation title for selecting a time zone.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select Time Zone"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイムゾーンを選択"
+          }
+        }
+      }
+    },
+    "reminder.form.value.select": {
+      "comment": "Button label shown when a date, time, or time zone value needs to be selected.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択"
+          }
+        }
+      }
+    },
+    "reminder.form.value.unavailable": {
+      "comment": "Value shown for date, time, or time zone fields when the schedule is read-only.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用できません"
+          }
+        }
+      }
+    },
+    "reminder.form.error.time-zone-invalid": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a valid IANA time zone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効な IANA タイムゾーンを選択してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.time-zone-required": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A time zone is required."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイムゾーンは必須です。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.title-required": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A title is required."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトルは必須です。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.title-too-large": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The title is too large to save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトルが大きすぎるため保存できません。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.url-invalid": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a valid HTTP or HTTPS URL."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効な HTTP または HTTPS URL を入力してください。"
+          }
+        }
+      }
+    },
+    "reminder.form.error.url-too-large": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The URL is too large to save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "URL が大きすぎるため保存できません。"
+          }
+        }
+      }
+    },
+    "reminder.form.expired-confirmation.confirm": {
+      "comment": "User-facing text for the semantic key reminder.form.expired-confirmation.confirm.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Anyway"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このまま保存"
+          }
+        }
+      }
+    },
+    "reminder.form.expired-confirmation.message": {
+      "comment": "User-facing text for the semantic key reminder.form.expired-confirmation.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This schedule has no future notification. Saving it will not deliver a notification."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このスケジュールには今後の通知がないため、保存しても通知されません。"
+          }
+        }
+      }
+    },
+    "reminder.form.expired-confirmation.title": {
+      "comment": "User-facing text for the semantic key reminder.form.expired-confirmation.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save Without a Notification?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知なしで保存しますか？"
+          }
+        }
+      }
+    },
+    "reminder.form.next-notifications": {
+      "comment": "User-facing text for the semantic key reminder.form.next-notifications.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の通知"
+          }
+        }
+      }
+    },
+    "reminder.form.repeat.current-value": {
+      "comment": "User-facing text for the semantic key reminder.form.repeat.current-value.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Current Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在の繰り返し"
+          }
+        }
+      }
+    },
+    "reminder.form.save-failed": {
+      "comment": "User-facing text for the semantic key reminder.form.save-failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The reminder could not be saved. Your form values were kept."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを保存できませんでした。フォームの入力内容は保持されています。"
+          }
+        }
+      }
+    },
+    "reminder.form.schedule-corrupt": {
+      "comment": "User-facing text for the semantic key reminder.form.schedule-corrupt.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This schedule is invalid. Schedule fields are read-only, but metadata can still be edited."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このスケジュールは無効です。スケジュール項目は読み取り専用ですが、メタデータは編集できます。"
+          }
+        }
+      }
+    },
+    "reminder.form.schedule-repair-required": {
+      "comment": "User-facing text for the semantic key reminder.form.schedule-repair-required.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This synced schedule needs repair before it can be scheduled."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期されたスケジュールは、予約する前に修復が必要です。"
+          }
+        }
+      }
+    },
+    "reminder.form.schedule-update-required": {
+      "comment": "User-facing text for the semantic key reminder.form.schedule-update-required.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A newer app version created this schedule. Schedule fields are read-only, but metadata can still be edited."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このスケジュールは新しいバージョンのアプリで作成されています。スケジュール項目は読み取り専用ですが、メタデータは編集できます。"
+          }
+        }
+      }
+    },
+    "reminder.form.section.basic-information": {
+      "comment": "User-facing text for the semantic key reminder.form.section.basic-information.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Basic Information"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基本情報"
+          }
+        }
+      }
+    },
+    "reminder.form.section.date-time": {
+      "comment": "User-facing text for the semantic key reminder.form.section.date-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Date & Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日付と時刻"
+          }
+        }
+      }
+    },
+    "reminder.form.section.early-reminder": {
+      "comment": "User-facing text for the semantic key reminder.form.section.early-reminder.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早期リマインダー"
+          }
+        }
+      }
+    },
+    "reminder.form.section.organization": {
+      "comment": "User-facing text for the semantic key reminder.form.section.organization.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organization"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理"
+          }
+        }
+      }
+    },
+    "reminder.form.section.repeat": {
+      "comment": "User-facing text for the semantic key reminder.form.section.repeat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返し"
+          }
+        }
+      }
+    },
+    "reminder.repeat-end.never": {
+      "comment": "User-facing text for the semantic key reminder.repeat-end.never.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Never"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "なし"
+          }
+        }
+      }
+    },
+    "reminder.repeat-end.on-date": {
+      "comment": "User-facing text for the semantic key reminder.repeat-end.on-date.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "On Date"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "日付を指定"
+          }
+        }
+      }
+    },
+    "reminder.repeat.biweekly": {
+      "comment": "User-facing text for the semantic key reminder.repeat.biweekly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 2 Weeks"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "2週間ごと"
+          }
+        }
+      }
+    },
+    "reminder.repeat.custom": {
+      "comment": "User-facing text for the semantic key reminder.repeat.custom.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Custom"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カスタム"
+          }
+        }
+      }
+    },
+    "reminder.repeat.daily": {
+      "comment": "User-facing text for the semantic key reminder.repeat.daily.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Daily"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日"
+          }
+        }
+      }
+    },
+    "reminder.repeat.every-3-months": {
+      "comment": "User-facing text for the semantic key reminder.repeat.every-3-months.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 3 Months"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3か月ごと"
+          }
+        }
+      }
+    },
+    "reminder.repeat.every-6-months": {
+      "comment": "User-facing text for the semantic key reminder.repeat.every-6-months.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every 6 Months"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "6か月ごと"
+          }
+        }
+      }
+    },
+    "reminder.repeat.hourly": {
+      "comment": "User-facing text for the semantic key reminder.repeat.hourly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Hourly"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎時"
+          }
+        }
+      }
+    },
+    "reminder.repeat.monthly": {
+      "comment": "User-facing text for the semantic key reminder.repeat.monthly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Monthly"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎月"
+          }
+        }
+      }
+    },
+    "reminder.repeat.none": {
+      "comment": "User-facing text for the semantic key reminder.repeat.none.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Does Not Repeat"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返さない"
+          }
+        }
+      }
+    },
+    "reminder.repeat.weekdays": {
+      "comment": "User-facing text for the semantic key reminder.repeat.weekdays.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weekdays"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平日"
+          }
+        }
+      }
+    },
+    "reminder.repeat.weekends": {
+      "comment": "User-facing text for the semantic key reminder.repeat.weekends.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weekends"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "週末"
+          }
+        }
+      }
+    },
+    "reminder.repeat.weekly": {
+      "comment": "User-facing text for the semantic key reminder.repeat.weekly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Weekly"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎週"
+          }
+        }
+      }
+    },
+    "reminder.repeat.yearly": {
+      "comment": "User-facing text for the semantic key reminder.repeat.yearly.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Yearly"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎年"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

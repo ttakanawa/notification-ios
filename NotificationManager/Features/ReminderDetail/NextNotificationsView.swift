@@ -11,14 +11,24 @@ struct NextNotificationsView: View {
     var body: some View {
         if let directOSFire {
             VStack(alignment: .leading, spacing: 8) {
-                LabeledContent("reminder.next.os-fire-authoritative") {
+                LabeledContent {
                     Text(directOSFire.authoritative, format: .dateTime)
+                } label: {
+                    Text(LocalizedStringResource(
+                        "reminder.next.os-fire-authoritative",
+                        table: "Reminder"
+                    ))
                 }
                 .accessibilityIdentifier("reminder-detail.next-os-fire")
 
                 if let preview = directOSFire.foundationPreview {
-                    LabeledContent("reminder.next.foundation-preview-reference") {
+                    LabeledContent {
                         Text(preview, format: .dateTime)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.next.foundation-preview-reference",
+                            table: "Reminder"
+                        ))
                     }
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("reminder-detail.foundation-preview")
@@ -28,7 +38,10 @@ struct NextNotificationsView: View {
 
         if notifications.isEmpty {
             if directOSFire == nil {
-                Text("reminder.next.none")
+                Text(LocalizedStringResource(
+                    "reminder.next.none",
+                    table: "Reminder"
+                ))
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -38,9 +51,9 @@ struct NextNotificationsView: View {
                     Text(value.alertInstant, format: .dateTime)
                         .font(.headline)
                     ForEach(Array(value.reasons.enumerated()), id: \.offset) { _, reason in
-                        LabeledContent(reason.role.semanticKey) {
+                        LabeledContent {
                             VStack(alignment: .trailing, spacing: 2) {
-                                Label(reason.kind.semanticKey, systemImage: "bell")
+                                Label(reason.kind.localizedResource, systemImage: "bell")
                                 Text(
                                     verbatim: sourceFormatter.instant(
                                         reason.baseOccurrenceInstant,
@@ -49,9 +62,11 @@ struct NextNotificationsView: View {
                                     )
                                 )
                             }
+                        } label: {
+                            Text(reason.role.localizedResource)
                         }
                     }
-                    LabeledContent("reminder.next.source-time") {
+                    LabeledContent {
                         Text(
                             verbatim: sourceFormatter.instant(
                                 value.sourceTime,
@@ -59,9 +74,19 @@ struct NextNotificationsView: View {
                                 locale: locale
                             )
                         )
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.next.source-time",
+                            table: "Reminder"
+                        ))
                     }
-                    LabeledContent("reminder.next.device-time") {
+                    LabeledContent {
                         Text(value.deviceLocalTime, format: .dateTime)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.next.device-time",
+                            table: "Reminder"
+                        ))
                     }
                 }
                 .fixedSize(horizontal: false, vertical: true)

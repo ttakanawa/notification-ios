@@ -4,15 +4,11 @@ struct NotificationNoLongerAvailableView: View {
     var body: some View {
         NavigationStack {
             ContentUnavailableView(
-                LocalizedStringKey(NotificationUnavailableContent.titleKey),
+                NotificationUnavailableContent.title,
                 systemImage: "bell.slash",
-                description: Text(
-                    LocalizedStringKey(NotificationUnavailableContent.messageKey)
-                )
+                description: Text(NotificationUnavailableContent.message)
             )
-            .navigationTitle(
-                LocalizedStringKey(NotificationUnavailableContent.titleKey)
-            )
+            .navigationTitle(NotificationUnavailableContent.title)
         }
         .accessibilityIdentifier("notification-unavailable.root")
     }

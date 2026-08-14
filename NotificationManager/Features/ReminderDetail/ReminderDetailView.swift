@@ -13,15 +13,21 @@ struct ReminderDetailView: View {
 
     var body: some View {
         List {
-            Section("reminder.detail.section.status") {
-                Label(model.lifecycleStatus.semanticKey, systemImage: model.lifecycleStatus.systemImage)
+            Section(LocalizedStringResource(
+                "reminder.detail.section.status",
+                table: "Reminder"
+            )) {
+                Label(
+                    model.lifecycleStatus.localizedResource,
+                    systemImage: model.lifecycleStatus.systemImage
+                )
                     .accessibilityIdentifier("reminder-detail.lifecycle-status")
 
                 ForEach(
                     Array(model.item.reminderStatus.secondary.enumerated()),
                     id: \.offset
                 ) { _, status in
-                    Label(status.semanticKey, systemImage: status.systemImage)
+                    Label(status.localizedResource, systemImage: status.systemImage)
                         .accessibilityIdentifier("reminder-detail.secondary-lifecycle-status")
                 }
 
@@ -29,7 +35,10 @@ struct ReminderDetailView: View {
                     Button {
                         enabledBinding.wrappedValue.toggle()
                     } label: {
-                        Text("reminder.field.enabled")
+                        Text(LocalizedStringResource(
+                            "reminder.field.enabled",
+                            table: "ReminderForm"
+                        ))
                             .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             .contentShape(Rectangle())
                     }
@@ -37,18 +46,30 @@ struct ReminderDetailView: View {
                     .disabled(actions.isWorking(model.id))
                     .accessibilityHidden(true)
 
-                    Toggle("reminder.field.enabled", isOn: enabledBinding)
+                    Toggle(LocalizedStringResource(
+                        "reminder.field.enabled",
+                        table: "ReminderForm"
+                    ), isOn: enabledBinding)
                         .labelsHidden()
                         .disabled(actions.isWorking(model.id))
-                        .accessibilityLabel("reminder.field.enabled")
+                        .accessibilityLabel(Text(LocalizedStringResource(
+                            "reminder.field.enabled",
+                            table: "ReminderForm"
+                        )))
                         .accessibilityIdentifier("reminder-detail.enabled")
                 }
 
                 if actions.state == .failed(model.id, .enabledChange) {
-                    Label("reminder.action.enabled-change-failed", systemImage: "exclamationmark.triangle")
+                    Label(LocalizedStringResource(
+                        "reminder.action.enabled-change-failed",
+                        table: "Reminder"
+                    ), systemImage: "exclamationmark.triangle")
                         .accessibilityIdentifier("reminder-detail.enabled-error")
                 } else if actions.state == .failed(model.id, .delete) {
-                    Label("reminder.action.delete-failed", systemImage: "exclamationmark.triangle")
+                    Label(LocalizedStringResource(
+                        "reminder.action.delete-failed",
+                        table: "Reminder"
+                    ), systemImage: "exclamationmark.triangle")
                         .accessibilityIdentifier("reminder-detail.delete-error")
                 }
 
@@ -61,14 +82,22 @@ struct ReminderDetailView: View {
                 }
             }
 
-            Section("reminder.detail.section.schedule") {
+            Section(LocalizedStringResource(
+                "reminder.detail.section.schedule",
+                table: "Reminder"
+            )) {
                 if let source = model.item.sourceWallClock {
-                    LabeledContent("reminder.field.source-time") {
+                    LabeledContent {
                         Text(verbatim: sourceFormatter.wallClock(source, locale: locale))
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.source-time",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if let sourceTime = model.sourceTime {
-                    LabeledContent("reminder.field.source-instant") {
+                    LabeledContent {
                         Text(
                             verbatim: sourceFormatter.instant(
                                 sourceTime,
@@ -76,43 +105,79 @@ struct ReminderDetailView: View {
                                 locale: locale
                             )
                         )
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.source-instant",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if let currentDeviceTime = model.currentDeviceTime {
-                    LabeledContent("reminder.field.current-device-time") {
+                    LabeledContent {
                         Text(currentDeviceTime, format: .dateTime)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.current-device-time",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if let summary = model.localizedRepeatSummary {
-                    LabeledContent("reminder.field.repeat") {
+                    LabeledContent {
                         Text(verbatim: summary)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.repeat",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if let summary = model.repeatEndSummary {
-                    LabeledContent("reminder.field.repeat-end") {
+                    LabeledContent {
                         Text(verbatim: summary)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.repeat-end",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if let summary = model.earlyReminderSummary {
-                    LabeledContent("reminder.field.early-reminder") {
+                    LabeledContent {
                         Text(verbatim: summary)
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.early-reminder",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
                 if !model.item.tags.isEmpty {
-                    LabeledContent("reminder.field.tags") {
+                    LabeledContent {
                         Text(verbatim: model.item.tags.map(\.name).joined(separator: ", "))
+                    } label: {
+                        Text(LocalizedStringResource(
+                            "reminder.field.tags",
+                            table: "ReminderForm"
+                        ))
                     }
                 }
             }
 
             if let notes = model.notes, !notes.isEmpty {
-                Section("reminder.detail.section.notes") {
+                Section(LocalizedStringResource(
+                    "reminder.detail.section.notes",
+                    table: "Reminder"
+                )) {
                     Text(verbatim: notes)
                         .fixedSize(horizontal: false, vertical: true)
                 }
             }
 
-            Section("reminder.detail.section.next-notifications") {
+            Section(LocalizedStringResource(
+                "reminder.detail.section.next-notifications",
+                table: "Reminder"
+            )) {
                 NextNotificationsView(
                     directOSFire: model.directOSFire,
                     notifications: model.nextNotifications
@@ -120,16 +185,27 @@ struct ReminderDetailView: View {
             }
 
             if !model.requestDiagnostics.isEmpty || !model.alertGroups.isEmpty {
-                Section("reminder.detail.section.diagnostics") {
+                Section(LocalizedStringResource(
+                    "reminder.detail.section.diagnostics",
+                    table: "Reminder"
+                )) {
                     ForEach(model.requestDiagnostics) { request in
-                        LabeledContent("reminder.diagnostics.request-type") {
-                            Text(request.kind.semanticKey)
+                        LabeledContent {
+                            Text(request.kind.localizedResource)
+                        } label: {
+                            Text(LocalizedStringResource(
+                                "reminder.diagnostics.request-type",
+                                table: "Reminder"
+                            ))
                         }
                         .accessibilityIdentifier("reminder-detail.request-type")
                     }
                     ForEach(model.alertGroups) { group in
                         LabeledContent {
-                            Label(group.outcome.semanticKey, systemImage: group.outcome.systemImage)
+                            Label(
+                                group.outcome.localizedResource,
+                                systemImage: group.outcome.systemImage
+                            )
                         } label: {
                             Text(group.groupID.baseOccurrenceInstant, format: .dateTime)
                         }
@@ -142,7 +218,10 @@ struct ReminderDetailView: View {
                     Button {
                         openURL(url)
                     } label: {
-                        Label("reminder.action.open-link", systemImage: "safari")
+                        Label(LocalizedStringResource(
+                            "reminder.action.open-link",
+                            table: "Reminder"
+                        ), systemImage: "safari")
                     }
                     .accessibilityIdentifier("reminder-detail.open-link")
                 }
@@ -151,12 +230,18 @@ struct ReminderDetailView: View {
         .navigationTitle(Text(verbatim: model.item.title))
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
-                Button("reminder.action.edit") {
+                Button(LocalizedStringResource(
+                    "reminder.action.edit",
+                    table: "Reminder"
+                )) {
                     router.showEdit(model.id)
                 }
                 .accessibilityIdentifier("reminder-detail.edit")
 
-                Button("reminder.action.delete", role: .destructive) {
+                Button(LocalizedStringResource(
+                    "reminder.action.delete",
+                    table: "Reminder"
+                ), role: .destructive) {
                     actions.requestDelete(model.id)
                 }
                 .disabled(actions.isWorking(model.id))
@@ -164,21 +249,33 @@ struct ReminderDetailView: View {
             }
         }
         .alert(
-            "reminder.form.delete-confirmation.title",
+            LocalizedStringResource(
+                "reminder.form.delete-confirmation.title",
+                table: "ReminderForm"
+            ),
             isPresented: deleteConfirmationPresented
         ) {
             Button(role: .destructive, action: confirmDelete) {
-                Text("reminder.form.delete-confirmation.confirm")
+                Text(LocalizedStringResource(
+                    "reminder.form.delete-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
                     .accessibilityIdentifier("reminder-detail.delete-confirm")
             }
             Button(role: .cancel) {
                 actions.cancelDelete(model.id)
             } label: {
-                Text("reminder.action.cancel")
+                Text(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ))
                     .accessibilityIdentifier("reminder-detail.delete-cancel")
             }
         } message: {
-            Text("reminder.form.delete-confirmation.message")
+            Text(LocalizedStringResource(
+                "reminder.form.delete-confirmation.message",
+                table: "ReminderForm"
+            ))
         }
         .announcesAccessibilityErrors(actionAccessibilityErrors)
         .background {
@@ -232,10 +329,18 @@ struct ReminderDetailView: View {
 }
 
 private extension MaterializedRequestTypePresentation {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .oneShot: "reminder.request-type.rolling-one-shot"
-        case .repeating: "reminder.request-type.direct-repeating"
+        case .oneShot:
+            LocalizedStringResource(
+                "reminder.request-type.rolling-one-shot",
+                table: "Reminder"
+            )
+        case .repeating:
+            LocalizedStringResource(
+                "reminder.request-type.direct-repeating",
+                table: "Reminder"
+            )
         }
     }
 }

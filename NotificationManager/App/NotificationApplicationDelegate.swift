@@ -98,7 +98,10 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         isInstalled = true
         let action = UNNotificationAction(
             identifier: Self.openLinkActionIdentifier,
-            title: String(localized: "reminder.action.open-link"),
+            title: String(
+                localized: "reminder.action.open-link",
+                table: "Reminder"
+            ),
             options: [.foreground]
         )
         let category = UNNotificationCategory(

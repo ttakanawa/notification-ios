@@ -7,7 +7,10 @@ struct TagPickerView: View {
     @State private var newName = ""
 
     var body: some View {
-        Section("tags.picker.title") {
+        Section(LocalizedStringResource(
+            "tags.picker.title",
+            table: "Tags"
+        )) {
             ForEach(model.tags, id: \.id) { tag in
                 Toggle(isOn: selectionBinding(for: tag.id)) {
                     Label {
@@ -19,17 +22,26 @@ struct TagPickerView: View {
                 .accessibilityIdentifier("tags.picker.tag.\(tag.id.uuidString.lowercased())")
             }
 
-            TextField("tags.field.name", text: $newName)
+            TextField(LocalizedStringResource(
+                "tags.field.name",
+                table: "Tags"
+            ), text: $newName, prompt: nil)
                 .submitLabel(.done)
                 .onSubmit(createAndSelect)
                 .accessibilityIdentifier("tags.picker.new-name")
 
-            Button("tags.action.create", action: createAndSelect)
+            Button(LocalizedStringResource(
+                "tags.action.create",
+                table: "Tags"
+            ), action: createAndSelect)
                 .disabled(model.isWorking || newName.isEmpty)
                 .accessibilityIdentifier("tags.picker.create")
 
             if let error = model.actionError {
-                Label(error.semanticKey, systemImage: "exclamationmark.triangle")
+                Label(
+                    error.localizedResource,
+                    systemImage: "exclamationmark.triangle"
+                )
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("tags.picker.error")

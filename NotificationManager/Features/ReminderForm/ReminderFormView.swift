@@ -44,11 +44,17 @@ struct ReminderFormView: View {
                 }
             }
         }
-        .navigationTitle(model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title")
+        .navigationTitle(Text(LocalizedStringResource(
+            model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title",
+            table: "ReminderForm"
+        )))
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                Button("reminder.action.save") {
+                Button(LocalizedStringResource(
+                    "reminder.action.save",
+                    table: "Reminder"
+                )) {
                     let reminderID = model.detachedDraft.id
                     Task {
                         await router.performReminderSave(reminderID) {
@@ -78,7 +84,10 @@ struct ReminderFormView: View {
             }
         }
         .alert(
-            "reminder.form.expired-confirmation.title",
+            LocalizedStringResource(
+                "reminder.form.expired-confirmation.title",
+                table: "ReminderForm"
+            ),
             isPresented: expiredConfirmationPresented
         ) {
             Button(role: .destructive) {
@@ -90,29 +99,50 @@ struct ReminderFormView: View {
                     }
                 }
             } label: {
-                Text("reminder.form.expired-confirmation.confirm")
+                Text(LocalizedStringResource(
+                    "reminder.form.expired-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
                     .accessibilityIdentifier("reminder-form.expired-confirm")
             }
-            Button("reminder.action.cancel", role: .cancel) {
+            Button(LocalizedStringResource(
+                "reminder.action.cancel",
+                table: "Reminder"
+            ), role: .cancel) {
                 model.dismissPendingConfirmation()
             }
         } message: {
-            Text("reminder.form.expired-confirmation.message")
+            Text(LocalizedStringResource(
+                "reminder.form.expired-confirmation.message",
+                table: "ReminderForm"
+            ))
         }
         .alert(
-            "reminder.form.delete-confirmation.title",
+            LocalizedStringResource(
+                "reminder.form.delete-confirmation.title",
+                table: "ReminderForm"
+            ),
             isPresented: deleteConfirmationPresented
         ) {
             Button(role: .destructive, action: confirmDelete) {
-                Text("reminder.form.delete-confirmation.confirm")
+                Text(LocalizedStringResource(
+                    "reminder.form.delete-confirmation.confirm",
+                    table: "ReminderForm"
+                ))
                     .accessibilityIdentifier("reminder-form.delete-confirm")
             }
             Button(role: .cancel, action: model.cancelDeleteConfirmation) {
-                Text("reminder.action.cancel")
+                Text(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ))
                     .accessibilityIdentifier("reminder-form.delete-cancel")
             }
         } message: {
-            Text("reminder.form.delete-confirmation.message")
+            Text(LocalizedStringResource(
+                "reminder.form.delete-confirmation.message",
+                table: "ReminderForm"
+            ))
         }
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {

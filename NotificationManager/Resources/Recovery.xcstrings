@@ -1,0 +1,150 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "data_unavailable.description": {
+      "comment": "User-facing text for the semantic key data_unavailable.description.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The local reminder store could not be opened. Store files and existing notification requests have not been deleted."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローカルのリマインダーストアを開けませんでした。ストアファイルと既存の通知リクエストは削除されていません。"
+          }
+        }
+      }
+    },
+    "data_unavailable.notifications-may-continue": {
+      "comment": "User-facing text for the semantic key data_unavailable.notifications-may-continue.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications may continue until you turn them off or remove pending app notifications."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知をオフにするか、保留中のアプリ通知を削除するまで通知が続く場合があります。"
+          }
+        }
+      }
+    },
+    "data_unavailable.remove-pending": {
+      "comment": "User-facing text for the semantic key data_unavailable.remove-pending.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove All Pending App Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中のアプリ通知をすべて削除"
+          }
+        }
+      }
+    },
+    "data_unavailable.remove-pending.explanation": {
+      "comment": "User-facing text for the semantic key data_unavailable.remove-pending.explanation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This removes only app-owned pending requests. Delivered notifications are not read or removed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリが所有する保留中のリクエストだけを削除します。配信済み通知は読み取りも削除もしません。"
+          }
+        }
+      }
+    },
+    "data_unavailable.title": {
+      "comment": "User-facing text for the semantic key data_unavailable.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data Unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データを利用できません"
+          }
+        }
+      }
+    },
+    "notification_unavailable.message": {
+      "comment": "User-facing text for the semantic key notification_unavailable.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reminder is no longer available. Return to the reminder list to continue."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリマインダーは利用できなくなりました。リマインダー一覧に戻って操作を続けてください。"
+          }
+        }
+      }
+    },
+    "notification_unavailable.title": {
+      "comment": "User-facing text for the semantic key notification_unavailable.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notification No Longer Available"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知は利用できません"
+          }
+        }
+      }
+    },
+    "recovery.error.data-unavailable": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder data is unavailable."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーのデータを利用できません。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

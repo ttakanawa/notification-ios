@@ -12,12 +12,18 @@ struct TagManagementView: View {
     var body: some View {
         List {
             Section {
-                TextField("tags.field.name", text: $newName)
+                TextField(LocalizedStringResource(
+                    "tags.field.name",
+                    table: "Tags"
+                ), text: $newName, prompt: nil)
                     .submitLabel(.done)
                     .onSubmit(createTag)
                     .accessibilityIdentifier("tags.management.new-name")
 
-                Button("tags.action.create", action: createTag)
+                Button(LocalizedStringResource(
+                    "tags.action.create",
+                    table: "Tags"
+                ), action: createTag)
                     .disabled(model.isWorking || newName.isEmpty)
                     .accessibilityIdentifier("tags.management.create")
             }
@@ -29,7 +35,10 @@ struct TagManagementView: View {
                     .accessibilityIdentifier("tags.management.count")
 
                 if model.tags.isEmpty {
-                    Text("tags.management.empty")
+                    Text(LocalizedStringResource(
+                        "tags.management.empty",
+                        table: "Tags"
+                    ))
                         .foregroundStyle(.secondary)
                 }
 
@@ -43,7 +52,13 @@ struct TagManagementView: View {
                             renameTagID = tag.id
                             renameName = tag.name
                         } label: {
-                            Label("tags.action.rename", systemImage: "pencil")
+                            Label(
+                                LocalizedStringResource(
+                                    "tags.action.rename",
+                                    table: "Tags"
+                                ),
+                                systemImage: "pencil"
+                            )
                                 .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
@@ -54,7 +69,13 @@ struct TagManagementView: View {
                         Button(role: .destructive) {
                             deleteTagID = tag.id
                         } label: {
-                            Label("tags.action.delete", systemImage: "trash")
+                            Label(
+                                LocalizedStringResource(
+                                    "tags.action.delete",
+                                    table: "Tags"
+                                ),
+                                systemImage: "trash"
+                            )
                                 .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
@@ -67,17 +88,29 @@ struct TagManagementView: View {
 
             if let error = model.actionError {
                 Section {
-                    Label(error.semanticKey, systemImage: "exclamationmark.triangle")
+                    Label(
+                        error.localizedResource,
+                        systemImage: "exclamationmark.triangle"
+                    )
                         .foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("tags.management.error")
                 }
             }
         }
-        .navigationTitle("tags.management.title")
+        .navigationTitle(LocalizedStringResource(
+            "tags.management.title",
+            table: "Tags"
+        ))
         .task { await model.load() }
-        .alert("tags.action.rename", isPresented: renamePresented) {
-            TextField("tags.field.name", text: $renameName)
+        .alert(LocalizedStringResource(
+            "tags.action.rename",
+            table: "Tags"
+        ), isPresented: renamePresented) {
+            TextField(LocalizedStringResource(
+                "tags.field.name",
+                table: "Tags"
+            ), text: $renameName, prompt: nil)
             Button {
                 guard let renameTagID else { return }
                 let value = renameName
@@ -87,14 +120,23 @@ struct TagManagementView: View {
                     }
                 }
             } label: {
-                Text("tags.action.rename")
+                Text(LocalizedStringResource(
+                    "tags.action.rename",
+                    table: "Tags"
+                ))
                     .accessibilityIdentifier("tags.management.rename-confirm")
             }
-            Button("reminder.action.cancel", role: .cancel) {
+            Button(LocalizedStringResource(
+                "reminder.action.cancel",
+                table: "Reminder"
+            ), role: .cancel) {
                 renameTagID = nil
             }
         }
-        .alert("tags.delete-confirmation.title", isPresented: deletePresented) {
+        .alert(LocalizedStringResource(
+            "tags.delete-confirmation.title",
+            table: "Tags"
+        ), isPresented: deletePresented) {
             Button(role: .destructive) {
                 guard let deleteTagID else { return }
                 Task {
@@ -103,14 +145,23 @@ struct TagManagementView: View {
                     }
                 }
             } label: {
-                Text("tags.action.delete")
+                Text(LocalizedStringResource(
+                    "tags.action.delete",
+                    table: "Tags"
+                ))
                     .accessibilityIdentifier("tags.management.delete-confirm")
             }
-            Button("reminder.action.cancel", role: .cancel) {
+            Button(LocalizedStringResource(
+                "reminder.action.cancel",
+                table: "Reminder"
+            ), role: .cancel) {
                 deleteTagID = nil
             }
         } message: {
-            Text("tags.delete-confirmation.message")
+            Text(LocalizedStringResource(
+                "tags.delete-confirmation.message",
+                table: "Tags"
+            ))
         }
         .announcesAccessibilityErrors(
             model.actionError.map { [$0.accessibilityIdentity] } ?? []
@@ -137,7 +188,7 @@ struct TagManagementView: View {
     private var tagCountText: String {
         let format = String(
             localized: "tags.management.count",
-            table: "Localizable",
+            table: "Tags",
             bundle: .main,
             locale: locale
         )
@@ -155,14 +206,38 @@ struct TagManagementView: View {
 }
 
 extension TagActionErrorIdentity {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .emptyName: "tags.error.empty-name"
-        case .nameTooLarge: "tags.error.name-too-large"
-        case .normalizedNameTooLarge: "tags.error.normalized-name-too-large"
-        case .duplicateName: "tags.error.duplicate-name"
-        case .notFound: "tags.error.not-found"
-        case .storeUnavailable: "tags.error.store-unavailable"
+        case .emptyName:
+            LocalizedStringResource(
+                "tags.error.empty-name",
+                table: "Tags"
+            )
+        case .nameTooLarge:
+            LocalizedStringResource(
+                "tags.error.name-too-large",
+                table: "Tags"
+            )
+        case .normalizedNameTooLarge:
+            LocalizedStringResource(
+                "tags.error.normalized-name-too-large",
+                table: "Tags"
+            )
+        case .duplicateName:
+            LocalizedStringResource(
+                "tags.error.duplicate-name",
+                table: "Tags"
+            )
+        case .notFound:
+            LocalizedStringResource(
+                "tags.error.not-found",
+                table: "Tags"
+            )
+        case .storeUnavailable:
+            LocalizedStringResource(
+                "tags.error.store-unavailable",
+                table: "Tags"
+            )
         }
     }
 

@@ -6,7 +6,12 @@ struct OrganizationSection: View {
 
     var body: some View {
         Section {
-            Toggle("reminder.field.enabled", isOn: $model.enabled)
+            Toggle(isOn: $model.enabled) {
+                Text(LocalizedStringResource(
+                    "reminder.field.enabled",
+                    table: "ReminderForm"
+                ))
+            }
                 .accessibilityIdentifier("reminder-form.enabled")
 
             if !tags.isEmpty {
@@ -28,7 +33,10 @@ struct OrganizationSection: View {
                 Button(role: .destructive) {
                     model.requestDeleteConfirmation()
                 } label: {
-                    Text("reminder.action.delete")
+                    Text(LocalizedStringResource(
+                        "reminder.action.delete",
+                        table: "Reminder"
+                    ))
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .contentShape(Rectangle())
                 }
@@ -39,16 +47,31 @@ struct OrganizationSection: View {
             }
 
             if model.saveState == .failed(.save) {
-                Label("reminder.form.save-failed", systemImage: "exclamationmark.triangle")
+                Label(
+                    LocalizedStringResource(
+                        "reminder.form.save-failed",
+                        table: "ReminderForm"
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.save-error")
             } else if model.saveState == .failed(.delete) {
-                Label("reminder.form.delete-failed", systemImage: "exclamationmark.triangle")
+                Label(
+                    LocalizedStringResource(
+                        "reminder.form.delete-failed",
+                        table: "ReminderForm"
+                    ),
+                    systemImage: "exclamationmark.triangle"
+                )
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.delete-error")
             }
         } header: {
-            Text("reminder.form.section.organization")
+            Text(LocalizedStringResource(
+                "reminder.form.section.organization",
+                table: "ReminderForm"
+            ))
                 .background {
                     AccessibilityIdentifierContainer(
                         identifier: "reminder-form.section.organization"

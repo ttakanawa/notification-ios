@@ -1,3 +1,5 @@
+import Foundation
+
 enum AboutPrivacyDisclosure: String, CaseIterable, Sendable, Hashable, Identifiable {
     case automaticICloudSync
     case syncCompletionNotGuaranteed
@@ -14,32 +16,68 @@ enum AboutPrivacyDisclosure: String, CaseIterable, Sendable, Hashable, Identifia
 
     var id: Self { self }
 
-    var semanticKey: String {
+    var localizedResource: LocalizedStringResource {
         switch self {
         case .automaticICloudSync:
-            "privacy.icloud.automatic-sync"
+            LocalizedStringResource(
+                "privacy.icloud.automatic-sync",
+                table: "Settings"
+            )
         case .syncCompletionNotGuaranteed:
-            "privacy.icloud.sync-completion"
+            LocalizedStringResource(
+                "privacy.icloud.sync-completion",
+                table: "Settings"
+            )
         case .accountBehaviorNotGuaranteed:
-            "privacy.icloud.account-behavior"
+            LocalizedStringResource(
+                "privacy.icloud.account-behavior",
+                table: "Settings"
+            )
         case .notificationStorageManagedByOS:
-            "privacy.notifications.os-storage"
+            LocalizedStringResource(
+                "privacy.notifications.os-storage",
+                table: "Settings"
+            )
         case .notificationPreviewsControlledByOS:
-            "privacy.notifications.previews"
+            LocalizedStringResource(
+                "privacy.notifications.previews",
+                table: "Settings"
+            )
         case .staleSyncedContentMayAppear:
-            "privacy.notifications.stale-content"
+            LocalizedStringResource(
+                "privacy.notifications.stale-content",
+                table: "Settings"
+            )
         case .notificationRemovalIsNonAtomic:
-            "privacy.notifications.non-atomic-removal"
+            LocalizedStringResource(
+                "privacy.notifications.non-atomic-removal",
+                table: "Settings"
+            )
         case .deliveredNotificationRetention:
-            "privacy.notifications.delivered-retention"
+            LocalizedStringResource(
+                "privacy.notifications.delivered-retention",
+                table: "Settings"
+            )
         case .delayedOperationsAfterTermination:
-            "privacy.notifications.delayed-operations"
+            LocalizedStringResource(
+                "privacy.notifications.delayed-operations",
+                table: "Settings"
+            )
         case .staleRepeatingRequestsUntilReconcile:
-            "privacy.notifications.stale-repeating"
+            LocalizedStringResource(
+                "privacy.notifications.stale-repeating",
+                table: "Settings"
+            )
         case .noServerAnalyticsOrAdvertising:
-            "privacy.data.no-server-analytics-ads"
+            LocalizedStringResource(
+                "privacy.data.no-server-analytics-ads",
+                table: "Settings"
+            )
         case .foundationModelsRunOnDevice:
-            "privacy.data.foundation-models-on-device"
+            LocalizedStringResource(
+                "privacy.data.foundation-models-on-device",
+                table: "Settings"
+            )
         }
     }
 }

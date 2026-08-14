@@ -15,6 +15,24 @@ final class LocalizationAccessibilityUITests: XCTestCase {
         XCTAssertTrue(
             app.descendants(matching: .any)["privacy.disclosure.automaticICloudSync"].exists
         )
+        XCTAssertTrue(
+            app.staticTexts[
+                "リマインダーとタグは、OS が利用可能にしたときに SwiftData の自動 iCloud 同期を使用します。"
+            ].exists
+        )
+    }
+
+    @MainActor
+    func testJapaneseRecoveryUsesBundledRecoveryAndCommonTranslations() {
+        let app = launch(
+            scenario: "data-unavailable",
+            extraArguments: ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP"]
+        )
+
+        XCTAssertTrue(app.navigationBars["データを利用できません"].waitForExistence(timeout: 2))
+        let retry = app.buttons["data-unavailable.retry"]
+        scrollToHittable(retry, in: app)
+        XCTAssertEqual(retry.label, "再試行")
     }
 
     @MainActor
@@ -51,15 +69,17 @@ final class LocalizationAccessibilityUITests: XCTestCase {
         )
 
         app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()
-        let delete = app.buttons["reminder-detail.delete"]
+        let delete = app.buttons["reminder-form.delete"]
+        scrollToHittable(delete, in: app)
         XCTAssertTrue(delete.waitForExistence(timeout: 2))
+        XCTAssertGreaterThanOrEqual(delete.frame.height, 44)
         delete.tap()
 
         let alert = app.alerts.firstMatch
         XCTAssertTrue(alert.waitForExistence(timeout: 1))
         for identifier in [
-            "reminder-detail.delete-confirm",
-            "reminder-detail.delete-cancel"
+            "reminder-form.delete-confirm",
+            "reminder-form.delete-cancel"
         ] {
             let action = alert.buttons[identifier].firstMatch
             XCTAssertTrue(action.waitForExistence(timeout: 1))

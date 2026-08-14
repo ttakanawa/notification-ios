@@ -39,9 +39,15 @@ struct AppRouterDestinationView: View {
                 NotificationNoLongerAvailableView()
             case nil:
                 ContentUnavailableView(
-                    "reminder.navigation.select.title",
+                    LocalizedStringResource(
+                        "reminder.navigation.select.title",
+                        table: "Reminder"
+                    ),
                     systemImage: "bell.badge",
-                    description: Text("reminder.navigation.select.message")
+                    description: Text(LocalizedStringResource(
+                        "reminder.navigation.select.message",
+                        table: "Reminder"
+                    ))
                 )
                 .accessibilityIdentifier("adaptive-root.empty-detail")
             }
@@ -50,9 +56,15 @@ struct AppRouterDestinationView: View {
 
     private var unavailable: some View {
         ContentUnavailableView(
-            "reminder.navigation.unavailable.title",
+            LocalizedStringResource(
+                "reminder.navigation.unavailable.title",
+                table: "Reminder"
+            ),
             systemImage: "exclamationmark.triangle",
-            description: Text("reminder.navigation.unavailable.message")
+            description: Text(LocalizedStringResource(
+                "reminder.navigation.unavailable.message",
+                table: "Reminder"
+            ))
         )
         .accessibilityIdentifier("reminder.navigation.unavailable")
     }

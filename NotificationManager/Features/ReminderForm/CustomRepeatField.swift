@@ -6,13 +6,21 @@ struct CustomRepeatField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            TextField("reminder.form.custom.placeholder", text: customTextBinding, axis: .vertical)
+            TextField(text: customTextBinding, axis: .vertical) {
+                Text(LocalizedStringResource(
+                    "reminder.form.custom.placeholder",
+                    table: "ReminderForm"
+                ))
+            }
                 .lineLimit(2...5)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .accessibilityIdentifier("reminder-form.custom.input")
 
-            Button("reminder.form.custom.preview") {
+            Button(LocalizedStringResource(
+                "reminder.form.custom.preview",
+                table: "ReminderForm"
+            )) {
                 Task { await model.submitCustomRepeat() }
             }
             .disabled(model.customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -22,12 +30,15 @@ struct CustomRepeatField: View {
             case .idle:
                 EmptyView()
             case let .failed(error):
-                Label(error.semanticKey, systemImage: "exclamationmark.triangle")
+                Label(error.localizedResource, systemImage: "exclamationmark.triangle")
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.custom.error")
             case let .awaitingSuggestion(suggestion):
                 VStack(alignment: .leading, spacing: 6) {
-                    Text("reminder.form.custom.did-you-mean")
+                    Text(LocalizedStringResource(
+                        "reminder.form.custom.did-you-mean",
+                        table: "ReminderForm"
+                    ))
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Button {
@@ -39,13 +50,19 @@ struct CustomRepeatField: View {
                 }
             case let .awaitingConfirmation(preview):
                 previewView(preview)
-                Button("reminder.form.custom.apply") {
+                Button(LocalizedStringResource(
+                    "reminder.form.custom.apply",
+                    table: "ReminderForm"
+                )) {
                     Task { await model.confirmCustomRepeat() }
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("reminder-form.custom.apply")
             case let .confirmed(preview):
-                Label("reminder.form.custom.applied", systemImage: "checkmark.circle")
+                Label(LocalizedStringResource(
+                    "reminder.form.custom.applied",
+                    table: "ReminderForm"
+                ), systemImage: "checkmark.circle")
                 Text(verbatim: preview.canonicalEnglish)
                     .font(.caption)
             }
@@ -80,13 +97,20 @@ struct CustomRepeatField: View {
     }
 }
 
-private extension CustomRepeatResolutionError {
-    var semanticKey: LocalizedStringKey {
+extension CustomRepeatResolutionError {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .assistanceUnavailable: "reminder.custom.error.assistance-unavailable"
-        case .safetyGuard: "reminder.custom.error.safety"
-        case .generation: "reminder.custom.error.generation"
-        case .validation: "reminder.custom.error.validation"
+        case .assistanceUnavailable:
+            LocalizedStringResource(
+                "reminder.custom.error.assistance-unavailable",
+                table: "ReminderForm"
+            )
+        case .safetyGuard:
+            LocalizedStringResource("reminder.custom.error.safety", table: "ReminderForm")
+        case .generation:
+            LocalizedStringResource("reminder.custom.error.generation", table: "ReminderForm")
+        case .validation:
+            LocalizedStringResource("reminder.custom.error.validation", table: "ReminderForm")
         }
     }
 }

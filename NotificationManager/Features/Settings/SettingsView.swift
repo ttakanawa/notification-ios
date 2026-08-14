@@ -12,20 +12,31 @@ struct SettingsView: View {
         Form {
             Section {
                 Toggle(
-                    "settings.notifications.this-device",
+                    LocalizedStringResource(
+                        "settings.notifications.this-device",
+                        table: "Settings"
+                    ),
                     isOn: notificationsEnabledBinding
                 )
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("settings.notifications-this-device")
 
-                Text("settings.notifications.explanation")
+                Text(LocalizedStringResource(
+                    "settings.notifications.explanation",
+                    table: "Settings"
+                ))
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
 
-                LabeledContent("settings.authorization.title") {
-                    Text(model.authorization.rawStatus.semanticKey)
+                LabeledContent {
+                    Text(model.authorization.rawStatus.localizedResource)
                         .accessibilityIdentifier("settings.authorization-status")
+                } label: {
+                    Text(LocalizedStringResource(
+                        "settings.authorization.title",
+                        table: "Settings"
+                    ))
                 }
 
                 Text(verbatim: authorizationRawValue)
@@ -36,37 +47,67 @@ struct SettingsView: View {
                 Button {
                     openNotificationSettings()
                 } label: {
-                    Label("settings.open-os-settings", systemImage: "gear")
+                    Label(
+                        LocalizedStringResource(
+                            "settings.open-os-settings",
+                            table: "Settings"
+                        ),
+                        systemImage: "gear"
+                    )
                 }
                 .accessibilityIdentifier("settings.open-os-settings")
 
                 if let error = model.actionError {
-                    Label(error.semanticKey, systemImage: "exclamationmark.triangle")
+                    Label(
+                        error.localizedResource,
+                        systemImage: "exclamationmark.triangle"
+                    )
                         .foregroundStyle(.red)
                         .fixedSize(horizontal: false, vertical: true)
                         .accessibilityIdentifier("settings.action-error")
                 }
             } header: {
-                Text("settings.section.notifications")
+                Text(LocalizedStringResource(
+                    "settings.section.notifications",
+                    table: "Settings"
+                ))
             }
 
-            Section("settings.section.organization") {
+            Section(LocalizedStringResource(
+                "settings.section.organization",
+                table: "Settings"
+            )) {
                 NavigationLink {
                     TagManagementView(model: tagModel)
                 } label: {
-                    Label("settings.tags", systemImage: "tag")
+                    Label(
+                        LocalizedStringResource(
+                            "settings.tags",
+                            table: "Settings"
+                        ),
+                        systemImage: "tag"
+                    )
                 }
                 .accessibilityIdentifier("settings.tags")
 
                 NavigationLink {
                     AboutPrivacyView()
                 } label: {
-                    Label("settings.about-privacy", systemImage: "hand.raised")
+                    Label(
+                        LocalizedStringResource(
+                            "settings.about-privacy",
+                            table: "Settings"
+                        ),
+                        systemImage: "hand.raised"
+                    )
                 }
                 .accessibilityIdentifier("settings.about-privacy")
             }
         }
-        .navigationTitle("settings.title")
+        .navigationTitle(LocalizedStringResource(
+            "settings.title",
+            table: "Settings"
+        ))
         .task { await model.load() }
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {
@@ -86,7 +127,7 @@ struct SettingsView: View {
     private var authorizationRawValue: String {
         let format = String(
             localized: "settings.authorization.raw-value",
-            table: "Localizable",
+            table: "Settings",
             bundle: .main,
             locale: locale
         )
@@ -111,23 +152,55 @@ struct SettingsView: View {
 }
 
 extension NotificationAuthorizationRawStatus {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .notDetermined: "settings.authorization.not-determined"
-        case .denied: "settings.authorization.denied"
-        case .authorized: "settings.authorization.authorized"
-        case .provisional: "settings.authorization.provisional"
-        case .ephemeral: "settings.authorization.ephemeral"
-        case .unknown: "settings.authorization.unknown"
+        case .notDetermined:
+            LocalizedStringResource(
+                "settings.authorization.not-determined",
+                table: "Settings"
+            )
+        case .denied:
+            LocalizedStringResource(
+                "settings.authorization.denied",
+                table: "Settings"
+            )
+        case .authorized:
+            LocalizedStringResource(
+                "settings.authorization.authorized",
+                table: "Settings"
+            )
+        case .provisional:
+            LocalizedStringResource(
+                "settings.authorization.provisional",
+                table: "Settings"
+            )
+        case .ephemeral:
+            LocalizedStringResource(
+                "settings.authorization.ephemeral",
+                table: "Settings"
+            )
+        case .unknown:
+            LocalizedStringResource(
+                "settings.authorization.unknown",
+                table: "Settings"
+            )
         }
     }
 }
 
 extension NotificationSettingsActionErrorIdentity {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .authorizationRequest: "settings.error.authorization-request"
-        case .pendingCleanup: "settings.error.pending-cleanup"
+        case .authorizationRequest:
+            LocalizedStringResource(
+                "settings.error.authorization-request",
+                table: "Settings"
+            )
+        case .pendingCleanup:
+            LocalizedStringResource(
+                "settings.error.pending-cleanup",
+                table: "Settings"
+            )
         }
     }
 

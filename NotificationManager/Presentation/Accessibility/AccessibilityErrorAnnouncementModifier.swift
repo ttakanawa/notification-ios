@@ -43,7 +43,7 @@ struct AccessibilityErrorAnnouncementModifier: ViewModifier {
         }
         let message = String(
             localized: String.LocalizationValue(identity.rawValue),
-            table: "Localizable",
+            table: identity.localizationTable.rawValue,
             bundle: .main,
             locale: locale
         )

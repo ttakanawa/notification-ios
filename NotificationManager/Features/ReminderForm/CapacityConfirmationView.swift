@@ -6,26 +6,37 @@ struct CapacityConfirmationView: View {
     let onConfirm: @MainActor () -> Void
     let onCancel: @MainActor () -> Void
 
+    @Environment(\.locale) private var locale
+
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
-                Label("reminder.form.capacity-confirmation.title", systemImage: "tray.full")
+                Label(LocalizedStringResource(
+                    "reminder.form.capacity-confirmation.title",
+                    table: "ReminderForm"
+                ), systemImage: "tray.full")
                     .font(.title2.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
 
-                Text("reminder.form.capacity-confirmation.message \(warning.planningCapacity)")
+                Text(verbatim: capacityMessage)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 0)
 
-                Button("reminder.form.capacity-confirmation.confirm") {
+                Button(LocalizedStringResource(
+                    "reminder.form.capacity-confirmation.confirm",
+                    table: "ReminderForm"
+                )) {
                     onConfirm()
                 }
                 .buttonStyle(.borderedProminent)
                 .frame(maxWidth: .infinity)
                 .accessibilityIdentifier("reminder-form.capacity-confirm")
 
-                Button("reminder.action.cancel", role: .cancel) {
+                Button(LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ), role: .cancel) {
                     onCancel()
                 }
                 .frame(maxWidth: .infinity)
@@ -37,5 +48,17 @@ struct CapacityConfirmationView: View {
                 )
             }
         }
+    }
+
+    private var capacityMessage: String {
+        let format = LocalizedTextProvider.live.value(
+            for: "reminder.form.capacity-confirmation.message",
+            locale: locale
+        )
+        return String(
+            format: format,
+            locale: locale,
+            arguments: [Int64(warning.planningCapacity)]
+        )
     }
 }

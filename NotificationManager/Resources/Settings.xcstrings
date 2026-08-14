@@ -1,0 +1,618 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "privacy.data.foundation-models-on-device": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assisted repeat interpretation uses only an on-device Foundation Model. It is not sent to Private Cloud Compute or a third-party model provider."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "繰り返しの入力支援にはオンデバイスの Foundation Model のみを使用します。Private Cloud Compute や第三者のモデル提供者には送信しません。"
+          }
+        }
+      }
+    },
+    "privacy.data.no-server-analytics-ads": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app uses no app-operated server, analytics SDK, or advertising SDK."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリは、アプリ独自のサーバー、分析 SDK、広告 SDK を使用しません。"
+          }
+        }
+      }
+    },
+    "privacy.icloud.account-behavior": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud account changes and the local copy that remains are managed by the operating system and are not guaranteed by this app."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud アカウントの変更と端末に残るローカルコピーは OS が管理し、このアプリでは保証しません。"
+          }
+        }
+      }
+    },
+    "privacy.icloud.automatic-sync": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders and tags use SwiftData automatic iCloud sync when the operating system makes it available."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーとタグは、OS が利用可能にしたときに SwiftData の自動 iCloud 同期を使用します。"
+          }
+        }
+      }
+    },
+    "privacy.icloud.sync-completion": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This app does not show or guarantee upload completion, download completion, timing, or the winner of concurrent edits."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリは、アップロードやダウンロードの完了、反映時期、同時編集の結果を表示または保証しません。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.delayed-operations": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A notification operation already handed to the operating system can finish after the app terminates, so content may briefly reappear."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OS に渡した通知操作はアプリ終了後に完了することがあり、内容が一時的に再表示される場合があります。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.delivered-retention": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delivered notifications normally remain under operating-system and user control. Explicit reminder deletion requests best-effort removal only on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "配信済み通知は通常、OS と利用者が管理します。リマインダーを明示的に削除した場合も、この端末で可能な範囲の削除を要求するだけです。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.non-atomic-removal": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Removing pending or delivered notifications is not atomic with saving, syncing, or delivery, so complete recall cannot be guaranteed."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中または配信済み通知の削除は、保存、同期、配信と一体の処理ではないため、完全な回収は保証できません。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.os-storage": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending and delivered notifications are stored and retained by the operating system outside the app's SwiftData and CloudKit encryption policy."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中および配信済みの通知は、アプリの SwiftData と CloudKit の暗号化方針の対象外で OS に保存・保持されます。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.previews": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Titles, notes, and other notification content may appear in previews according to the operating system's notification preview setting."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトル、メモなどの通知内容は、OS の通知プレビュー設定に従って表示される場合があります。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.stale-content": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "During sync delays, a notification can show an older title, note, recurrence summary, source time, time zone, or reason from this device's previous local snapshot."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期の遅延中は、この端末の以前のローカル状態にある古いタイトル、メモ、繰り返し概要、基準時刻、タイムゾーン、理由が通知に表示される場合があります。"
+          }
+        }
+      }
+    },
+    "privacy.notifications.stale-repeating": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "After a crash or termination, a delayed repeating request can repeat stale content until the next time the app runs reconciliation."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "クラッシュや終了後、遅延した繰り返し通知が、次回アプリで再調整されるまで古い内容を繰り返す場合があります。"
+          }
+        }
+      }
+    },
+    "privacy.section.data": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data Use"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "データの利用"
+          }
+        }
+      }
+    },
+    "privacy.section.icloud": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
+          }
+        }
+      }
+    },
+    "privacy.section.notifications": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "privacy.title": {
+      "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About & Privacy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリとプライバシー"
+          }
+        }
+      }
+    },
+    "settings.about-privacy": {
+      "comment": "User-facing text for the semantic key settings.about-privacy.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "About & Privacy"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このアプリとプライバシー"
+          }
+        }
+      }
+    },
+    "settings.authorization.authorized": {
+      "comment": "User-facing text for the semantic key settings.authorization.authorized.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Authorized"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "許可済み"
+          }
+        }
+      }
+    },
+    "settings.authorization.denied": {
+      "comment": "User-facing text for the semantic key settings.authorization.denied.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Denied"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "拒否"
+          }
+        }
+      }
+    },
+    "settings.authorization.ephemeral": {
+      "comment": "User-facing text for the semantic key settings.authorization.ephemeral.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ephemeral"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時的な許可"
+          }
+        }
+      }
+    },
+    "settings.authorization.not-determined": {
+      "comment": "User-facing text for the semantic key settings.authorization.not-determined.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Determined"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未選択"
+          }
+        }
+      }
+    },
+    "settings.authorization.provisional": {
+      "comment": "User-facing text for the semantic key settings.authorization.provisional.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Provisional"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "仮の許可"
+          }
+        }
+      }
+    },
+    "settings.authorization.raw-value": {
+      "comment": "Diagnostic authorization status. The %lld placeholder is the raw integer value returned by the operating system.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Raw status: %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "生のステータス：%lld"
+          }
+        }
+      }
+    },
+    "settings.authorization.title": {
+      "comment": "User-facing text for the semantic key settings.authorization.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OS Notification Authorization"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OS の通知許可"
+          }
+        }
+      }
+    },
+    "settings.authorization.unknown": {
+      "comment": "User-facing text for the semantic key settings.authorization.unknown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unknown"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "不明"
+          }
+        }
+      }
+    },
+    "settings.error.authorization-request": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notification permission could not be requested. Your device preference was kept."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知許可を要求できませんでした。この端末の設定は保持されています。"
+          }
+        }
+      }
+    },
+    "settings.error.pending-cleanup": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pending app notifications could not all be removed. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保留中のアプリ通知をすべて削除できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "settings.notifications.explanation": {
+      "comment": "User-facing text for the semantic key settings.notifications.explanation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This setting applies only to this device. Turning it off keeps reminders and tags in iCloud and removes app-owned pending notifications from this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この設定はこの端末だけに適用されます。オフにしてもリマインダーとタグは iCloud に残り、この端末で保留中のアプリ通知を削除します。"
+          }
+        }
+      }
+    },
+    "settings.notifications.this-device": {
+      "comment": "User-facing text for the semantic key settings.notifications.this-device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications on This Device"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末で通知"
+          }
+        }
+      }
+    },
+    "settings.open-os-settings": {
+      "comment": "User-facing text for the semantic key settings.open-os-settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Notification Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知設定を開く"
+          }
+        }
+      }
+    },
+    "settings.section.notifications": {
+      "comment": "User-facing text for the semantic key settings.section.notifications.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      }
+    },
+    "settings.section.organization": {
+      "comment": "User-facing text for the semantic key settings.section.organization.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Organization"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "整理"
+          }
+        }
+      }
+    },
+    "settings.tags": {
+      "comment": "User-facing text for the semantic key settings.tags.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Manage Tags"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグを管理"
+          }
+        }
+      }
+    },
+    "settings.title": {
+      "comment": "User-facing text for the semantic key settings.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settings"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

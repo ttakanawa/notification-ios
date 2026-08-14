@@ -1,0 +1,618 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "localization.notification.body": {
+      "comment": "Notification body template. Placeholder 1 is the user note or localized repeat summary String; placeholder 2 is the localized source-time sentence String; placeholder 3 is the localized reason sentence String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n%2$@\n%3$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@\n%2$@\n%3$@"
+          }
+        }
+      }
+    },
+    "localization.reason.one-shot.early.primary": {
+      "comment": "Complete notification-reason sentence. The %@ placeholder is a locale-formatted source-zone date and time String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early reminder for %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の早期通知です。"
+          }
+        }
+      }
+    },
+    "localization.reason.one-shot.early.secondary": {
+      "comment": "Complete notification-reason sentence. The %@ placeholder is a locale-formatted source-zone date and time String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also early for %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "さらに、%@の早期通知です。"
+          }
+        }
+      }
+    },
+    "localization.reason.one-shot.main.primary": {
+      "comment": "Complete notification-reason sentence. The %@ placeholder is a locale-formatted source-zone date and time String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At the scheduled time for %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の予定時刻です。"
+          }
+        }
+      }
+    },
+    "localization.reason.one-shot.main.secondary": {
+      "comment": "Complete notification-reason sentence. The %@ placeholder is a locale-formatted source-zone date and time String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Also at the scheduled time for %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "さらに、%@の予定時刻です。"
+          }
+        }
+      }
+    },
+    "localization.reason.repeating.early": {
+      "comment": "User-facing text for the semantic key localization.reason.repeating.early.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early reminder for the next occurrence."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次回の予定に対する早期通知です。"
+          }
+        }
+      }
+    },
+    "localization.reason.repeating.main": {
+      "comment": "User-facing text for the semantic key localization.reason.repeating.main.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At the scheduled time."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予定時刻の通知です。"
+          }
+        }
+      }
+    },
+    "localization.reason.repeating.main-and-early": {
+      "comment": "User-facing text for the semantic key localization.reason.repeating.main-and-early.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "At the scheduled time. Also early for the next occurrence."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予定時刻の通知です。次回の予定に対する早期通知でもあります。"
+          }
+        }
+      }
+    },
+    "localization.repeat.daily.interval": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %lld days."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld日ごとに繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.daily.one": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every day."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎日繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.hourly.interval": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %lld hours."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld時間ごとに繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.hourly.one": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every hour."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎時繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.monthly.interval": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %1$lld months on %2$@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lldか月ごとの%2$@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.monthly.one": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every month on %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎月%@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.one-time": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One time."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1回のみです。"
+          }
+        }
+      }
+    },
+    "localization.repeat.weekdays": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every weekday."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平日に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.weekends": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every weekend."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "週末に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.weekly.interval": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %1$lld weeks on %2$@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld週間ごとの%2$@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.weekly.one": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎週%@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.yearly.interval": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every %1$lld years on %2$@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld年ごとの%2$@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.repeat.yearly.one": {
+      "comment": "Complete localized repeat summary. A %lld placeholder is the integer repeat interval; a %@ placeholder is a locale-formatted weekday list or selector String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Every year on %@."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "毎年%@に繰り返します。"
+          }
+        }
+      }
+    },
+    "localization.selector.day-of-month": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "day %lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld日"
+          }
+        }
+      }
+    },
+    "localization.selector.day-set.weekday": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "weekday"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "平日"
+          }
+        }
+      }
+    },
+    "localization.selector.day-set.weekend": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "weekend day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "週末日"
+          }
+        }
+      }
+    },
+    "localization.selector.last-day": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the last day"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最終日"
+          }
+        }
+      }
+    },
+    "localization.selector.last-weekday": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the last %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最終%@"
+          }
+        }
+      }
+    },
+    "localization.selector.month-day": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ %2$lld"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@%2$lld日"
+          }
+        }
+      }
+    },
+    "localization.selector.month-last-day": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the last day of %@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@の最終日"
+          }
+        }
+      }
+    },
+    "localization.selector.month-ordinal-day-set": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the %2$@ %3$@ of %1$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@の%2$@%3$@"
+          }
+        }
+      }
+    },
+    "localization.selector.month-ordinal-weekday": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ of %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%2$@の%1$@"
+          }
+        }
+      }
+    },
+    "localization.selector.nth-last-weekday": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the %1$@ last %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "最後から%1$@番目の%2$@"
+          }
+        }
+      }
+    },
+    "localization.selector.ordinal-day-set": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the %1$@ %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "localization.selector.ordinal-weekday": {
+      "comment": "Localized repeat-selector phrase. A %lld placeholder is a calendar day integer; each %@ placeholder is a locale-formatted ordinal, weekday, day-set, or month String according to its position.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "the %1$@ %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@%2$@"
+          }
+        }
+      }
+    },
+    "localization.source-time.sentence": {
+      "comment": "Complete source-time sentence. Placeholder 1 is a locale-aware short source wall-clock time String; placeholder 2 is a bidi-isolated IANA time-zone identifier String.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source time: %1$@ (%2$@)."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基準時刻：%1$@（%2$@）。"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

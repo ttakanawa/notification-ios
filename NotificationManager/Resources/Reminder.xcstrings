@@ -1,0 +1,1104 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "reminder.action.add": {
+      "comment": "User-facing text for the semantic key reminder.action.add.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを追加"
+          }
+        }
+      }
+    },
+    "reminder.action.back": {
+      "comment": "Navigation action that returns from a registered reminder form.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Back"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "戻る"
+          }
+        }
+      }
+    },
+    "reminder.action.cancel": {
+      "comment": "User-facing text for the semantic key reminder.action.cancel.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancel"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "キャンセル"
+          }
+        }
+      }
+    },
+    "reminder.action.delete": {
+      "comment": "User-facing text for the semantic key reminder.action.delete.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "削除"
+          }
+        }
+      }
+    },
+    "reminder.action.delete-failed": {
+      "comment": "User-facing text for the semantic key reminder.action.delete-failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The reminder could not be deleted. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを削除できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.action.done": {
+      "comment": "Confirmation action that applies the selected date or time in the picker sheet.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Done"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "完了"
+          }
+        }
+      }
+    },
+    "reminder.action.edit": {
+      "comment": "User-facing text for the semantic key reminder.action.edit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Edit"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "編集"
+          }
+        }
+      }
+    },
+    "reminder.action.enabled-change-failed": {
+      "comment": "User-facing text for the semantic key reminder.action.enabled-change-failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The enabled setting could not be changed. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効設定を変更できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.action.open-link": {
+      "comment": "User-facing text for the semantic key reminder.action.open-link.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Link"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リンクを開く"
+          }
+        }
+      }
+    },
+    "reminder.action.save": {
+      "comment": "User-facing text for the semantic key reminder.action.save.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        }
+      }
+    },
+    "reminder.detail.section.diagnostics": {
+      "comment": "User-facing text for the semantic key reminder.detail.section.diagnostics.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnostics"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "診断情報"
+          }
+        }
+      }
+    },
+    "reminder.detail.section.next-notifications": {
+      "comment": "User-facing text for the semantic key reminder.detail.section.next-notifications.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の通知"
+          }
+        }
+      }
+    },
+    "reminder.detail.section.notes": {
+      "comment": "User-facing text for the semantic key reminder.detail.section.notes.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ"
+          }
+        }
+      }
+    },
+    "reminder.detail.section.schedule": {
+      "comment": "User-facing text for the semantic key reminder.detail.section.schedule.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Schedule"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "スケジュール"
+          }
+        }
+      }
+    },
+    "reminder.detail.section.status": {
+      "comment": "User-facing text for the semantic key reminder.detail.section.status.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Status"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "状態"
+          }
+        }
+      }
+    },
+    "reminder.device-status.authorization-unknown": {
+      "comment": "User-facing text for the semantic key reminder.device-status.authorization-unknown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Scheduled: Authorization Unknown"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：通知許可の状態が不明"
+          }
+        }
+      }
+    },
+    "reminder.device-status.capacity": {
+      "comment": "User-facing text for the semantic key reminder.device-status.capacity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Scheduled: Capacity"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：上限超過"
+          }
+        }
+      }
+    },
+    "reminder.device-status.device-off": {
+      "comment": "User-facing text for the semantic key reminder.device-status.device-off.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Scheduled: This Device Off"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：この端末ではオフ"
+          }
+        }
+      }
+    },
+    "reminder.device-status.error": {
+      "comment": "User-facing text for the semantic key reminder.device-status.error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unscheduled: Error"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：エラー"
+          }
+        }
+      }
+    },
+    "reminder.device-status.not-applicable": {
+      "comment": "User-facing text for the semantic key reminder.device-status.not-applicable.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Applicable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "対象外"
+          }
+        }
+      }
+    },
+    "reminder.device-status.permission-denied": {
+      "comment": "User-facing text for the semantic key reminder.device-status.permission-denied.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not Scheduled: Permission Denied"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：通知が許可されていません"
+          }
+        }
+      }
+    },
+    "reminder.device-status.permission-not-determined": {
+      "comment": "User-facing text for the semantic key reminder.device-status.permission-not-determined.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Permission Not Determined"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知許可が未選択"
+          }
+        }
+      }
+    },
+    "reminder.device-status.scheduled": {
+      "comment": "User-facing text for the semantic key reminder.device-status.scheduled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予約済み"
+          }
+        }
+      }
+    },
+    "reminder.device-status.scheduling": {
+      "comment": "User-facing text for the semantic key reminder.device-status.scheduling.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduling"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予約中"
+          }
+        }
+      }
+    },
+    "reminder.diagnostics.request-type": {
+      "comment": "User-facing text for the semantic key reminder.diagnostics.request-type.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Request Type"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リクエストの種類"
+          }
+        }
+      }
+    },
+    "reminder.group-outcome.capacity": {
+      "comment": "User-facing text for the semantic key reminder.group-outcome.capacity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unscheduled: Capacity"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：上限超過"
+          }
+        }
+      }
+    },
+    "reminder.group-outcome.error": {
+      "comment": "User-facing text for the semantic key reminder.group-outcome.error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Unscheduled: Error"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未予約：エラー"
+          }
+        }
+      }
+    },
+    "reminder.group-outcome.scheduled": {
+      "comment": "User-facing text for the semantic key reminder.group-outcome.scheduled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予約済み"
+          }
+        }
+      }
+    },
+    "reminder.lifecycle.active": {
+      "comment": "User-facing text for the semantic key reminder.lifecycle.active.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Active"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "有効"
+          }
+        }
+      }
+    },
+    "reminder.lifecycle.disabled": {
+      "comment": "User-facing text for the semantic key reminder.lifecycle.disabled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Disabled"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無効"
+          }
+        }
+      }
+    },
+    "reminder.lifecycle.expired": {
+      "comment": "User-facing text for the semantic key reminder.lifecycle.expired.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Expired"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "期限切れ"
+          }
+        }
+      }
+    },
+    "reminder.lifecycle.invalid-schedule": {
+      "comment": "User-facing text for the semantic key reminder.lifecycle.invalid-schedule.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Invalid Schedule"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "無効なスケジュール"
+          }
+        }
+      }
+    },
+    "reminder.lifecycle.update-required": {
+      "comment": "User-facing text for the semantic key reminder.lifecycle.update-required.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Update Required"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アップデートが必要"
+          }
+        }
+      }
+    },
+    "reminder.list.section.inactive": {
+      "comment": "User-facing text for the semantic key reminder.list.section.inactive.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Inactive"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "非アクティブ"
+          }
+        }
+      }
+    },
+    "reminder.list.section.needs-attention": {
+      "comment": "User-facing text for the semantic key reminder.list.section.needs-attention.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs Attention"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認が必要"
+          }
+        }
+      }
+    },
+    "reminder.list.section.upcoming": {
+      "comment": "User-facing text for the semantic key reminder.list.section.upcoming.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今後"
+          }
+        }
+      }
+    },
+    "reminder.list.title": {
+      "comment": "User-facing text for the semantic key reminder.list.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダー"
+          }
+        }
+      }
+    },
+    "reminder.navigation.select.message": {
+      "comment": "User-facing text for the semantic key reminder.navigation.select.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a reminder from the list to view its details."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一覧からリマインダーを選択すると詳細を表示できます。"
+          }
+        }
+      }
+    },
+    "reminder.navigation.select.title": {
+      "comment": "User-facing text for the semantic key reminder.navigation.select.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Select a Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを選択"
+          }
+        }
+      }
+    },
+    "reminder.navigation.unavailable": {
+      "comment": "User-facing text for the semantic key reminder.navigation.unavailable.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder Unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを利用できません"
+          }
+        }
+      }
+    },
+    "reminder.navigation.unavailable.message": {
+      "comment": "User-facing text for the semantic key reminder.navigation.unavailable.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This reminder is no longer available in the current local store."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリマインダーは現在のローカルストアで利用できなくなりました。"
+          }
+        }
+      }
+    },
+    "reminder.navigation.unavailable.title": {
+      "comment": "User-facing text for the semantic key reminder.navigation.unavailable.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminder Unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを利用できません"
+          }
+        }
+      }
+    },
+    "reminder.next.device-time": {
+      "comment": "User-facing text for the semantic key reminder.next.device-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Device Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "端末時刻"
+          }
+        }
+      }
+    },
+    "reminder.next.foundation-preview-reference": {
+      "comment": "User-facing text for the semantic key reminder.next.foundation-preview-reference.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foundation Preview (Reference)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Foundation プレビュー（参考）"
+          }
+        }
+      }
+    },
+    "reminder.next.none": {
+      "comment": "User-facing text for the semantic key reminder.next.none.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No future notifications are currently available."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在、今後の通知はありません。"
+          }
+        }
+      }
+    },
+    "reminder.next.os-fire": {
+      "comment": "User-facing text for the semantic key reminder.next.os-fire.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next OS Fire"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次回の OS 通知"
+          }
+        }
+      }
+    },
+    "reminder.next.os-fire-authoritative": {
+      "comment": "User-facing text for the semantic key reminder.next.os-fire-authoritative.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next OS Fire (Authoritative)"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次回の OS 通知（基準）"
+          }
+        }
+      }
+    },
+    "reminder.next.primary-reason": {
+      "comment": "User-facing text for the semantic key reminder.next.primary-reason.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Primary Reason"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "主な理由"
+          }
+        }
+      }
+    },
+    "reminder.next.secondary-reason": {
+      "comment": "User-facing text for the semantic key reminder.next.secondary-reason.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Secondary Reason"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "副次的な理由"
+          }
+        }
+      }
+    },
+    "reminder.next.source-time": {
+      "comment": "User-facing text for the semantic key reminder.next.source-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基準時刻"
+          }
+        }
+      }
+    },
+    "reminder.next.unavailable": {
+      "comment": "User-facing text for the semantic key reminder.next.unavailable.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No next notification is available."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次の通知はありません。"
+          }
+        }
+      }
+    },
+    "reminder.reason.early": {
+      "comment": "User-facing text for the semantic key reminder.reason.early.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Early Reminder"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "早期リマインダー"
+          }
+        }
+      }
+    },
+    "reminder.reason.main": {
+      "comment": "User-facing text for the semantic key reminder.reason.main.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled Time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予定時刻"
+          }
+        }
+      }
+    },
+    "reminder.request-type.direct-repeating": {
+      "comment": "User-facing text for the semantic key reminder.request-type.direct-repeating.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Direct Repeating"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直接繰り返し"
+          }
+        }
+      }
+    },
+    "reminder.request-type.rolling-one-shot": {
+      "comment": "User-facing text for the semantic key reminder.request-type.rolling-one-shot.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rolling One-Shot"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ローリング単発"
+          }
+        }
+      }
+    },
+    "reminder.row.source-time": {
+      "comment": "User-facing text for the semantic key reminder.row.source-time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "基準時刻"
+          }
+        }
+      }
+    },
+    "reminder.scheduling.scheduled-through": {
+      "comment": "User-facing text for the semantic key reminder.scheduling.scheduled-through.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Scheduled Through"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "予約済み期間"
+          }
+        }
+      }
+    },
+    "reminder.source-instant.presentation": {
+      "comment": "Source-zone instant presentation. Placeholder 1 is a locale-formatted date and time string; placeholder 2 is a bidi-isolated IANA time-zone identifier.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "reminder.source-wall-clock.presentation": {
+      "comment": "Saved source wall-clock presentation. Placeholder 1 is a locale-formatted date and time string; placeholder 2 is a bidi-isolated IANA time-zone identifier.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@ · %2$@"
+          }
+        }
+      }
+    },
+    "reminder.tag-filter.all": {
+      "comment": "User-facing text for the semantic key reminder.tag-filter.all.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "All Tags"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "すべてのタグ"
+          }
+        }
+      }
+    },
+    "reminder.tag-filter.menu": {
+      "comment": "User-facing text for the semantic key reminder.tag-filter.menu.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filter by Tag"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグで絞り込む"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

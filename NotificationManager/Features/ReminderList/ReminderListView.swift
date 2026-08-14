@@ -19,29 +19,44 @@ struct ReminderListView: View {
             )
 
             reminderSection(
-                "reminder.list.section.upcoming",
+                LocalizedStringResource(
+                    "reminder.list.section.upcoming",
+                    table: "Reminder"
+                ),
                 identifier: "reminder-list.section.upcoming",
                 items: model.sections.upcoming
             )
             reminderSection(
-                "reminder.list.section.needs-attention",
+                LocalizedStringResource(
+                    "reminder.list.section.needs-attention",
+                    table: "Reminder"
+                ),
                 identifier: "reminder-list.section.needs-attention",
                 items: model.sections.needsAttention
             )
             reminderSection(
-                "reminder.list.section.inactive",
+                LocalizedStringResource(
+                    "reminder.list.section.inactive",
+                    table: "Reminder"
+                ),
                 identifier: "reminder-list.section.inactive",
                 items: model.sections.inactive
             )
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("reminder.list.title")
+        .navigationTitle(LocalizedStringResource(
+            "reminder.list.title",
+            table: "Reminder"
+        ))
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
                     router.showSettings()
                 } label: {
-                    Label("settings.title", systemImage: "gear")
+                    Label(
+                        LocalizedStringResource("settings.title", table: "Settings"),
+                        systemImage: "gear"
+                    )
                 }
                 .accessibilityIdentifier("reminder-list.settings")
             }
@@ -49,7 +64,10 @@ struct ReminderListView: View {
                 Button {
                     router.showCreate()
                 } label: {
-                    Label("reminder.action.add", systemImage: "plus")
+                    Label(
+                        LocalizedStringResource("reminder.action.add", table: "Reminder"),
+                        systemImage: "plus"
+                    )
                 }
                 .accessibilityIdentifier("reminder-list.add")
             }
@@ -62,7 +80,7 @@ struct ReminderListView: View {
 
     @ViewBuilder
     private func reminderSection(
-        _ title: LocalizedStringKey,
+        _ title: LocalizedStringResource,
         identifier: String,
         items: [ReminderListItemPresentation]
     ) -> some View {
@@ -81,7 +99,10 @@ struct ReminderListView: View {
                     )
 
                     if let failure = actionFailure(for: item.id) {
-                        Label(failure.semanticKey, systemImage: "exclamationmark.triangle")
+                        Label(
+                            failure.localizedResource,
+                            systemImage: "exclamationmark.triangle"
+                        )
                             .foregroundStyle(.red)
                             .fixedSize(horizontal: false, vertical: true)
                             .accessibilityIdentifier(
@@ -112,10 +133,18 @@ struct ReminderListView: View {
 }
 
 extension ReminderActionFailure {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .enabledChange: "reminder.action.enabled-change-failed"
-        case .delete: "reminder.action.delete-failed"
+        case .enabledChange:
+            LocalizedStringResource(
+                "reminder.action.enabled-change-failed",
+                table: "Reminder"
+            )
+        case .delete:
+            LocalizedStringResource(
+                "reminder.action.delete-failed",
+                table: "Reminder"
+            )
         }
     }
 

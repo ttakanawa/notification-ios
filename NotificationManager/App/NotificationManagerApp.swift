@@ -53,7 +53,10 @@ private struct AppBootstrapRoot: View {
         Group {
             switch bootstrapper.state {
             case .loading:
-                ProgressView("common.app-name")
+                ProgressView(LocalizedStringResource(
+                    "common.app-name",
+                    table: "Common"
+                ))
                     .accessibilityIdentifier("app-bootstrap.loading")
             case let .ready(environment):
                 ReadyAppRoot(environment: environment)

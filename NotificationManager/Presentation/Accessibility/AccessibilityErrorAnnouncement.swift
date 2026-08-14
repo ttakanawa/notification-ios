@@ -27,6 +27,13 @@ enum AccessibilityErrorIdentity: String, Sendable, Hashable {
     case tagNotFound = "tags.error.not-found"
     case tagStoreUnavailable = "tags.error.store-unavailable"
     case dataUnavailable = "recovery.error.data-unavailable"
+
+    var localizationTable: LocalizationTable {
+        guard let table = LocalizationTable(semanticKey: rawValue) else {
+            preconditionFailure("Unowned accessibility localization key: \(rawValue)")
+        }
+        return table
+    }
 }
 
 struct AccessibilityErrorAnnouncementResolver: Sendable {

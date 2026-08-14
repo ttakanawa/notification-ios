@@ -7,7 +7,7 @@ struct DateTimeSection: View {
     var body: some View {
         Section {
             if case let .readOnly(reason) = model.scheduleAccess {
-                Label(reason.semanticKey, systemImage: "lock")
+                Label(reason.localizedResource, systemImage: "lock")
                     .fixedSize(horizontal: false, vertical: true)
                     .background {
                         AccessibilityIdentifierContainer(
@@ -16,55 +16,85 @@ struct DateTimeSection: View {
                     }
             }
 
-            TextField("reminder.field.date-placeholder", text: dateBinding)
+            TextField(LocalizedStringResource(
+                "reminder.field.date-placeholder",
+                table: "ReminderForm"
+            ), text: dateBinding, prompt: nil)
                 .textContentType(.dateTime)
                 .keyboardType(.numbersAndPunctuation)
                 .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityLabel("reminder.field.date")
+                .accessibilityLabel(Text(LocalizedStringResource(
+                    "reminder.field.date",
+                    table: "ReminderForm"
+                )))
                 .accessibilityIdentifier("reminder-form.date")
 
             if !model.sourceDateTextIsValid {
-                Label("reminder.form.error.invalid-date", systemImage: "exclamationmark.triangle")
+                Label(LocalizedStringResource(
+                    "reminder.form.error.invalid-date",
+                    table: "ReminderForm"
+                ), systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.date-error")
             }
 
-            TextField("reminder.field.time-placeholder", text: timeBinding)
+            TextField(LocalizedStringResource(
+                "reminder.field.time-placeholder",
+                table: "ReminderForm"
+            ), text: timeBinding, prompt: nil)
                 .textContentType(.dateTime)
                 .keyboardType(.numbersAndPunctuation)
                 .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityLabel("reminder.field.time")
+                .accessibilityLabel(Text(LocalizedStringResource(
+                    "reminder.field.time",
+                    table: "ReminderForm"
+                )))
                 .accessibilityIdentifier("reminder-form.time")
 
             if !model.sourceTimeTextIsValid {
-                Label("reminder.form.error.invalid-time", systemImage: "exclamationmark.triangle")
+                Label(LocalizedStringResource(
+                    "reminder.form.error.invalid-time",
+                    table: "ReminderForm"
+                ), systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.time-error")
             }
 
-            TextField("reminder.field.time-zone-placeholder", text: timeZoneBinding)
+            TextField(LocalizedStringResource(
+                "reminder.field.time-zone-placeholder",
+                table: "ReminderForm"
+            ), text: timeZoneBinding, prompt: nil)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityLabel("reminder.field.time-zone")
+                .accessibilityLabel(Text(LocalizedStringResource(
+                    "reminder.field.time-zone",
+                    table: "ReminderForm"
+                )))
                 .accessibilityIdentifier("reminder-form.time-zone")
 
             if let issue = model.timeZoneFieldIssue {
-                Label(issue.semanticKey, systemImage: "exclamationmark.triangle")
+                Label(issue.localizedResource, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.time-zone-error")
             }
 
             if case let .repair(issues) = model.scheduleAccess, !issues.isEmpty {
-                Label("reminder.form.schedule-repair-required", systemImage: "wrench.and.screwdriver")
+                Label(LocalizedStringResource(
+                    "reminder.form.schedule-repair-required",
+                    table: "ReminderForm"
+                ), systemImage: "wrench.and.screwdriver")
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.schedule-repair")
             }
         } header: {
-            Text("reminder.form.section.date-time")
+            Text(LocalizedStringResource(
+                "reminder.form.section.date-time",
+                table: "ReminderForm"
+            ))
                 .background {
                     AccessibilityIdentifierContainer(
                         identifier: "reminder-form.section.date-time"
@@ -101,11 +131,19 @@ struct DateTimeSection: View {
 
 }
 
-private extension ReminderFormReadOnlyReason {
-    var semanticKey: LocalizedStringKey {
+extension ReminderFormReadOnlyReason {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .updateRequired: "reminder.form.schedule-update-required"
-        case .invalidSchedule: "reminder.form.schedule-corrupt"
+        case .updateRequired:
+            LocalizedStringResource(
+                "reminder.form.schedule-update-required",
+                table: "ReminderForm"
+            )
+        case .invalidSchedule:
+            LocalizedStringResource(
+                "reminder.form.schedule-corrupt",
+                table: "ReminderForm"
+            )
         }
     }
 }

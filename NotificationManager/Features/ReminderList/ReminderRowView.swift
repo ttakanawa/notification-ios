@@ -44,31 +44,38 @@ struct ReminderRowView: View {
 }
 
 extension AlertKind {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .main: "reminder.reason.main"
-        case .early: "reminder.reason.early"
+        case .main: LocalizedStringResource("reminder.reason.main", table: "Reminder")
+        case .early: LocalizedStringResource("reminder.reason.early", table: "Reminder")
         }
     }
 }
 
 extension PhysicalNotificationReasonRole {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .primary: "reminder.next.primary-reason"
-        case .secondary: "reminder.next.secondary-reason"
+        case .primary:
+            LocalizedStringResource("reminder.next.primary-reason", table: "Reminder")
+        case .secondary:
+            LocalizedStringResource("reminder.next.secondary-reason", table: "Reminder")
         }
     }
 }
 
 extension LifecycleStatus {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .active: "reminder.lifecycle.active"
-        case .disabled: "reminder.lifecycle.disabled"
-        case .expired: "reminder.lifecycle.expired"
-        case .updateRequired: "reminder.lifecycle.update-required"
-        case .invalidSchedule: "reminder.lifecycle.invalid-schedule"
+        case .active:
+            LocalizedStringResource("reminder.lifecycle.active", table: "Reminder")
+        case .disabled:
+            LocalizedStringResource("reminder.lifecycle.disabled", table: "Reminder")
+        case .expired:
+            LocalizedStringResource("reminder.lifecycle.expired", table: "Reminder")
+        case .updateRequired:
+            LocalizedStringResource("reminder.lifecycle.update-required", table: "Reminder")
+        case .invalidSchedule:
+            LocalizedStringResource("reminder.lifecycle.invalid-schedule", table: "Reminder")
         }
     }
 
@@ -84,17 +91,32 @@ extension LifecycleStatus {
 }
 
 extension DeviceSchedulingStatus {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .notApplicable: "reminder.device-status.not-applicable"
-        case .notScheduledThisDeviceOff: "reminder.device-status.device-off"
-        case .permissionNotDetermined: "reminder.device-status.permission-not-determined"
-        case .notScheduledPermissionDenied: "reminder.device-status.permission-denied"
-        case .notScheduledAuthorizationUnknown: "reminder.device-status.authorization-unknown"
-        case .unscheduledError: "reminder.device-status.error"
-        case .scheduling: "reminder.device-status.scheduling"
-        case .unscheduledCapacity: "reminder.device-status.capacity"
-        case .scheduled: "reminder.device-status.scheduled"
+        case .notApplicable:
+            LocalizedStringResource("reminder.device-status.not-applicable", table: "Reminder")
+        case .notScheduledThisDeviceOff:
+            LocalizedStringResource("reminder.device-status.device-off", table: "Reminder")
+        case .permissionNotDetermined:
+            LocalizedStringResource(
+                "reminder.device-status.permission-not-determined",
+                table: "Reminder"
+            )
+        case .notScheduledPermissionDenied:
+            LocalizedStringResource("reminder.device-status.permission-denied", table: "Reminder")
+        case .notScheduledAuthorizationUnknown:
+            LocalizedStringResource(
+                "reminder.device-status.authorization-unknown",
+                table: "Reminder"
+            )
+        case .unscheduledError:
+            LocalizedStringResource("reminder.device-status.error", table: "Reminder")
+        case .scheduling:
+            LocalizedStringResource("reminder.device-status.scheduling", table: "Reminder")
+        case .unscheduledCapacity:
+            LocalizedStringResource("reminder.device-status.capacity", table: "Reminder")
+        case .scheduled:
+            LocalizedStringResource("reminder.device-status.scheduled", table: "Reminder")
         }
     }
 
@@ -115,11 +137,14 @@ extension DeviceSchedulingStatus {
 }
 
 extension AlertGroupSchedulingOutcome {
-    var semanticKey: LocalizedStringKey {
+    var localizedResource: LocalizedStringResource {
         switch self {
-        case .scheduled: "reminder.group-outcome.scheduled"
-        case .unscheduledCapacity: "reminder.group-outcome.capacity"
-        case .unscheduledError: "reminder.group-outcome.error"
+        case .scheduled:
+            LocalizedStringResource("reminder.group-outcome.scheduled", table: "Reminder")
+        case .unscheduledCapacity:
+            LocalizedStringResource("reminder.group-outcome.capacity", table: "Reminder")
+        case .unscheduledError:
+            LocalizedStringResource("reminder.group-outcome.error", table: "Reminder")
         }
     }
 

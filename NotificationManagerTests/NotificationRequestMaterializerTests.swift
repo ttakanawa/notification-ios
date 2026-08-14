@@ -1036,7 +1036,8 @@ private struct DSTGapSupplementalTextFormatter: LocalizedNotificationTextFormatt
     func content(for input: NotificationTextInput, locale: Locale) -> NotificationText {
         let source = LocalizedRepeatFormatter(
             localizer: LocalizedTextProvider { key, locale in
-                precondition(key == "localization.source-time.sentence")
+                #expect(key == "localization.source-time.sentence")
+                #expect(["en_US", "ja_JP"].contains(locale.identifier))
                 return locale.language.languageCode == .japanese
                     ? "基準時刻：%1$@（%2$@）。"
                     : "Source time: %1$@ (%2$@)."

@@ -250,6 +250,15 @@ struct SettingsRecoveryTests {
         #expect(await counter.value == 2)
         #expect(!actions.isRetrying)
     }
+
+    @Test func dynamicRecoveryAndPrivacyContentExposeLocalizedResources() {
+        let recoveryTitle: LocalizedStringResource = NotificationUnavailableContent.title
+        let disclosure: LocalizedStringResource =
+            AboutPrivacyDisclosure.automaticICloudSync.localizedResource
+
+        #expect(String(localized: recoveryTitle).isEmpty == false)
+        #expect(String(localized: disclosure).isEmpty == false)
+    }
 }
 
 @Suite("Recovery privacy boundaries")
@@ -287,13 +296,6 @@ struct RecoveryPrivacyBoundaryTests {
         ])
     }
 
-    @Test func neutralUnavailableContentExposesOnlySemanticRecoveryCopy() {
-        #expect(NotificationUnavailableContent.titleKey == "notification_unavailable.title")
-        #expect(
-            NotificationUnavailableContent.messageKey
-                == "notification_unavailable.message"
-        )
-    }
 }
 
 @Suite("Tag management and picker")
@@ -486,8 +488,9 @@ struct SourceTimePresentationTests {
 
     @Test func savedWallClockUsesExplicitLocaleAndBidiIsolatesTheIANAIdentifier() {
         let formatter = SourceDateTimePresentationFormatter(
-            localizer: LocalizedTextProvider { key, _ in
+            localizer: LocalizedTextProvider { key, locale in
                 #expect(key == "reminder.source-wall-clock.presentation")
+                #expect(["en_US", "ja_JP", "ar"].contains(locale.identifier))
                 return "%1$@ · %2$@"
             }
         )
@@ -696,6 +699,47 @@ struct LocalizedNotificationReasonPresentationTests {
 
 @Suite("Accessibility error announcement identity")
 struct AccessibilityErrorAnnouncementTests {
+    @Test func identitiesKeepRawIdentityWhileExposingOwnedLocalizationTable() {
+        let fixtures: [
+            (
+                identity: AccessibilityErrorIdentity,
+                rawValue: String,
+                table: LocalizationTable
+            )
+        ] = [
+            (
+                .reminderTitleRequired,
+                "reminder.form.error.title-required",
+                .reminderForm
+            ),
+            (
+                .reminderEnabledChangeFailed,
+                "reminder.action.enabled-change-failed",
+                .reminder
+            ),
+            (
+                .settingsPendingCleanup,
+                "settings.error.pending-cleanup",
+                .settings
+            ),
+            (
+                .tagDuplicateName,
+                "tags.error.duplicate-name",
+                .tags
+            ),
+            (
+                .dataUnavailable,
+                "recovery.error.data-unavailable",
+                .recovery
+            )
+        ]
+
+        for fixture in fixtures {
+            #expect(fixture.identity.rawValue == fixture.rawValue)
+            #expect(fixture.identity.localizationTable == fixture.table)
+        }
+    }
+
     @Test func newlySurfacedErrorIsSelectedByStableSemanticIdentity() {
         let resolver = AccessibilityErrorAnnouncementResolver()
 

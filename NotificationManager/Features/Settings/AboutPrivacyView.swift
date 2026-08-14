@@ -4,7 +4,10 @@ struct AboutPrivacyView: View {
     var body: some View {
         List {
             disclosureSection(
-                "privacy.section.icloud",
+                LocalizedStringResource(
+                    "privacy.section.icloud",
+                    table: "Settings"
+                ),
                 disclosures: [
                     .automaticICloudSync,
                     .syncCompletionNotGuaranteed,
@@ -12,7 +15,10 @@ struct AboutPrivacyView: View {
                 ]
             )
             disclosureSection(
-                "privacy.section.notifications",
+                LocalizedStringResource(
+                    "privacy.section.notifications",
+                    table: "Settings"
+                ),
                 disclosures: [
                     .notificationStorageManagedByOS,
                     .notificationPreviewsControlledByOS,
@@ -24,25 +30,31 @@ struct AboutPrivacyView: View {
                 ]
             )
             disclosureSection(
-                "privacy.section.data",
+                LocalizedStringResource(
+                    "privacy.section.data",
+                    table: "Settings"
+                ),
                 disclosures: [
                     .noServerAnalyticsOrAdvertising,
                     .foundationModelsRunOnDevice
                 ]
             )
         }
-        .navigationTitle("privacy.title")
+        .navigationTitle(LocalizedStringResource(
+            "privacy.title",
+            table: "Settings"
+        ))
         .accessibilityIdentifier("privacy.root")
     }
 
     private func disclosureSection(
-        _ title: LocalizedStringKey,
+        _ title: LocalizedStringResource,
         disclosures: [AboutPrivacyDisclosure]
     ) -> some View {
         Section(title) {
             ForEach(disclosures) { disclosure in
                 Label {
-                    Text(LocalizedStringKey(disclosure.semanticKey))
+                    Text(disclosure.localizedResource)
                         .fixedSize(horizontal: false, vertical: true)
                 } icon: {
                     Image(systemName: "info.circle")

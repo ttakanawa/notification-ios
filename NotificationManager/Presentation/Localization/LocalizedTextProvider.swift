@@ -4,9 +4,13 @@ struct LocalizedTextProvider: Sendable {
     typealias Lookup = @Sendable (_ key: String, _ locale: Locale) -> String
 
     static let live = Self { key, locale in
-        String(
+        guard let table = LocalizationTable(semanticKey: key) else {
+            assertionFailure("Unknown localization key prefix: \(key)")
+            return key
+        }
+        return String(
             localized: String.LocalizationValue(key),
-            table: "Localizable",
+            table: table.rawValue,
             bundle: bundle(for: locale),
             locale: locale
         )

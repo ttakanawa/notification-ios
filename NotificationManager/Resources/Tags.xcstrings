@@ -1,0 +1,312 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "tags.action.create": {
+      "comment": "User-facing text for the semantic key tags.action.create.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create Tag"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグを作成"
+          }
+        }
+      }
+    },
+    "tags.action.delete": {
+      "comment": "User-facing text for the semantic key tags.action.delete.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete Tag"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグを削除"
+          }
+        }
+      }
+    },
+    "tags.action.rename": {
+      "comment": "User-facing text for the semantic key tags.action.rename.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rename Tag"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ名を変更"
+          }
+        }
+      }
+    },
+    "tags.delete-confirmation.message": {
+      "comment": "User-facing text for the semantic key tags.delete-confirmation.message.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Deleting this tag removes it from reminders but does not delete any reminder."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このタグを削除するとリマインダーとの関連付けが解除されますが、リマインダー自体は削除されません。"
+          }
+        }
+      }
+    },
+    "tags.delete-confirmation.title": {
+      "comment": "User-facing text for the semantic key tags.delete-confirmation.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Delete This Tag?"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このタグを削除しますか？"
+          }
+        }
+      }
+    },
+    "tags.error.duplicate-name": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A tag with the same normalized name already exists on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正規化後に同じ名前となるタグがこの端末にすでにあります。"
+          }
+        }
+      }
+    },
+    "tags.error.empty-name": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Enter a tag name."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ名を入力してください。"
+          }
+        }
+      }
+    },
+    "tags.error.name-too-large": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The tag name is too large to save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ名が大きすぎるため保存できません。"
+          }
+        }
+      }
+    },
+    "tags.error.normalized-name-too-large": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The normalized tag name is too large to save."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "正規化後のタグ名が大きすぎるため保存できません。"
+          }
+        }
+      }
+    },
+    "tags.error.not-found": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This tag is no longer available."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このタグは利用できなくなりました。"
+          }
+        }
+      }
+    },
+    "tags.error.store-unavailable": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags could not be loaded or changed. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグを読み込みまたは変更できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
+    "tags.field.name": {
+      "comment": "User-facing text for the semantic key tags.field.name.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tag Name"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ名"
+          }
+        }
+      }
+    },
+    "tags.management.count": {
+      "comment": "Tag-management item count. The %lld placeholder is the locale-formatted number of tags.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "variations": {
+            "plural": {
+              "one": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tag"
+                }
+              },
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld tags"
+                }
+              }
+            }
+          }
+        },
+        "ja": {
+          "variations": {
+            "plural": {
+              "other": {
+                "stringUnit": {
+                  "state": "translated",
+                  "value": "%lld個のタグ"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "tags.management.empty": {
+      "comment": "User-facing text for the semantic key tags.management.empty.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tags have been created."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグはまだ作成されていません。"
+          }
+        }
+      }
+    },
+    "tags.management.title": {
+      "comment": "User-facing text for the semantic key tags.management.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ"
+          }
+        }
+      }
+    },
+    "tags.picker.title": {
+      "comment": "User-facing text for the semantic key tags.picker.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tags"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグ"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

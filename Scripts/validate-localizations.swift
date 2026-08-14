@@ -21,6 +21,57 @@ private struct Catalog: Decodable {
     let version: String
 }
 
+private enum CatalogTable: String, CaseIterable {
+    case Common
+    case ReminderForm
+    case Reminder
+    case NotificationText
+    case Settings
+    case Tags
+    case Recovery
+
+    init?(url: URL) {
+        self.init(rawValue: url.deletingPathExtension().lastPathComponent)
+    }
+
+    func owns(_ key: String) -> Bool {
+        switch self {
+        case .Common:
+            key.hasPrefix("common.")
+        case .ReminderForm:
+            ["reminder.form.", "reminder.field.", "reminder.early.",
+             "reminder.early-unit.", "reminder.repeat.",
+             "reminder.repeat-end.", "reminder.custom."].contains {
+                key.hasPrefix($0)
+            }
+        case .Reminder:
+            key.hasPrefix("reminder.")
+                && CatalogTable.ReminderForm.owns(key) == false
+        case .NotificationText:
+            key.hasPrefix("localization.")
+        case .Settings:
+            key.hasPrefix("settings.") || key.hasPrefix("privacy.")
+        case .Tags:
+            key.hasPrefix("tags.")
+        case .Recovery:
+            key.hasPrefix("data_unavailable.")
+                || key.hasPrefix("notification_unavailable.")
+                || key.hasPrefix("recovery.")
+        }
+    }
+}
+
+private struct LoadedCatalog {
+    let table: CatalogTable
+    let url: URL
+    let catalog: Catalog
+}
+
+private struct ValidationSummary {
+    let catalogCount: Int
+    let keyCount: Int
+}
+
 private struct CatalogEntry: Decodable {
     let comment: String?
     let extractionState: String?
@@ -60,44 +111,62 @@ private struct LintFailure: Error, CustomStringConvertible {
 }
 
 private struct LocalizationValidator {
-    let catalogURL: URL
+    let catalogURLs: [URL]
     let sourceRoot: URL?
 
-    func validate() throws -> Int {
-        let data: Data
-        do {
-            data = try Data(contentsOf: catalogURL)
-        } catch {
-            throw LintFailure(messages: [
-                "Unable to read catalog at \(catalogURL.path): \(error.localizedDescription)"
-            ])
-        }
-
-        let catalog: Catalog
-        do {
-            catalog = try JSONDecoder().decode(Catalog.self, from: data)
-        } catch {
-            throw LintFailure(messages: ["Invalid String Catalog JSON: \(error)"])
-        }
-
+    func validate() throws -> ValidationSummary {
+        let loadedCatalogs = try loadCatalogs()
         var failures: [String] = []
-        if catalog.version != "1.0" {
-            failures.append("Catalog version must be 1.0, found \(catalog.version).")
-        }
-        if catalog.sourceLanguage != "en" {
-            failures.append("Catalog sourceLanguage must be en, found \(catalog.sourceLanguage).")
-        }
-        if catalog.strings.isEmpty {
-            failures.append("Catalog must contain at least one semantic key.")
+        for loaded in loadedCatalogs {
+            let catalog = loaded.catalog
+            if catalog.version != "1.0" {
+                failures.append(
+                    "\(loaded.table.rawValue): catalog version must be 1.0, "
+                        + "found \(catalog.version)."
+                )
+            }
+            if catalog.sourceLanguage != "en" {
+                failures.append(
+                    "\(loaded.table.rawValue): catalog sourceLanguage must be en, "
+                        + "found \(catalog.sourceLanguage)."
+                )
+            }
+            if catalog.strings.isEmpty {
+                failures.append(
+                    "\(loaded.table.rawValue): catalog must contain at least one semantic key."
+                )
+            }
+
+            for key in catalog.strings.keys.sorted() {
+                guard let entry = catalog.strings[key] else { continue }
+                validate(key: key, entry: entry, failures: &failures)
+            }
         }
 
-        for key in catalog.strings.keys.sorted() {
-            guard let entry = catalog.strings[key] else { continue }
-            validate(key: key, entry: entry, failures: &failures)
+        var owners: [String: CatalogTable] = [:]
+        var entries: [String: CatalogEntry] = [:]
+        for loaded in loadedCatalogs {
+            for key in loaded.catalog.strings.keys.sorted() {
+                if let existing = owners[key] {
+                    failures.append(
+                        "\(key): duplicate key in \(existing.rawValue) and "
+                            + "\(loaded.table.rawValue)."
+                    )
+                    continue
+                }
+                owners[key] = loaded.table
+                entries[key] = loaded.catalog.strings[key]
+                if loaded.table.owns(key) == false {
+                    failures.append(
+                        "\(key): owned by a different catalog, found in "
+                            + "\(loaded.table.rawValue)."
+                    )
+                }
+            }
         }
 
-        let undeclaredPluralKeys = catalog.strings.keys.filter { key in
-            guard let localizations = catalog.strings[key]?.localizations else { return false }
+        let undeclaredPluralKeys = entries.keys.filter { key in
+            guard let localizations = entries[key]?.localizations else { return false }
             return localizations.values.contains { $0.variations?.plural != nil }
                 && !declaredPluralKeys.contains(key)
         }
@@ -105,20 +174,69 @@ private struct LocalizationValidator {
             failures.append("\(key): plural variations exist but the key is not explicitly declared.")
         }
 
-        for key in declaredPluralKeys.sorted() where catalog.strings[key] == nil {
+        for key in declaredPluralKeys.sorted() where entries[key] == nil {
             failures.append("\(key): explicitly declared plural key is missing from the catalog.")
         }
 
         if let sourceRoot {
             validateSourceCoverage(
-                catalogKeys: Set(catalog.strings.keys),
+                owners: owners,
                 sourceRoot: sourceRoot,
                 failures: &failures
             )
         }
 
         guard failures.isEmpty else { throw LintFailure(messages: failures) }
-        return catalog.strings.count
+        return ValidationSummary(
+            catalogCount: loadedCatalogs.count,
+            keyCount: owners.count
+        )
+    }
+
+    private func loadCatalogs() throws -> [LoadedCatalog] {
+        var urlsByTable: [CatalogTable: URL] = [:]
+        var failures: [String] = []
+
+        for url in catalogURLs {
+            guard let table = CatalogTable(url: url) else {
+                failures.append(
+                    "Unknown catalog table \(url.deletingPathExtension().lastPathComponent)."
+                )
+                continue
+            }
+            if urlsByTable[table] != nil {
+                failures.append("Duplicate catalog table \(table.rawValue).")
+                continue
+            }
+            urlsByTable[table] = url
+        }
+
+        for table in CatalogTable.allCases where urlsByTable[table] == nil {
+            failures.append("Missing required catalog table \(table.rawValue).")
+        }
+        guard failures.isEmpty else { throw LintFailure(messages: failures) }
+
+        return try CatalogTable.allCases.map { table in
+            let url = urlsByTable[table]!
+            let data: Data
+            do {
+                data = try Data(contentsOf: url)
+            } catch {
+                throw LintFailure(messages: [
+                    "Unable to read catalog at \(url.path): \(error.localizedDescription)"
+                ])
+            }
+
+            let catalog: Catalog
+            do {
+                catalog = try JSONDecoder().decode(Catalog.self, from: data)
+            } catch {
+                throw LintFailure(messages: [
+                    "Invalid String Catalog JSON at \(url.path): \(error)"
+                ])
+            }
+            return LoadedCatalog(table: table, url: url, catalog: catalog)
+        }
     }
 
     private func validate(
@@ -275,10 +393,18 @@ private struct LocalizationValidator {
     }
 
     private func validateSourceCoverage(
-        catalogKeys: Set<String>,
+        owners: [String: CatalogTable],
         sourceRoot: URL,
         failures: inout [String]
     ) {
+        let compatibilityCatalog = sourceRoot
+            .appendingPathComponent("NotificationManager/Resources/Localizable.xcstrings")
+        if FileManager.default.fileExists(atPath: compatibilityCatalog.path) {
+            failures.append(
+                "Legacy compatibility catalog must not exist at \(compatibilityCatalog.path)."
+            )
+        }
+
         let sourceDirectory = sourceRoot.appendingPathComponent("NotificationManager")
         guard let enumerator = FileManager.default.enumerator(
             at: sourceDirectory,
@@ -289,20 +415,278 @@ private struct LocalizationValidator {
         }
 
         var references: Set<String> = []
+        var explicitTableReferences: Set<ExplicitTableReference> = []
+        var interpolatedSemanticKeys: Set<String> = []
+        var implicitSemanticLookups: Set<ImplicitSemanticLookup> = []
         for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
             guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
-            references.formUnion(Self.semanticReferences(
-                in: Self.excludingAccessibilityIdentifierCalls(from: source)
-            ))
+            let filteredSource = Self.excludingAccessibilityIdentifierCalls(
+                from: Self.excludingComments(from: source)
+            )
+            let executableSource = Self.excludingTripleQuotedStringContents(
+                from: filteredSource
+            )
+            let referenceSource = Self.excludingTextVerbatimCalls(
+                from: executableSource
+            )
+            references.formUnion(Self.semanticReferences(in: referenceSource))
+            explicitTableReferences.formUnion(Self.explicitTableReferences(in: executableSource))
+            interpolatedSemanticKeys.formUnion(
+                Self.interpolatedSemanticKeys(in: executableSource)
+            )
+            implicitSemanticLookups.formUnion(
+                Self.implicitSemanticLookups(in: executableSource)
+            )
         }
-        for missing in references.subtracting(catalogKeys).sorted() {
+        for missing in references.subtracting(owners.keys).sorted() {
             failures.append("\(missing): referenced by app source but missing from the catalog.")
         }
+        for reference in explicitTableReferences.sorted(by: {
+            ($0.key, $0.table) < ($1.key, $1.table)
+        }) {
+            guard let owner = owners[reference.key], reference.table != owner.rawValue else {
+                continue
+            }
+            failures.append(
+                "\(reference.key): source declares table \(reference.table), "
+                    + "expected \(owner.rawValue)."
+            )
+        }
+        for key in interpolatedSemanticKeys.sorted() {
+            failures.append(
+                "\(key): interpolated semantic key must use an explicit catalog format entry."
+            )
+        }
+        for lookup in implicitSemanticLookups.sorted(by: {
+            ($0.key, $0.callKind) < ($1.key, $1.callKind)
+        }) {
+            failures.append(
+                "\(lookup.key): implicit \(lookup.callKind) localization lookup "
+                    + "must declare an explicit table."
+            )
+        }
+    }
+
+    private struct ExplicitTableReference: Hashable {
+        let key: String
+        let table: String
+    }
+
+    private struct ImplicitSemanticLookup: Hashable {
+        let key: String
+        let callKind: String
+    }
+
+    private static func excludingComments(from source: String) -> String {
+        let characters = Array(source)
+        var output = characters
+        var index = 0
+        var isInsideString = false
+        var isEscaped = false
+
+        while index < characters.count {
+            let character = characters[index]
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                index += 1
+                continue
+            }
+            if character == "\"" {
+                isInsideString = true
+                index += 1
+                continue
+            }
+            guard character == "/", index + 1 < characters.count else {
+                index += 1
+                continue
+            }
+
+            if characters[index + 1] == "/" {
+                while index < characters.count,
+                      characters[index] != "\n",
+                      characters[index] != "\r" {
+                    output[index] = " "
+                    index += 1
+                }
+                continue
+            }
+            guard characters[index + 1] == "*" else {
+                index += 1
+                continue
+            }
+
+            var depth = 0
+            while index < characters.count {
+                if index + 1 < characters.count,
+                   characters[index] == "/",
+                   characters[index + 1] == "*" {
+                    output[index] = " "
+                    output[index + 1] = " "
+                    depth += 1
+                    index += 2
+                } else if index + 1 < characters.count,
+                          characters[index] == "*",
+                          characters[index + 1] == "/" {
+                    output[index] = " "
+                    output[index + 1] = " "
+                    depth -= 1
+                    index += 2
+                    if depth == 0 { break }
+                } else {
+                    if characters[index] != "\n", characters[index] != "\r" {
+                        output[index] = " "
+                    }
+                    index += 1
+                }
+            }
+        }
+        return String(output)
     }
 
     private static func excludingAccessibilityIdentifierCalls(from source: String) -> String {
         [".accessibilityIdentifier", "AccessibilityIdentifierContainer"].reduce(source) {
             excludingCalls(named: $1, from: $0)
+        }
+    }
+
+    private static func excludingTextVerbatimCalls(from source: String) -> String {
+        let pattern = #"\bText\s*\(\s*verbatim\s*:"#
+        guard let expression = try? NSRegularExpression(pattern: pattern) else {
+            return source
+        }
+
+        let fullRange = NSRange(source.startIndex..<source.endIndex, in: source)
+        var output = ""
+        var cursor = source.startIndex
+        for match in expression.matches(in: source, range: fullRange) {
+            guard let matchRange = Range(match.range(at: 0), in: source),
+                  matchRange.lowerBound >= cursor,
+                  let openingParenthesis = source[matchRange].firstIndex(of: "("),
+                  let end = callEnd(
+                      in: source,
+                      openingParenthesis: openingParenthesis
+                  )
+            else {
+                continue
+            }
+            output.append(contentsOf: source[cursor..<matchRange.lowerBound])
+            for character in source[matchRange.lowerBound..<end] {
+                output.append(character == "\n" || character == "\r" ? character : " ")
+            }
+            cursor = end
+        }
+        output.append(contentsOf: source[cursor...])
+        return output
+    }
+
+    private static func excludingTripleQuotedStringContents(from source: String) -> String {
+        let characters = Array(source)
+        var output = characters
+        var index = 0
+
+        while index < characters.count {
+            guard isTripleQuote(at: index, in: characters) else {
+                if characters[index] == "\"" {
+                    index = ordinaryStringEnd(startingAt: index, in: characters)
+                } else {
+                    index += 1
+                }
+                continue
+            }
+
+            mask(index..<(index + 3), in: characters, output: &output)
+            index += 3
+            while index < characters.count {
+                if isTripleQuote(at: index, in: characters) {
+                    mask(index..<(index + 3), in: characters, output: &output)
+                    index += 3
+                    break
+                }
+
+                if characters[index] == "\\" {
+                    var afterBackslashes = index
+                    while afterBackslashes < characters.count,
+                          characters[afterBackslashes] == "\\" {
+                        afterBackslashes += 1
+                    }
+                    let slashCount = afterBackslashes - index
+                    if slashCount.isMultiple(of: 2) == false,
+                       afterBackslashes < characters.count,
+                       characters[afterBackslashes] == "(",
+                       let openingParenthesis = source.index(
+                           source.startIndex,
+                           offsetBy: afterBackslashes,
+                           limitedBy: source.endIndex
+                       ),
+                       let callEnd = callEnd(
+                           in: source,
+                           openingParenthesis: openingParenthesis
+                       ) {
+                        mask(
+                            index..<(afterBackslashes - 1),
+                            in: characters,
+                            output: &output
+                        )
+                        index = source.distance(from: source.startIndex, to: callEnd)
+                        continue
+                    }
+                    mask(index..<afterBackslashes, in: characters, output: &output)
+                    index = afterBackslashes
+                    continue
+                }
+
+                mask(index..<(index + 1), in: characters, output: &output)
+                index += 1
+            }
+        }
+        return String(output)
+    }
+
+    private static func isTripleQuote(
+        at index: Int,
+        in characters: [Character]
+    ) -> Bool {
+        index + 2 < characters.count
+            && characters[index] == "\""
+            && characters[index + 1] == "\""
+            && characters[index + 2] == "\""
+    }
+
+    private static func ordinaryStringEnd(
+        startingAt start: Int,
+        in characters: [Character]
+    ) -> Int {
+        var index = start + 1
+        var isEscaped = false
+        while index < characters.count {
+            let character = characters[index]
+            if isEscaped {
+                isEscaped = false
+            } else if character == "\\" {
+                isEscaped = true
+            } else if character == "\"" {
+                return index + 1
+            }
+            index += 1
+        }
+        return index
+    }
+
+    private static func mask(
+        _ range: Range<Int>,
+        in characters: [Character],
+        output: inout [Character]
+    ) {
+        for index in range where index >= 0 && index < characters.count {
+            if characters[index] != "\n", characters[index] != "\r" {
+                output[index] = " "
+            }
         }
     }
 
@@ -342,6 +726,14 @@ private struct LocalizationValidator {
         }
         guard index < source.endIndex, source[index] == "(" else { return nil }
 
+        return callEnd(in: source, openingParenthesis: index)
+    }
+
+    private static func callEnd(
+        in source: String,
+        openingParenthesis: String.Index
+    ) -> String.Index? {
+        var index = openingParenthesis
         var depth = 0
         var isInsideString = false
         var isEscaped = false
@@ -378,6 +770,402 @@ private struct LocalizationValidator {
             guard let valueRange = Range(match.range(at: 1), in: source) else { return nil }
             return String(source[valueRange])
         })
+    }
+
+    private static func explicitTableReferences(
+        in source: String
+    ) -> Set<ExplicitTableReference> {
+        let semanticKey = "(?:reminder|settings|tags|common|data_unavailable|"
+            + "notification_unavailable|privacy|recovery|localization)"
+            + "(?:\\.[a-z0-9_-]+)+"
+        let pattern = "(?:LocalizedStringResource\\s*\\(\\s*|"
+            + "String\\s*\\(\\s*localized\\s*:\\s*)"
+            + "\"(\(semanticKey))\""
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        return Set(expression.matches(in: source, range: range).compactMap { match in
+            guard let matchRange = Range(match.range(at: 0), in: source),
+                  let keyRange = Range(match.range(at: 1), in: source),
+                  let openingParenthesis = source[matchRange].firstIndex(of: "("),
+                  let end = callEnd(
+                      in: source,
+                      openingParenthesis: openingParenthesis
+                  )
+            else {
+                return nil
+            }
+            let call = String(source[openingParenthesis..<end])
+            guard let table = topLevelStringArgument(named: "table", in: call) else {
+                return nil
+            }
+            return ExplicitTableReference(
+                key: String(source[keyRange]),
+                table: table
+            )
+        })
+    }
+
+    private static func topLevelStringArgument(
+        named name: String,
+        in call: String
+    ) -> String? {
+        let characters = Array(call)
+        let nameCharacters = Array(name)
+        var parenthesisDepth = 0
+        var bracketDepth = 0
+        var braceDepth = 0
+        var isInsideString = false
+        var isEscaped = false
+        var index = 0
+
+        while index < characters.count {
+            let character = characters[index]
+            if isInsideString {
+                if isEscaped {
+                    isEscaped = false
+                } else if character == "\\" {
+                    isEscaped = true
+                } else if character == "\"" {
+                    isInsideString = false
+                }
+                index += 1
+                continue
+            }
+            if character == "\"" {
+                isInsideString = true
+                index += 1
+                continue
+            }
+
+            switch character {
+            case "(": parenthesisDepth += 1
+            case ")": parenthesisDepth -= 1
+            case "[": bracketDepth += 1
+            case "]": bracketDepth -= 1
+            case "{": braceDepth += 1
+            case "}": braceDepth -= 1
+            default: break
+            }
+
+            if parenthesisDepth == 1, bracketDepth == 0, braceDepth == 0,
+               let value = stringArgumentValue(
+                   named: nameCharacters,
+                   at: index,
+                   in: characters
+               ) {
+                return value
+            }
+            index += 1
+        }
+        return nil
+    }
+
+    private static func stringArgumentValue(
+        named name: [Character],
+        at index: Int,
+        in characters: [Character]
+    ) -> String? {
+        guard index + name.count <= characters.count,
+              Array(characters[index..<(index + name.count)]) == name,
+              index == 0 || !isIdentifierCharacter(characters[index - 1]),
+              index + name.count == characters.count
+                || !isIdentifierCharacter(characters[index + name.count])
+        else {
+            return nil
+        }
+
+        var cursor = index + name.count
+        while cursor < characters.count, characters[cursor].isWhitespace {
+            cursor += 1
+        }
+        guard cursor < characters.count, characters[cursor] == ":" else { return nil }
+        cursor += 1
+        while cursor < characters.count, characters[cursor].isWhitespace {
+            cursor += 1
+        }
+        guard cursor < characters.count, characters[cursor] == "\"" else { return nil }
+        cursor += 1
+
+        var value = ""
+        var isEscaped = false
+        while cursor < characters.count {
+            let character = characters[cursor]
+            if isEscaped {
+                value.append(character)
+                isEscaped = false
+            } else if character == "\\" {
+                value.append(character)
+                isEscaped = true
+            } else if character == "\"" {
+                return value
+            } else {
+                value.append(character)
+            }
+            cursor += 1
+        }
+        return nil
+    }
+
+    private static func isIdentifierCharacter(_ character: Character) -> Bool {
+        character == "_" || character.isLetter || character.isNumber
+    }
+
+    private static let localizedInitializerKinds = [
+        "Button",
+        "ContentUnavailableView",
+        "ControlGroup",
+        "DatePicker",
+        "DisclosureGroup",
+        "Gauge",
+        "GroupBox",
+        "Label",
+        "LabeledContent",
+        "Link",
+        "Menu",
+        "NavigationLink",
+        "Picker",
+        "ProgressView",
+        "Section",
+        "SecureField",
+        "ShareLink",
+        "Stepper",
+        "Tab",
+        "TableColumn",
+        "Text",
+        "TextField",
+        "Toggle",
+        "Window",
+        "WindowGroup",
+    ]
+
+    private static let localizedModifierKinds = [
+        "accessibilityHint",
+        "accessibilityLabel",
+        "accessibilityValue",
+        "alert",
+        "badge",
+        "confirmationDialog",
+        "help",
+        "navigationSubtitle",
+        "navigationTitle",
+    ]
+
+    private static let namedLocalizedArguments = [
+        (callKind: "searchable", argument: "prompt"),
+    ]
+
+    private static func regularExpressionAlternation(for values: [String]) -> String {
+        values
+            .map(NSRegularExpression.escapedPattern(for:))
+            .joined(separator: "|")
+    }
+
+    private static func interpolatedSemanticKeys(in source: String) -> Set<String> {
+        let semanticKey = "(?:reminder|settings|tags|common|data_unavailable|"
+            + "notification_unavailable|privacy|recovery|localization)"
+            + "(?:\\.[a-z0-9_-]+)+"
+        let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
+        let modifierKinds = regularExpressionAlternation(for: localizedModifierKinds)
+        let patterns = [
+            "\\b(?:LocalizedStringResource|\(initializerKinds))\\s*\\(\\s*"
+                + "\"(\(semanticKey))\\s*\\\\\\(",
+            "\\.(?:\(modifierKinds))\\s*\\(\\s*"
+                + "\"(\(semanticKey))\\s*\\\\\\(",
+        ]
+        let range = NSRange(source.startIndex..<source.endIndex, in: source)
+        var keys: Set<String> = []
+        for pattern in patterns {
+            guard let expression = try? NSRegularExpression(pattern: pattern) else { continue }
+            keys.formUnion(expression.matches(in: source, range: range).compactMap { match in
+                guard let keyRange = Range(match.range(at: 1), in: source) else { return nil }
+                return String(source[keyRange])
+            })
+        }
+        for localizedArgument in namedLocalizedArguments {
+            let callKind = NSRegularExpression.escapedPattern(
+                for: localizedArgument.callKind
+            )
+            let callPattern = "\\.\(callKind)\\s*\\("
+            guard let expression = try? NSRegularExpression(pattern: callPattern) else {
+                continue
+            }
+            for match in expression.matches(in: source, range: range) {
+                guard let matchRange = Range(match.range(at: 0), in: source),
+                      let openingParenthesis = source[matchRange].lastIndex(of: "("),
+                      let end = callEnd(
+                          in: source,
+                          openingParenthesis: openingParenthesis
+                      )
+                else {
+                    continue
+                }
+                let call = String(source[openingParenthesis..<end])
+                guard let value = topLevelStringArgument(
+                    named: localizedArgument.argument,
+                    in: call
+                ), let key = interpolatedSemanticKey(in: value) else {
+                    continue
+                }
+                keys.insert(key)
+            }
+        }
+        return keys
+    }
+
+    private static func interpolatedSemanticKey(in value: String) -> String? {
+        let semanticKey = "(?:reminder|settings|tags|common|data_unavailable|"
+            + "notification_unavailable|privacy|recovery|localization)"
+            + "(?:\\.[a-z0-9_-]+)+"
+        let pattern = "^(\(semanticKey))\\s*\\\\\\("
+        guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
+        let range = NSRange(value.startIndex..<value.endIndex, in: value)
+        guard let match = expression.firstMatch(in: value, range: range),
+              let keyRange = Range(match.range(at: 1), in: value)
+        else {
+            return nil
+        }
+        return String(value[keyRange])
+    }
+
+    private static func implicitSemanticLookups(
+        in source: String
+    ) -> Set<ImplicitSemanticLookup> {
+        let semanticKey = "(?:reminder|settings|tags|common|data_unavailable|"
+            + "notification_unavailable|privacy|recovery|localization)"
+            + "(?:\\.[a-z0-9_-]+)+"
+        var lookups: Set<ImplicitSemanticLookup> = []
+
+        let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
+        let viewPattern = "\\b(\(initializerKinds))\\s*\\(\\s*"
+            + "\"(\(semanticKey))\""
+        if let expression = try? NSRegularExpression(pattern: viewPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in expression.matches(in: source, range: range) {
+                guard let kindRange = Range(match.range(at: 1), in: source),
+                      let keyRange = Range(match.range(at: 2), in: source)
+                else {
+                    continue
+                }
+                lookups.insert(
+                    ImplicitSemanticLookup(
+                        key: String(source[keyRange]),
+                        callKind: String(source[kindRange])
+                    )
+                )
+            }
+        }
+
+        let modifierKinds = regularExpressionAlternation(for: localizedModifierKinds)
+        let modifierPattern = "\\.(\(modifierKinds))\\s*\\(\\s*\"(\(semanticKey))\""
+        if let expression = try? NSRegularExpression(pattern: modifierPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in expression.matches(in: source, range: range) {
+                guard let kindRange = Range(match.range(at: 1), in: source),
+                      let keyRange = Range(match.range(at: 2), in: source)
+                else {
+                    continue
+                }
+                lookups.insert(
+                    ImplicitSemanticLookup(
+                        key: String(source[keyRange]),
+                        callKind: String(source[kindRange])
+                    )
+                )
+            }
+        }
+
+        for localizedArgument in namedLocalizedArguments {
+            let callKind = NSRegularExpression.escapedPattern(
+                for: localizedArgument.callKind
+            )
+            let callPattern = "\\.\(callKind)\\s*\\("
+            guard let expression = try? NSRegularExpression(pattern: callPattern) else {
+                continue
+            }
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in expression.matches(in: source, range: range) {
+                guard let matchRange = Range(match.range(at: 0), in: source),
+                      let openingParenthesis = source[matchRange].lastIndex(of: "("),
+                      let end = callEnd(
+                          in: source,
+                          openingParenthesis: openingParenthesis
+                      )
+                else {
+                    continue
+                }
+                let call = String(source[openingParenthesis..<end])
+                guard let key = topLevelStringArgument(
+                    named: localizedArgument.argument,
+                    in: call
+                ), isSemanticKey(key) else {
+                    continue
+                }
+                lookups.insert(
+                    ImplicitSemanticLookup(
+                        key: key,
+                        callKind: "\(localizedArgument.callKind)(\(localizedArgument.argument):)"
+                    )
+                )
+            }
+        }
+
+        let resourcePattern = "\\bLocalizedStringResource\\s*\\(\\s*"
+            + "\"(\(semanticKey))\""
+        if let expression = try? NSRegularExpression(pattern: resourcePattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in expression.matches(in: source, range: range) {
+                guard let matchRange = Range(match.range(at: 0), in: source),
+                      let keyRange = Range(match.range(at: 1), in: source),
+                      let openingParenthesis = source[matchRange].firstIndex(of: "("),
+                      let end = callEnd(
+                          in: source,
+                          openingParenthesis: openingParenthesis
+                      )
+                else {
+                    continue
+                }
+                let call = String(source[openingParenthesis..<end])
+                guard topLevelStringArgument(named: "table", in: call) == nil else {
+                    continue
+                }
+                lookups.insert(
+                    ImplicitSemanticLookup(
+                        key: String(source[keyRange]),
+                        callKind: "LocalizedStringResource"
+                    )
+                )
+            }
+        }
+
+        let stringPattern = "\\bString\\s*\\(\\s*localized\\s*:\\s*"
+            + "\"(\(semanticKey))\""
+        if let expression = try? NSRegularExpression(pattern: stringPattern) {
+            let range = NSRange(source.startIndex..<source.endIndex, in: source)
+            for match in expression.matches(in: source, range: range) {
+                guard let matchRange = Range(match.range(at: 0), in: source),
+                      let keyRange = Range(match.range(at: 1), in: source),
+                      let openingParenthesis = source[matchRange].firstIndex(of: "("),
+                      let end = callEnd(
+                          in: source,
+                          openingParenthesis: openingParenthesis
+                      )
+                else {
+                    continue
+                }
+                let call = String(source[openingParenthesis..<end])
+                guard topLevelStringArgument(named: "table", in: call) == nil else {
+                    continue
+                }
+                lookups.insert(
+                    ImplicitSemanticLookup(
+                        key: String(source[keyRange]),
+                        callKind: "String(localized:)"
+                    )
+                )
+            }
+        }
+
+        return lookups
     }
 
     private static func isSemanticKey(_ key: String) -> Bool {
@@ -481,24 +1269,50 @@ private func inferredSourceRoot(catalogURL: URL) -> URL? {
 
 private func run() throws {
     let arguments = Array(CommandLine.arguments.dropFirst())
-    guard arguments.count == 1 || arguments.count == 3 else {
+    guard !arguments.isEmpty else {
         throw LintFailure(messages: [
-            "Usage: swift Scripts/validate-localizations.swift <catalog> [--source-root <repository>]"
+            "Usage: swift Scripts/validate-localizations.swift <catalog>... "
+                + "[--source-root <repository>]"
         ])
     }
-    let catalogURL = URL(fileURLWithPath: arguments[0]).standardizedFileURL
+
+    let catalogArguments: ArraySlice<String>
     let sourceRoot: URL?
-    if arguments.count == 3 {
-        guard arguments[1] == "--source-root" else {
-            throw LintFailure(messages: ["Expected --source-root as the second argument."])
+    if let sourceRootIndex = arguments.firstIndex(of: "--source-root") {
+        guard sourceRootIndex > 0, sourceRootIndex == arguments.count - 2 else {
+            throw LintFailure(messages: [
+                "Expected one or more catalogs followed by --source-root and a repository path."
+            ])
         }
-        sourceRoot = URL(fileURLWithPath: arguments[2]).standardizedFileURL
+        catalogArguments = arguments[..<sourceRootIndex]
+        sourceRoot = URL(
+            fileURLWithPath: arguments[sourceRootIndex + 1]
+        ).standardizedFileURL
     } else {
-        sourceRoot = inferredSourceRoot(catalogURL: catalogURL)
+        guard arguments.allSatisfy({ !$0.hasPrefix("--") }) else {
+            throw LintFailure(messages: [
+                "Usage: swift Scripts/validate-localizations.swift <catalog>... "
+                    + "[--source-root <repository>]"
+            ])
+        }
+        catalogArguments = arguments[...]
+        let firstCatalogURL = URL(
+            fileURLWithPath: catalogArguments.first!
+        ).standardizedFileURL
+        sourceRoot = inferredSourceRoot(catalogURL: firstCatalogURL)
     }
 
-    let count = try LocalizationValidator(catalogURL: catalogURL, sourceRoot: sourceRoot).validate()
-    print("Validated \(count) localization keys for English and Japanese.")
+    let catalogURLs = catalogArguments.map {
+        URL(fileURLWithPath: $0).standardizedFileURL
+    }
+    let summary = try LocalizationValidator(
+        catalogURLs: catalogURLs,
+        sourceRoot: sourceRoot
+    ).validate()
+    print(
+        "Validated \(summary.keyCount) localization keys across "
+            + "\(summary.catalogCount) catalogs for English and Japanese."
+    )
 }
 
 do {
