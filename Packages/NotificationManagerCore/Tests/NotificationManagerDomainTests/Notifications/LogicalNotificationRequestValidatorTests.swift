@@ -92,8 +92,8 @@ struct LogicalNotificationRequestValidatorTests {
                 reminder(
                     schedule: .valid(
                         definition,
-                        sourceVersion: 1,
-                        originalData: Data([1])
+                        sourceVersion: 2,
+                        originalData: Data([2])
                     ))
             ],
             tags: []
