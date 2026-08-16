@@ -431,9 +431,6 @@ final class ReminderFormModel {
     }
 
     var titleFieldIssue: ReminderFormFieldIssue? {
-        if detachedDraft.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return .titleRequired
-        }
         if detachedDraft.title.utf8.count > ReminderLimits.titleBytes {
             return .titleTooLarge
         }

@@ -1056,9 +1056,12 @@ struct ReminderFormModelTests {
         populateSchedule(model, rule: .daily(interval: 1))
 
         model.title = "   "
-        #expect(model.titleFieldIssue == .titleRequired)
+        #expect(model.titleFieldIssue == nil)
+        #expect(!model.canSave)
+
         model.title = String(repeating: "a", count: ReminderLimits.titleBytes + 1)
         #expect(model.titleFieldIssue == .titleTooLarge)
+        #expect(!model.canSave)
 
         model.notes = String(repeating: "n", count: ReminderLimits.notesBytes + 1)
         #expect(model.notesFieldIssue == .notesTooLarge)
