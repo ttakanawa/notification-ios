@@ -42,6 +42,16 @@ struct NotificationContractTests {
         #expect(result.openedURL == URL(string: "https://example.com/current"))
         #expect(result.missingDestination == .notificationUnavailable)
     }
+
+    @Test func secondsPersistPlanValidateAndMaterializeAsARepeatingCalendarTrigger() throws {
+        let result = try NotificationContractHarness().secondEarlyReminderContract()
+
+        #expect(result.payloadVersion == 2)
+        #expect(result.dateComponents.hour == 9)
+        #expect(result.dateComponents.minute == 29)
+        #expect(result.dateComponents.second == 30)
+        #expect(result.repeats)
+    }
 }
 
 private struct PayloadAndCleanupContractResult: Sendable {
@@ -70,6 +80,12 @@ private struct RoutingContractResult: Sendable {
     let defaultDestination: NotificationResponseOutcome
     let openedURL: URL?
     let missingDestination: NotificationResponseOutcome
+}
+
+private struct SecondEarlyReminderContractResult: Sendable {
+    let payloadVersion: UInt32
+    let dateComponents: DateComponents
+    let repeats: Bool
 }
 
 private struct NotificationContractHarness {
@@ -295,6 +311,83 @@ private struct NotificationContractHarness {
             defaultDestination: defaultDestination,
             openedURL: openedURL,
             missingDestination: missingDestination
+        )
+    }
+
+    func secondEarlyReminderContract() throws -> SecondEarlyReminderContractResult {
+        let schedule = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2039,
+                month: 11,
+                day: 28,
+                hour: 9,
+                minute: 30,
+                timeZoneIdentifier: "Africa/Abidjan"
+            ),
+            rule: .daily(interval: 1),
+            end: .never,
+            early: EarlyReminder(value: 30, unit: .seconds)
+        )
+        let codec = SchedulePayloadCodec()
+        let payload = try codec.encodeCurrent(schedule)
+        guard
+            case .valid(let decodedSchedule, let sourceVersion, let originalData) = codec.decode(
+                payload.data
+            ),
+            decodedSchedule == schedule,
+            sourceVersion == payload.version,
+            originalData == payload.data
+        else {
+            throw NotificationContractError.invalidPayloadRoundTrip
+        }
+        let reminder = ReminderSnapshot(
+            id: primaryID,
+            title: "Second early reminder",
+            notes: nil,
+            urlString: nil,
+            enabled: true,
+            schedule: .valid(
+                decodedSchedule,
+                sourceVersion: sourceVersion,
+                originalData: originalData
+            ),
+            tagIDs: [],
+            createdAt: evaluationNow,
+            updatedAt: evaluationNow
+        )
+        let planned = try plan(reminders: [reminder])
+        guard
+            let earlyRequest = planned.requests.first(where: { request in
+                guard case .repeating(let components, let contributors) = request.payload else {
+                    return false
+                }
+                return components.hour == 9
+                    && components.minute == 29
+                    && components.second == 30
+                    && contributors.contains { $0.kind == .early }
+            })
+        else {
+            throw NotificationContractError.missingLogicalRequest
+        }
+        let materialized = try NotificationRequestMaterializer(
+            formatter: ContractNotificationTextFormatter()
+        ).materialize(
+            earlyRequest,
+            input: MaterializationInput(
+                reminder: reminder,
+                locale: Locale(identifier: "en_US"),
+                evaluationNow: evaluationNow,
+                recurrenceEnvironment: environment
+            )
+        )
+        guard let trigger = materialized.trigger as? UNCalendarNotificationTrigger else {
+            throw NotificationContractError.unexpectedTrigger
+        }
+
+        return SecondEarlyReminderContractResult(
+            payloadVersion: sourceVersion,
+            dateComponents: trigger.dateComponents,
+            repeats: trigger.repeats
         )
     }
 
