@@ -75,7 +75,7 @@ public struct NotificationIdentifierCodec: Sendable {
         fields.append(#""minute":\#(components.minute)"#)
         if let month = components.month { fields.append(#""month":\#(month)"#) }
         fields.append(#""repeats":true"#)
-        fields.append(#""second":0"#)
+        fields.append(#""second":\#(components.second)"#)
         fields.append(#""timeZone":"\#(components.timeZoneIdentifier)""#)
         if let weekday = components.weekday { fields.append(#""weekday":\#(weekday)"#) }
         return Data(("{" + fields.joined(separator: ",") + "}").utf8)

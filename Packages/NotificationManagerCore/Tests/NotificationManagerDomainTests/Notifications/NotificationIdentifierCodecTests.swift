@@ -34,6 +34,26 @@ struct NotificationIdentifierCodecTests {
         )
     }
 
+    @Test func nonzeroSecondContributesToCanonicalDocumentAndDigest() throws {
+        let components = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 29,
+            second: 30
+        )
+
+        #expect(
+            try components.canonicalDocument()
+                == Data(
+                    #"{"calendar":"gregorian","hour":9,"minute":29,"repeats":true,"second":30,"timeZone":"America/New_York"}"#
+                        .utf8
+                ))
+        #expect(
+            try codec.repeatingDigest(components: components)
+                == "1c12c766831bcf6e4ebc7366f2a03dfbe06fff19cb1c87735f6cf8a6eef2e552"
+        )
+    }
+
     @Test func canonicalDocumentsContainOnlyPresentFieldsInSortedOrder() throws {
         let fixtures: [(RepeatingTriggerComponents, String)] = [
             (
