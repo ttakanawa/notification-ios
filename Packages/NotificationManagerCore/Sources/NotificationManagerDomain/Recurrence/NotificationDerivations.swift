@@ -87,7 +87,7 @@ func earlyAlertInstant(
             switch early.unit {
             case .days: .day
             case .weeks: .weekOfYear
-            case .minutes, .hours:
+            case .seconds, .minutes, .hours:
                 preconditionFailure("Fixed-duration unit reached calendar offset")
             }
         guard
@@ -104,6 +104,7 @@ func earlyAlertInstant(
 
     let secondsPerUnit: Int64 =
         switch early.unit {
+        case .seconds: 1
         case .minutes: 60
         case .hours: 3_600
         case .days: 86_400
@@ -126,7 +127,7 @@ private func usesCalendarOffset(_ unit: EarlyReminderUnit, rule: RepeatRule) -> 
         false
     case (.days, _), (.weeks, _):
         true
-    case (.minutes, _), (.hours, _):
+    case (.seconds, _), (.minutes, _), (.hours, _):
         false
     }
 }

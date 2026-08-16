@@ -1164,7 +1164,7 @@ enum OpaqueScheduleFixture: Sendable, CaseIterable {
 
     func schedule(raw: Data) -> ScheduleReadState {
         switch self {
-        case .unsupported: .unsupportedFuture(version: 2, originalData: raw)
+        case .unsupported: .unsupportedFuture(version: 3, originalData: raw)
         case .corrupt: .corrupt(originalData: raw)
         }
     }

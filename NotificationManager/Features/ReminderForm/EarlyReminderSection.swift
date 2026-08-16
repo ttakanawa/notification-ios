@@ -155,7 +155,8 @@ extension EarlyReminderChoice {
     }
 }
 
-private enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
+enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
+    case seconds
     case minutes
     case hours
     case days
@@ -166,6 +167,7 @@ private enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
     init(_ value: EarlyReminderUnit) {
         self =
             switch value {
+            case .seconds: .seconds
             case .minutes: .minutes
             case .hours: .hours
             case .days: .days
@@ -175,6 +177,7 @@ private enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
 
     var value: EarlyReminderUnit {
         switch self {
+        case .seconds: .seconds
         case .minutes: .minutes
         case .hours: .hours
         case .days: .days
@@ -184,6 +187,8 @@ private enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
 
     var localizedResource: LocalizedStringResource {
         switch self {
+        case .seconds:
+            LocalizedStringResource("reminder.early-unit.seconds", table: "ReminderForm")
         case .minutes:
             LocalizedStringResource("reminder.early-unit.minutes", table: "ReminderForm")
         case .hours:

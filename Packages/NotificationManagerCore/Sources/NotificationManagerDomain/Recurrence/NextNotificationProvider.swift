@@ -285,6 +285,8 @@ public struct NextNotificationProvider: Sendable {
         calendar: Calendar
     ) throws -> Date {
         switch (early.unit, rule) {
+        case (.seconds, _):
+            return try addingFixedSeconds(Int64(early.value), to: evaluationNow)
         case (.days, .hourly):
             return try addingFixedSeconds(Int64(early.value) * 86_400, to: evaluationNow)
         case (.weeks, .hourly):

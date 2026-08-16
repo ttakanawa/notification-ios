@@ -96,6 +96,7 @@ struct NextNotificationProviderTests {
 
     @Test func hourlyAllEarlyUnitsUseFixedElapsedDurations() throws {
         let units: [(EarlyReminderUnit, Int, Date)] = [
+            (.seconds, 30, date("2026-11-01T14:29:30Z")),
             (.minutes, 30, date("2026-11-01T14:00:00Z")),
             (.hours, 2, date("2026-11-01T12:30:00Z")),
             (.days, 1, date("2026-10-31T14:30:00Z")),

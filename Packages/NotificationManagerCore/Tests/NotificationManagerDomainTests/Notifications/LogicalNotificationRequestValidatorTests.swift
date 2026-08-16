@@ -45,7 +45,7 @@ struct LogicalNotificationRequestValidatorTests {
             )
         ]
         let invalidSchedules: [ScheduleReadState] = [
-            .unsupportedFuture(version: 2, originalData: Data([2])),
+            .unsupportedFuture(version: 3, originalData: Data([3])),
             .corrupt(originalData: Data([0])),
             .domainInvalid(
                 repairSeed: ScheduleRepairSeed(),

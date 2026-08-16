@@ -127,6 +127,24 @@
         }
       }
     },
+    "reminder.early-unit.seconds": {
+      "comment": "User-facing text for the semantic key reminder.early-unit.seconds.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seconds"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "秒"
+          }
+        }
+      }
+    },
     "reminder.early-unit.weeks": {
       "comment": "User-facing text for the semantic key reminder.early-unit.weeks.",
       "extractionState": "manual",

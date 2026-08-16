@@ -8,7 +8,7 @@ public enum SchedulePayloadCodecError: Error, Sendable, Equatable {
 
 public struct SchedulePayloadCodec: SchedulePayloadCoding {
     public static let format = "notification-manager.schedule"
-    public static let currentVersion: UInt32 = 1
+    public static let currentVersion: UInt32 = 2
 
     public init() {}
 
@@ -19,13 +19,19 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
             return .corrupt(originalData: data)
         }
         guard probe.version > 0 else { return .corrupt(originalData: data) }
-        guard probe.version == Self.currentVersion else {
+        switch probe.version {
+        case 1, 2:
+            guard let document = try? StrictJSONValue.parse(data) else {
+                return .corrupt(originalData: data)
+            }
+            return decode(
+                document,
+                version: probe.version,
+                originalData: data
+            )
+        default:
             return .unsupportedFuture(version: probe.version, originalData: data)
         }
-        guard let document = try? StrictJSONValue.parse(data) else {
-            return .corrupt(originalData: data)
-        }
-        return decodeV1(document, originalData: data)
     }
 
     public func encodeCurrent(_ definition: ScheduleDefinition) throws -> EncodedSchedulePayload {
@@ -34,9 +40,9 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
             throw SchedulePayloadCodecError.invalidSchedule(issues)
         }
 
-        let envelope = ScheduleEnvelopeV1DTO(
+        let envelope = ScheduleEnvelopeDTO(
             format: Self.format,
-            payload: SchedulePayloadV1DTO(definition),
+            payload: SchedulePayloadDTO(definition),
             version: Self.currentVersion
         )
         let encoder = JSONEncoder()
@@ -45,9 +51,13 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         return EncodedSchedulePayload(version: Self.currentVersion, data: data)
     }
 
-    private func decodeV1(_ document: StrictJSONValue, originalData: Data) -> ScheduleReadState {
+    private func decode(
+        _ document: StrictJSONValue,
+        version: UInt32,
+        originalData: Data
+    ) -> ScheduleReadState {
         do {
-            let payload = try RawPayload(document)
+            let payload = try RawPayload(document, version: version)
             let decoded = payload.makeDomain()
             var issues = decoded.combinationIssues
             if let definition = decoded.definition {
@@ -56,7 +66,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
                 issues = issues.removingDuplicates()
                 if issues.isEmpty {
                     return .valid(
-                        definition, sourceVersion: Self.currentVersion, originalData: originalData)
+                        definition, sourceVersion: version, originalData: originalData)
                 }
             }
             return .domainInvalid(
@@ -80,13 +90,13 @@ private struct RawPayload {
     let end: RawEnd
     let early: EarlyReminder?
 
-    init(_ document: StrictJSONValue) throws {
+    init(_ document: StrictJSONValue, version: UInt32) throws {
         let envelope = try document.requireObject(
             exactKeys: ["format", "payload", "version"],
             requiredKeys: ["format", "payload", "version"]
         )
         guard envelope["format"]?.stringValue == SchedulePayloadCodec.format,
-            envelope["version"]?.integer(as: UInt32.self) == SchedulePayloadCodec.currentVersion,
+            envelope["version"]?.integer(as: UInt32.self) == version,
             let payloadValue = envelope["payload"]
         else {
             throw PayloadStructureError.invalid
@@ -104,7 +114,7 @@ private struct RawPayload {
         source = try Self.decodeSource(sourceValue)
         rule = try RawRule(ruleValue)
         end = try RawEnd(endValue)
-        early = try payload["early"].map(Self.decodeEarly)
+        early = try payload["early"].map { try Self.decodeEarly($0, version: version) }
     }
 
     func makeDomain() -> DecodedPayload {
@@ -147,13 +157,23 @@ private struct RawPayload {
         )
     }
 
-    private static func decodeEarly(_ value: StrictJSONValue) throws -> EarlyReminder {
+    private static func decodeEarly(
+        _ value: StrictJSONValue,
+        version: UInt32
+    ) throws -> EarlyReminder {
         let object = try value.requireObject(
             exactKeys: ["value", "unit", "mainEnabled"],
             requiredKeys: ["value", "unit", "mainEnabled"]
         )
-        guard let unit = EarlyReminderUnit(rawValue: try object.requireString("unit")) else {
-            throw PayloadStructureError.invalid
+        let rawUnit = try object.requireString("unit")
+        let unit: EarlyReminderUnit
+        switch (version, rawUnit) {
+        case (_, "minutes"): unit = .minutes
+        case (_, "hours"): unit = .hours
+        case (_, "days"): unit = .days
+        case (_, "weeks"): unit = .weeks
+        case (2, "seconds"): unit = .seconds
+        default: throw PayloadStructureError.invalid
         }
         return EarlyReminder(
             value: try object.requireInteger("value"),
@@ -506,18 +526,6 @@ extension DaySet {
         switch rawValue {
         case "weekday": self = .weekday
         case "weekend": self = .weekend
-        default: return nil
-        }
-    }
-}
-
-extension EarlyReminderUnit {
-    fileprivate init?(rawValue: String) {
-        switch rawValue {
-        case "minutes": self = .minutes
-        case "hours": self = .hours
-        case "days": self = .days
-        case "weeks": self = .weeks
         default: return nil
         }
     }

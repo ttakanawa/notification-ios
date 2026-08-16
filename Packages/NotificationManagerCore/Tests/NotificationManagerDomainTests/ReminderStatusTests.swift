@@ -7,7 +7,7 @@ import Testing
 struct ReminderStatusTests {
     @Test func unsupportedSchedulePrecedesDisabledAndExpired() throws {
         let state = try calculator.status(
-            schedule: .unsupportedFuture(version: 2, originalData: Data()),
+            schedule: .unsupportedFuture(version: 3, originalData: Data()),
             enabled: false,
             after: now,
             environment: .foundation

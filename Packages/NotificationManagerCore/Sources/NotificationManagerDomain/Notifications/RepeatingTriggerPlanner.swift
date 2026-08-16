@@ -309,11 +309,18 @@ public struct RepeatingTriggerPlanner: Sendable {
             return timeZone.nextDaylightSavingTimeTransition(
                 after: evaluationNow.addingTimeInterval(-1)
             ) == nil
-        case .minutes, .hours:
+        case .seconds, .minutes, .hours:
             break
         }
 
-        let secondsPerUnit: Int64 = early.unit == .minutes ? 60 : 3_600
+        let secondsPerUnit: Int64 =
+            switch early.unit {
+            case .seconds: 1
+            case .minutes: 60
+            case .hours: 3_600
+            case .days, .weeks:
+                preconditionFailure("Calendar unit reached fixed-duration offset")
+            }
         let (seconds, overflow) = Int64(early.value).multipliedReportingOverflow(
             by: secondsPerUnit
         )

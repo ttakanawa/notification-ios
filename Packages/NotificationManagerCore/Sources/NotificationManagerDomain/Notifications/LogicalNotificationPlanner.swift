@@ -769,6 +769,8 @@ private func baseCandidate(
     calendar: Calendar
 ) throws -> Date {
     switch (early.unit, rule) {
+    case (.seconds, _):
+        return try addFixed(Int64(early.value), to: evaluationNow)
     case (.days, .hourly):
         return try addFixed(Int64(early.value) * 86_400, to: evaluationNow)
     case (.weeks, .hourly):

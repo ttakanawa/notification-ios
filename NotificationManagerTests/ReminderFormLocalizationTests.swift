@@ -48,6 +48,20 @@ struct ReminderFormLocalizationTests {
         }
     }
 
+    @Test func earlyReminderUnitChoicesUseReminderFormResources() {
+        let fixtures: [(EarlyReminderUnitChoice, String)] = [
+            (.seconds, "reminder.early-unit.seconds"),
+            (.minutes, "reminder.early-unit.minutes"),
+            (.hours, "reminder.early-unit.hours"),
+            (.days, "reminder.early-unit.days"),
+            (.weeks, "reminder.early-unit.weeks")
+        ]
+
+        for (choice, key) in fixtures {
+            expectReminderFormResource(choice.localizedResource, key: key)
+        }
+    }
+
     @Test func customRepeatErrorsUseReminderFormResources() {
         let fixtures: [(CustomRepeatResolutionError, String)] = [
             (

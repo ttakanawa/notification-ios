@@ -7,20 +7,21 @@ import Testing
 @Suite struct SchedulePayloadCodecTests {
     private let codec = SchedulePayloadCodec()
 
-    @Test func encodesNormativeV1GoldenBytes() throws {
-        let data = try codec.encodeCurrent(.weekdayFixture).data
-        let expected = Data(
+    @Test func decodesNormativeV1GoldenBytes() {
+        let data = Data(
             #"{"format":"notification-manager.schedule","payload":{"early":{"mainEnabled":true,"unit":"minutes","value":5},"end":{"type":"never"},"rule":{"interval":1,"type":"weekly","weekdaySetKind":"weekday","weekdays":["monday","tuesday","wednesday","thursday","friday"]},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}"#
                 .utf8
         )
 
-        #expect(data == expected)
+        #expect(
+            codec.decode(data)
+                == .valid(.weekdayFixture, sourceVersion: 1, originalData: data))
     }
 
     @Test func currentEncodingCarriesMatchingVersionAndBytes() throws {
         let encoded = try codec.encodeCurrent(.weekdayFixture)
 
-        #expect(encoded.version == SchedulePayloadCodec.currentVersion)
+        #expect(encoded.version == 2)
         #expect(
             codec.decode(encoded.data)
                 == .valid(
@@ -28,6 +29,33 @@ import Testing
                     sourceVersion: encoded.version,
                     originalData: encoded.data
                 ))
+    }
+
+    @Test func v2RoundTripsSecondsWhileV1GrammarRejectsSeconds() throws {
+        let schedule = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2026,
+                month: 8,
+                day: 3,
+                hour: 9,
+                minute: 30,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            rule: .daily(interval: 1),
+            end: .never,
+            early: EarlyReminder(value: 30, unit: .seconds)
+        )
+        let encoded = try codec.encodeCurrent(schedule)
+
+        #expect(encoded.version == 2)
+        #expect(
+            codec.decode(encoded.data)
+                == .valid(schedule, sourceVersion: 2, originalData: encoded.data))
+
+        let illegalV1 = Data(
+            #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"none"},"end":{"type":"never"},"early":{"value":30,"unit":"seconds","mainEnabled":true}},"version":1}"#.utf8
+        )
+        #expect(codec.decode(illegalV1) == .corrupt(originalData: illegalV1))
     }
 
     @Test(arguments: ["0", "-1", "1.0", "1e0", "null"])
@@ -38,7 +66,7 @@ import Testing
         #expect(codec.decode(data).isCorrupt)
     }
 
-    @Test(arguments: ["2", "4294967295"])
+    @Test(arguments: ["3", "4294967295"])
     func futureVersionProbeShortCircuitsPayloadValidation(_ version: String) throws {
         let data = Data(
             #"{"format":"notification-manager.schedule","futureKey":null,"version":\#(version)}"#
@@ -51,17 +79,17 @@ import Testing
 
     @Test func futureVersionProbeSkipsNestedDuplicateKeys() {
         let duplicateKeys = Data(
-            #"{"format":"notification-manager.schedule","version":2,"payload":{"a":1,"a":2}}"#.utf8)
+            #"{"format":"notification-manager.schedule","version":3,"payload":{"a":1,"a":2}}"#.utf8)
 
         #expect(
             codec.decode(duplicateKeys)
-                == .unsupportedFuture(version: 2, originalData: duplicateKeys))
+                == .unsupportedFuture(version: 3, originalData: duplicateKeys))
     }
 
     @Test func futureVersionProbeHandlesNearLimitNestingWithoutUsingTheCallStack() {
         let depth = 8_000
         let deeplyNested = Data(
-            (#"{"format":"notification-manager.schedule","version":2,"payload":"#
+            (#"{"format":"notification-manager.schedule","version":3,"payload":"#
                 + String(repeating: "[", count: depth)
                 + "0"
                 + String(repeating: "]", count: depth)
@@ -71,16 +99,16 @@ import Testing
         #expect(deeplyNested.count > 15 * 1_024)
         #expect(deeplyNested.count < 16 * 1_024)
         #expect(
-            codec.decode(deeplyNested) == .unsupportedFuture(version: 2, originalData: deeplyNested)
+            codec.decode(deeplyNested) == .unsupportedFuture(version: 3, originalData: deeplyNested)
         )
     }
 
     @Test func futureVersionProbeStillRejectsAmbiguousHeadersAndMalformedJSON() {
         let documents = [
-            #"{"format":"notification-manager.schedule","format":"notification-manager.schedule","version":2}"#,
-            #"{"format":"notification-manager.schedule","version":2,"version":3}"#,
-            #"{"format":"notification-manager.schedule","version":2,"payload":[}"#,
-            #"{"format":"notification-manager.schedule","version":2,"payload":null}null"#
+            #"{"format":"notification-manager.schedule","format":"notification-manager.schedule","version":3}"#,
+            #"{"format":"notification-manager.schedule","version":3,"version":4}"#,
+            #"{"format":"notification-manager.schedule","version":3,"payload":[}"#,
+            #"{"format":"notification-manager.schedule","version":3,"payload":null}null"#
         ]
 
         for document in documents {
@@ -300,6 +328,7 @@ import Testing
             .fixture(
                 rule: .daily(interval: 1),
                 early: EarlyReminder(value: 1, unit: .hours, mainEnabled: false)),
+            .fixture(rule: .daily(interval: 1), early: EarlyReminder(value: 30, unit: .seconds)),
             .fixture(rule: .daily(interval: 1), early: EarlyReminder(value: 2, unit: .days)),
             .fixture(rule: .daily(interval: 1), early: EarlyReminder(value: 3, unit: .weeks))
         ]
@@ -335,7 +364,7 @@ import Testing
             + Data(
                 #"{"version":1,"payload":{"end":{"type":"never"},"rule":{"type":"none"},"source":{"timeZone":"America/New_York","minute":30,"hour":9,"day":3,"month":8,"year":2026}},"format":"notification-manager.schedule"}"#
                     .utf8) + Data("\t".utf8)
-        let future = Data(#"{"version":2,"format":"notification-manager.schedule"}"#.utf8)
+        let future = Data(#"{"version":3,"format":"notification-manager.schedule"}"#.utf8)
         let corrupt = Data(#"{"format":"notification-manager.schedule","version":0}"#.utf8)
         let invalid = Data(
             #"{"format":"notification-manager.schedule","payload":{"end":{"type":"never"},"rule":{"interval":0,"type":"daily"},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}"#

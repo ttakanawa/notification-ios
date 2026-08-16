@@ -240,7 +240,7 @@ struct LogicalNotificationPlannerTests {
             "00000000-0000-0000-0000-00000000000A", hour: 13, interval: 24, enabled: false)
         let unsupported = classifiedReminder(
             "00000000-0000-0000-0000-00000000000B",
-            schedule: .unsupportedFuture(version: 2, originalData: Data([2]))
+            schedule: .unsupportedFuture(version: 3, originalData: Data([3]))
         )
         let invalid = classifiedReminder(
             "00000000-0000-0000-0000-00000000000C",

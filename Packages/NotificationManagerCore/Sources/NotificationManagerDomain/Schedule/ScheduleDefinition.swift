@@ -92,6 +92,7 @@ public enum RepeatEnd: Sendable, Equatable {
 }
 
 public enum EarlyReminderUnit: Sendable, Equatable {
+    case seconds
     case minutes
     case hours
     case days

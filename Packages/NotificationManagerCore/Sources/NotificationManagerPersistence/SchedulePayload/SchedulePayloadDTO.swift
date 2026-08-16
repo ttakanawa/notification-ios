@@ -1,12 +1,12 @@
 import NotificationManagerDomain
 
-struct ScheduleEnvelopeV1DTO: Encodable {
+struct ScheduleEnvelopeDTO: Encodable {
     let format: String
-    let payload: SchedulePayloadV1DTO
+    let payload: SchedulePayloadDTO
     let version: UInt32
 }
 
-struct SchedulePayloadV1DTO: Encodable {
+struct SchedulePayloadDTO: Encodable {
     let source: SourceDTO
     let rule: RuleDTO
     let end: EndDTO
@@ -217,10 +217,11 @@ enum DaySetDTO: String, Encodable {
 }
 
 enum EarlyReminderUnitDTO: String, Encodable {
-    case minutes, hours, days, weeks
+    case seconds, minutes, hours, days, weeks
 
     init(_ value: EarlyReminderUnit) {
         switch value {
+        case .seconds: self = .seconds
         case .minutes: self = .minutes
         case .hours: self = .hours
         case .days: self = .days

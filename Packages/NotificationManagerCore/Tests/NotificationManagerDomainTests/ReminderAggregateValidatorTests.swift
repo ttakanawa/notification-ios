@@ -169,7 +169,7 @@ struct ReminderAggregateValidatorTests {
         let original = Data([0x7B, 0x00, 0x7D])
         let states: [ScheduleReadState] = [
             .valid(validSchedule, sourceVersion: 1, originalData: original),
-            .unsupportedFuture(version: 2, originalData: original),
+            .unsupportedFuture(version: 3, originalData: original),
             .corrupt(originalData: original),
             .domainInvalid(
                 repairSeed: ScheduleRepairSeed(source: validSource),

@@ -13,7 +13,7 @@ struct NotificationContractTests {
         let result = try await NotificationContractHarness().payloadAndCleanupContract()
 
         #expect(result.payloadFormat == "notification-manager.schedule")
-        #expect(result.payloadVersion == 1)
+        #expect(result.payloadVersion == 2)
         #expect(result.directRequestsAreRepeating)
         #expect(result.rollingRequestsAreOneShot)
         #expect(result.identifierClassificationsAreCurrent)
