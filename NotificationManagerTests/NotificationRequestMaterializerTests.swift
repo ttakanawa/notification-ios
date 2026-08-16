@@ -155,6 +155,12 @@ struct NotificationRequestMaterializerTests {
     }
 
     @Test func repeatingUsesSourceIANAGregorianComponentsAndHasNextDate() throws {
+        let sourceComponents = RepeatingTriggerComponents(
+            timeZoneIdentifier: "America/New_York",
+            hour: 9,
+            minute: 30,
+            second: 0
+        )
         let components = RepeatingTriggerComponents(
             timeZoneIdentifier: "America/New_York",
             hour: 9,
@@ -162,8 +168,22 @@ struct NotificationRequestMaterializerTests {
             second: 30
         )
         let request = try testMaterializer().materialize(
-            repeatingRequest(components: components),
-            input: MaterializationInput(reminder: reminder(), locale: Locale(identifier: "en_US"))
+            repeatingRequest(
+                components: components,
+                contributors: [
+                    RepeatingTriggerContributor(
+                        kind: .early,
+                        sourceComponents: sourceComponents
+                    )
+                ]
+            ),
+            input: MaterializationInput(
+                reminder: reminder(
+                    schedule: validScheduleState(
+                        early: EarlyReminder(value: 30, unit: .seconds)
+                    )),
+                locale: Locale(identifier: "en_US")
+            )
         )
         let trigger = calendarTrigger(request)
         let actual = trigger.dateComponents
