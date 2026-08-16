@@ -175,15 +175,9 @@ final class ReminderFormModel {
             end: .never,
             early: nil
         )
-        let initialDraft = ReminderDraft(
-            id: newReminderID,
-            source: source,
-            rule: .none,
-            end: .never,
-            scheduleChange: .replace(schedule),
-            createdAt: now,
-            updatedAt: now
-        )
+        var initialDraft = ReminderDraft(id: newReminderID, now: now)
+        initialDraft.source = source
+        initialDraft.scheduleChange = .replace(schedule)
         detachedDraft = initialDraft
         scheduleAccess = .editable
         canDelete = false

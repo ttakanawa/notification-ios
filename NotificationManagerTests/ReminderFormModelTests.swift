@@ -7,6 +7,22 @@ import Testing
 
 @MainActor
 struct ReminderFormModelTests {
+    @Test func newDraftNormalizesFractionalTimestampAndCanSave() {
+        let expectedTimestamp = date("2040-08-01T02:30:45Z")
+        let model = ReminderFormModel(
+            newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
+            now: expectedTimestamp.addingTimeInterval(0.75),
+            actions: .inert,
+            defaultTimeZone: TimeZone(identifier: "Asia/Tokyo")!
+        )
+
+        model.title = "Test"
+
+        #expect(model.detachedDraft.createdAt == expectedTimestamp)
+        #expect(model.detachedDraft.updatedAt == expectedTimestamp)
+        #expect(model.canSave)
+    }
+
     @Test func newDraftStartsAtTheNextWholeHourInTheInjectedTimeZone() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let model = ReminderFormModel(
