@@ -53,7 +53,8 @@ import Testing
                 == .valid(schedule, sourceVersion: 2, originalData: encoded.data))
 
         let illegalV1 = Data(
-            #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"none"},"end":{"type":"never"},"early":{"value":30,"unit":"seconds","mainEnabled":true}},"version":1}"#.utf8
+            #"{"format":"notification-manager.schedule","payload":{"source":{"year":2026,"month":8,"day":3,"hour":9,"minute":30,"timeZone":"America/New_York"},"rule":{"type":"none"},"end":{"type":"never"},"early":{"value":30,"unit":"seconds","mainEnabled":true}},"version":1}"#
+                .utf8
         )
         #expect(codec.decode(illegalV1) == .corrupt(originalData: illegalV1))
     }
