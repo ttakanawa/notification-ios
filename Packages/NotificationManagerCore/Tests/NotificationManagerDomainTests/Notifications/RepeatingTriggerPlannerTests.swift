@@ -91,6 +91,29 @@ struct RepeatingTriggerPlannerTests {
             ])
     }
 
+    @Test func secondEarlyOffsetRemainsAStaticRepeatingResidue() throws {
+        let definition = schedule(
+            rule: .daily(interval: 1),
+            early: .init(value: 30, unit: .seconds)
+        )
+
+        #expect(
+            try #require(plan(definition)).map(\.components) == [
+                .init(
+                    timeZoneIdentifier: "Africa/Abidjan",
+                    hour: 9,
+                    minute: 29,
+                    second: 30
+                ),
+                .init(
+                    timeZoneIdentifier: "Africa/Abidjan",
+                    hour: 9,
+                    minute: 30,
+                    second: 0
+                )
+            ])
+    }
+
     @Test func earlyOnlyCalendarOffsetsCanRemainDirect() throws {
         let daily = schedule(
             rule: .daily(interval: 1),

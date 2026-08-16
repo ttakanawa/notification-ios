@@ -38,7 +38,7 @@ public struct RepeatingTriggerComponents: Sendable, Equatable, Hashable {
             weekday.map({ (1...7).contains($0) }) ?? true,
             (0...23).contains(hour),
             (0...59).contains(minute),
-            second == 0,
+            (0...59).contains(second),
             hasAllowedShape,
             hasValidFixedMonthDay
         else {

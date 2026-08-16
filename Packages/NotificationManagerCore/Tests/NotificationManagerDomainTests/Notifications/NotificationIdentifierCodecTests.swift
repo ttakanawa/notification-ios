@@ -69,7 +69,8 @@ struct NotificationIdentifierCodecTests {
                 timeZoneIdentifier: "UTC", weekday: 0, hour: 9, minute: 0, second: 0),
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 24, minute: 0, second: 0),
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 60, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 0, second: 1)
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 0, second: -1),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 0, second: 60)
         ]
 
         for components in invalid {
@@ -112,6 +113,7 @@ struct NotificationIdentifierCodecTests {
     @Test func acceptsEveryAllowedTriggerShapeAtItsBoundaries() throws {
         let allowed = [
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 0, minute: 0, second: 0),
+            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 23, minute: 59, second: 59),
             RepeatingTriggerComponents(
                 timeZoneIdentifier: "UTC", weekday: 7, hour: 23, minute: 59, second: 0),
             RepeatingTriggerComponents(

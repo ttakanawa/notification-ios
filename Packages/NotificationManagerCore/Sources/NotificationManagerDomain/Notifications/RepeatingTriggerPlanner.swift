@@ -408,20 +408,22 @@ public struct RepeatingTriggerPlanner: Sendable {
         )
         guard let hour = values.hour,
             let minute = values.minute,
-            values.second == 0
+            let second = values.second,
+            (0...59).contains(second)
         else {
             return nil
         }
         switch cadence {
         case .daily:
-            return trigger(zone: timeZoneIdentifier, hour: hour, minute: minute)
+            return trigger(zone: timeZoneIdentifier, hour: hour, minute: minute, second: second)
         case .weekly:
             guard let weekday = values.weekday else { return nil }
             return trigger(
                 zone: timeZoneIdentifier,
                 weekday: weekday,
                 hour: hour,
-                minute: minute
+                minute: minute,
+                second: second
             )
         case .monthly:
             guard let day = values.day else { return nil }
@@ -429,7 +431,8 @@ public struct RepeatingTriggerPlanner: Sendable {
                 zone: timeZoneIdentifier,
                 day: day,
                 hour: hour,
-                minute: minute
+                minute: minute,
+                second: second
             )
         case .yearly:
             guard let month = values.month, let day = values.day else { return nil }
@@ -438,7 +441,8 @@ public struct RepeatingTriggerPlanner: Sendable {
                 month: month,
                 day: day,
                 hour: hour,
-                minute: minute
+                minute: minute,
+                second: second
             )
         }
     }
@@ -483,7 +487,8 @@ public struct RepeatingTriggerPlanner: Sendable {
         day: Int? = nil,
         weekday: Int? = nil,
         hour: Int,
-        minute: Int
+        minute: Int,
+        second: Int = 0
     ) -> RepeatingTriggerComponents {
         let components = RepeatingTriggerComponents(
             timeZoneIdentifier: zone,
@@ -492,7 +497,7 @@ public struct RepeatingTriggerPlanner: Sendable {
             weekday: weekday,
             hour: hour,
             minute: minute,
-            second: 0
+            second: second
         )
         precondition(
             (try? components.validated()) != nil,

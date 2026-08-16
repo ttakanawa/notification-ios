@@ -158,8 +158,8 @@ struct NotificationRequestMaterializerTests {
         let components = RepeatingTriggerComponents(
             timeZoneIdentifier: "America/New_York",
             hour: 9,
-            minute: 30,
-            second: 0
+            minute: 29,
+            second: 30
         )
         let request = try testMaterializer().materialize(
             repeatingRequest(components: components),
@@ -175,8 +175,8 @@ struct NotificationRequestMaterializerTests {
         #expect(actual.day == nil)
         #expect(actual.weekday == nil)
         #expect(actual.hour == 9)
-        #expect(actual.minute == 30)
-        #expect(actual.second == 0)
+        #expect(actual.minute == 29)
+        #expect(actual.second == 30)
         #expect(trigger.repeats)
         #expect(trigger.nextTriggerDate() != nil)
     }

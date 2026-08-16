@@ -85,6 +85,36 @@ struct LogicalNotificationRequestValidatorTests {
         )
     }
 
+    @Test func acceptsStaticRepeatingRequestsFromPlannerWithSecondEarlyOffset() throws {
+        let definition = schedule(early: EarlyReminder(value: 30, unit: .seconds))
+        let snapshot = CompleteReminderSnapshot(
+            reminders: [
+                reminder(
+                    schedule: .valid(
+                        definition,
+                        sourceVersion: 1,
+                        originalData: Data([1])
+                    ))
+            ],
+            tags: []
+        )
+        let plan = try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: snapshot,
+                evaluationNow: date("2040-08-31T13:30:00Z"),
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 2,
+                recurrenceEnvironment: .foundation
+            ))
+
+        #expect(plan.requests.count == 2)
+        #expect(plan.requests.allSatisfy { $0.isRepeating })
+        for request in plan.requests {
+            try validator.validate(request, for: definition)
+        }
+    }
+
     @Test func rejectsMissingExtraAndUnrelatedOneShotContributorGroups() throws {
         let reason = mainReason()
         let variants: [[Date]] = [
