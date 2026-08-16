@@ -240,20 +240,22 @@ struct ReminderFormModelTests {
         #expect(model.sourceTime == SourceTime(hour: 9, minute: 30))
     }
 
-    @Test func invalidRawInputIsDirtyEvenWhenTheLastParsedValueIsRetained() {
+    @Test func existingOutOfRangeEarlyReminderIsPreservedUntilUnitChanges() {
         let model = ReminderFormModel(
-            snapshot: validSnapshot(
-                early: EarlyReminder(value: 5, unit: .minutes)
-            ),
+            snapshot: validSnapshot(early: EarlyReminder(value: 90, unit: .minutes)),
             savedRepeatPresentation: .standard(localizedSummary: "Every week."),
             now: date("2040-08-01T00:00:00Z"),
             actions: .inert
         )
 
-        model.updateEarlyReminderValueText("invalid")
+        #expect(model.earlyReminder == EarlyReminder(value: 90, unit: .minutes))
+        #expect(model.earlyReminderAmountChoices == Array(1...59) + [90])
+        #expect(!model.hasChanges)
 
+        model.updateEarlyReminderUnit(.hours)
+
+        #expect(model.earlyReminder == EarlyReminder(value: 23, unit: .hours))
         #expect(model.hasChanges)
-        #expect(!model.canSave)
     }
 
     @Test func invalidURLRemainsDirtyUntilRestoredToTheRegisteredBaseline() {
@@ -829,7 +831,7 @@ struct ReminderFormModelTests {
         _ = await secondSave.value
     }
 
-    @Test func partialEarlyReminderInputRemainsVisibleAndCannotBeSaved() {
+    @Test func selectingCustomFromNoneUsesFiveMinuteDefault() {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
             now: date("2040-08-01T00:00:00Z"),
@@ -837,14 +839,11 @@ struct ReminderFormModelTests {
         )
         populateSchedule(model, rule: .daily(interval: 1))
 
-        model.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
-        #expect(model.canSave)
+        model.applyEarlyReminderChoice(.custom)
 
-        model.updateEarlyReminderValueText("")
-
-        #expect(model.earlyReminderValueText.isEmpty)
-        #expect(!model.canSave)
-        #expect(model.previewNotifications.isEmpty)
+        #expect(model.earlyReminderChoice == .custom)
+        #expect(model.earlyReminder == EarlyReminder(value: 5, unit: .minutes))
+        #expect(model.earlyReminderAmountChoices == Array(1...59))
     }
 
     @Test func clearingExistingRequiredTimeZoneKeepsInvalidReplacementIntent() {
@@ -936,6 +935,18 @@ struct ReminderFormModelTests {
         )
         populateSchedule(model, rule: .daily(interval: 1))
 
+        model.applyEarlyReminderChoice(.thirtySeconds)
+        #expect(model.earlyReminderChoice == .thirtySeconds)
+        #expect(model.earlyReminder == EarlyReminder(value: 30, unit: .seconds))
+
+        model.applyEarlyReminderChoice(.custom)
+        model.updateEarlyReminderAmount(59)
+        #expect(model.earlyReminder == EarlyReminder(value: 59, unit: .seconds))
+
+        model.updateEarlyReminderUnit(.hours)
+        #expect(model.earlyReminder == EarlyReminder(value: 23, unit: .hours))
+        #expect(model.earlyReminderAmountChoices == Array(1...23))
+
         model.applyEarlyReminderChoice(.oneMinute)
         #expect(model.earlyReminderChoice == .oneMinute)
         #expect(model.earlyReminder == EarlyReminder(value: 1, unit: .minutes))
@@ -956,7 +967,7 @@ struct ReminderFormModelTests {
         #expect(model.earlyReminder == nil)
 
         model.applyEarlyReminderChoice(.custom)
-        model.updateEarlyReminderValueText("1")
+        model.updateEarlyReminderAmount(1)
         #expect(model.earlyReminderChoice == .custom)
         #expect(model.earlyReminder == EarlyReminder(value: 1, unit: .minutes))
     }

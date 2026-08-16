@@ -434,7 +434,7 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testEarlyReminderExposesOneMinuteFiveMinuteAndCustomChoices() {
+    func testEarlyReminderExposesThirtySecondPresetAndCustomWheel() {
         let app = launch(scenario: "empty-list")
         app.buttons["reminder-list.add"].tap()
 
@@ -442,12 +442,20 @@ final class ReminderFlowUITests: XCTestCase {
         scrollToHittable(picker, in: app)
         XCTAssertTrue(picker.waitForExistence(timeout: 1))
         picker.tap()
+        XCTAssertTrue(app.buttons["reminder.early.thirty-seconds-before"].exists)
         XCTAssertTrue(app.buttons["reminder.early.one-minute-before"].exists)
         XCTAssertTrue(app.buttons["reminder.early.five-minutes-before"].exists)
         app.buttons["reminder.early.custom"].tap()
 
-        XCTAssertTrue(app.textFields["reminder-form.early-value"].waitForExistence(timeout: 1))
-        XCTAssertTrue(app.buttons["reminder-form.early-unit"].exists)
+        let amountPicker = app.pickers["reminder-form.early-value"]
+        XCTAssertTrue(amountPicker.waitForExistence(timeout: 1))
+        let wheel = amountPicker.pickerWheels.element
+        wheel.adjust(toPickerWheelValue: "6")
+        XCTAssertEqual(wheel.value as? String, "6")
+
+        let unitPicker = app.buttons["reminder-form.early-unit"]
+        unitPicker.tap()
+        XCTAssertTrue(app.buttons["reminder.early-unit.seconds"].exists)
         XCTAssertTrue(app.switches["reminder-form.main-enabled"].exists)
     }
 

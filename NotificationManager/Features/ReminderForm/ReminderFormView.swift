@@ -166,8 +166,7 @@ struct ReminderFormView: View {
             model.notesFieldIssue?.accessibilityIdentity,
             model.urlFieldIssue?.accessibilityIdentity,
             model.timeZoneFieldIssue?.accessibilityIdentity,
-            model.repeatEndDateFieldIssue?.accessibilityIdentity,
-            model.earlyReminderValueTextIsValid ? nil : .reminderEarlyValueInvalid
+            model.repeatEndDateFieldIssue?.accessibilityIdentity
         ].compactMap { $0 }
 
         if case .failed(let error) = model.customRepeatState {

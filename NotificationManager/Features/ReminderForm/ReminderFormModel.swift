@@ -94,6 +94,7 @@ enum ReminderFormFieldIssue: Sendable, Equatable {
 
 enum EarlyReminderChoice: String, Sendable, Equatable, CaseIterable, Identifiable {
     case none
+    case thirtySeconds
     case oneMinute
     case fiveMinutes
     case custom
@@ -124,7 +125,6 @@ final class ReminderFormModel {
     private(set) var currentRepeatWasCustom = false
     private(set) var canonicalEnglishDisclosure: String?
     private(set) var repeatEndsOnDate = false
-    private(set) var earlyReminderValueText = ""
     private(set) var earlyReminderChoice: EarlyReminderChoice = .none
     private(set) var customRepeatText = ""
     private(set) var isReplacingCustomRepeat = false
@@ -210,7 +210,6 @@ final class ReminderFormModel {
         if case .onDate = initialDraft.end {
             repeatEndsOnDate = true
         }
-        earlyReminderValueText = initialDraft.early.map { String($0.value) } ?? ""
         earlyReminderChoice = Self.earlyReminderChoice(for: initialDraft.early)
         canDelete = true
         self.availableTags = availableTags
@@ -374,10 +373,14 @@ final class ReminderFormModel {
         set {
             guard canEditSchedule, newValue != detachedDraft.early else { return }
             detachedDraft.early = newValue
-            earlyReminderValueText = newValue.map { String($0.value) } ?? ""
             earlyReminderChoice = Self.earlyReminderChoice(for: newValue)
             scheduleFieldChanged()
         }
+    }
+
+    var earlyReminderAmountChoices: [Int] {
+        guard let early = detachedDraft.early else { return [] }
+        return EarlyReminderAmountOptions.values(for: early)
     }
 
     var canEditMetadata: Bool { true }
@@ -466,12 +469,6 @@ final class ReminderFormModel {
             : .timeZoneInvalid
     }
 
-    var earlyReminderValueTextIsValid: Bool {
-        guard let early = detachedDraft.early else { return earlyReminderValueText.isEmpty }
-        return Int(earlyReminderValueText) == early.value
-            && (1...9_999).contains(early.value)
-    }
-
     var repeatEndDateFieldIssue: ReminderFormFieldIssue? {
         guard repeatEndsOnDate else {
             return repeatEnd == .never ? nil : .repeatEndInvalid
@@ -529,21 +526,19 @@ final class ReminderFormModel {
         )
     }
 
-    func updateEarlyReminderValueText(_ input: String) {
+    func updateEarlyReminderAmount(_ amount: Int) {
         guard canEditSchedule,
-            input != earlyReminderValueText,
-            let current = detachedDraft.early
+            let current = detachedDraft.early,
+            amount != current.value,
+            EarlyReminderAmountOptions.standardRange(for: current.unit).contains(amount)
         else {
             return
         }
-        earlyReminderValueText = input
-        if let value = Int(input) {
-            detachedDraft.early = EarlyReminder(
-                value: value,
-                unit: current.unit,
-                mainEnabled: current.mainEnabled
-            )
-        }
+        detachedDraft.early = EarlyReminder(
+            value: amount,
+            unit: current.unit,
+            mainEnabled: current.mainEnabled
+        )
         earlyReminderChoice = .custom
         scheduleFieldChanged()
     }
@@ -555,8 +550,9 @@ final class ReminderFormModel {
         else {
             return
         }
+        let amount = EarlyReminderAmountOptions.clamped(current.value, for: unit)
         detachedDraft.early = EarlyReminder(
-            value: current.value,
+            value: amount,
             unit: unit,
             mainEnabled: current.mainEnabled
         )
@@ -585,25 +581,27 @@ final class ReminderFormModel {
         switch choice {
         case .none:
             detachedDraft.early = nil
-            earlyReminderValueText = ""
+        case .thirtySeconds:
+            detachedDraft.early = EarlyReminder(
+                value: 30,
+                unit: .seconds,
+                mainEnabled: mainEnabled
+            )
         case .oneMinute:
             detachedDraft.early = EarlyReminder(
                 value: 1,
                 unit: .minutes,
                 mainEnabled: mainEnabled
             )
-            earlyReminderValueText = "1"
         case .fiveMinutes:
             detachedDraft.early = EarlyReminder(
                 value: 5,
                 unit: .minutes,
                 mainEnabled: mainEnabled
             )
-            earlyReminderValueText = "5"
         case .custom:
             if detachedDraft.early == nil {
                 detachedDraft.early = EarlyReminder(value: 5, unit: .minutes)
-                earlyReminderValueText = "5"
             }
         }
         earlyReminderChoice = choice
@@ -736,7 +734,6 @@ final class ReminderFormModel {
         case .onDate:
             repeatEndsOnDate = true
         }
-        earlyReminderValueText = schedule.early.map { String($0.value) } ?? ""
         detachedDraft.scheduleChange = .replace(schedule)
         customRepeatState = .confirmed(preview)
         isReplacingCustomRepeat = false
@@ -852,7 +849,6 @@ final class ReminderFormModel {
         customRepeatState = .idle
         detachedDraft = baseline.draft
         repeatEndsOnDate = baseline.editableContent.repeatEndsOnDate
-        earlyReminderValueText = baseline.editableContent.earlyReminderValueText
         earlyReminderChoice = baseline.editableContent.earlyReminderChoice
         isReplacingCustomRepeat = baseline.editableContent.isReplacingCustomRepeat
         customRepeatText = baseline.editableContent.customRepeatText
@@ -887,7 +883,6 @@ final class ReminderFormModel {
             repeatEnd: detachedDraft.end,
             repeatEndsOnDate: repeatEndsOnDate,
             earlyReminder: detachedDraft.early,
-            earlyReminderValueText: earlyReminderValueText,
             earlyReminderChoice: earlyReminderChoice,
             isReplacingCustomRepeat: isReplacingCustomRepeat,
             currentRepeatWasCustom: currentRepeatWasCustom,
@@ -910,7 +905,6 @@ final class ReminderFormModel {
     private var scheduleInputFieldsAreValid: Bool {
         guard canEditSchedule else { return true }
         return repeatEndDateFieldIssue == nil
-            && earlyReminderValueTextIsValid
     }
 
     private func refreshAnchorDependentPreset() {
@@ -1089,6 +1083,8 @@ final class ReminderFormModel {
         switch early {
         case nil:
             .none
+        case .some(let value) where value.value == 30 && value.unit == .seconds:
+            .thirtySeconds
         case .some(let value) where value.value == 1 && value.unit == .minutes:
             .oneMinute
         case .some(let value) where value.value == 5 && value.unit == .minutes:
@@ -1112,7 +1108,6 @@ private struct ReminderFormEditableContent: Equatable {
     let repeatEnd: RepeatEnd
     let repeatEndsOnDate: Bool
     let earlyReminder: EarlyReminder?
-    let earlyReminderValueText: String
     let earlyReminderChoice: EarlyReminderChoice
     let isReplacingCustomRepeat: Bool
     let currentRepeatWasCustom: Bool

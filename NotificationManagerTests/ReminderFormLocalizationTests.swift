@@ -38,6 +38,7 @@ struct ReminderFormLocalizationTests {
     @Test func earlyReminderChoicesUseReminderFormResources() {
         let fixtures: [(EarlyReminderChoice, String)] = [
             (.none, "reminder.early.none"),
+            (.thirtySeconds, "reminder.early.thirty-seconds-before"),
             (.oneMinute, "reminder.early.one-minute-before"),
             (.fiveMinutes, "reminder.early.five-minutes-before"),
             (.custom, "reminder.early.custom")

@@ -235,6 +235,24 @@
         }
       }
     },
+    "reminder.early.thirty-seconds-before": {
+      "comment": "User-facing text for the semantic key reminder.early.thirty-seconds-before.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30 Seconds Before"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "30秒前"
+          }
+        }
+      }
+    },
     "reminder.field.current-device-time": {
       "comment": "User-facing text for the semantic key reminder.field.current-device-time.",
       "extractionState": "manual",
@@ -915,24 +933,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "リマインダーを編集"
-          }
-        }
-      }
-    },
-    "reminder.form.error.invalid-early-value": {
-      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enter an amount from 1 through 9999."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "1から9999までの数量を入力してください。"
           }
         }
       }
