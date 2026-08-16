@@ -71,11 +71,11 @@ public actor CustomRepeatSession {
         }
 
         switch resolution {
-        case let .failed(error):
+        case .failed(let error):
             state = .failed(error)
-        case let .suggested(suggestion):
+        case .suggested(let suggestion):
             state = .awaitingSuggestion(suggestion)
-        case let .resolved(resolved):
+        case .resolved(let resolved):
             do {
                 let nextNotifications = try NextNotificationProvider().nextPhysicalNotifications(
                     for: reminderID,

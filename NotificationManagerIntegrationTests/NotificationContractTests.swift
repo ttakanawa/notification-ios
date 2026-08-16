@@ -4,6 +4,7 @@ import NotificationManagerDomain
 import NotificationManagerPersistence
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Notification acceptance contracts")
@@ -81,12 +82,12 @@ private struct NotificationContractHarness {
         let codec = SchedulePayloadCodec()
         let directSchedule = weekdaySchedule()
         let payload = try codec.encodeCurrent(directSchedule)
-        guard case let .valid(decodedSchedule, sourceVersion, _) = codec.decode(payload),
-              sourceVersion == 1,
-              decodedSchedule == directSchedule,
-              let envelope = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
-              let payloadFormat = envelope["format"] as? String,
-              let payloadVersionNumber = envelope["version"] as? NSNumber
+        guard case .valid(let decodedSchedule, let sourceVersion, _) = codec.decode(payload),
+            sourceVersion == 1,
+            decodedSchedule == directSchedule,
+            let envelope = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
+            let payloadFormat = envelope["format"] as? String,
+            let payloadVersionNumber = envelope["version"] as? NSNumber
         else {
             throw NotificationContractError.invalidPayloadRoundTrip
         }
@@ -138,7 +139,7 @@ private struct NotificationContractHarness {
             )
         )
         guard let englishTrigger = english.trigger as? UNCalendarNotificationTrigger,
-              let japaneseTrigger = japanese.trigger as? UNCalendarNotificationTrigger
+            let japaneseTrigger = japanese.trigger as? UNCalendarNotificationTrigger
         else {
             throw NotificationContractError.unexpectedTrigger
         }
@@ -168,8 +169,8 @@ private struct NotificationContractHarness {
         let classificationsAreCurrent = (directPlan.requests + rollingPlan.requests)
             .allSatisfy { request in
                 switch NotificationIdentifierCodec().classify(request.identifier) {
-                case let .currentOneShot(reminderID, _),
-                     let .currentRepeating(reminderID, _):
+                case .currentOneShot(let reminderID, _),
+                    .currentRepeating(let reminderID, _):
                     reminderID == request.reminderID
                 case .appOwnedStale, .unrelated:
                     false
@@ -206,7 +207,7 @@ private struct NotificationContractHarness {
         let snapshot = CompleteReminderSnapshot(reminders: [first, second], tags: [])
         let expectedPlan = try plan(reminders: snapshot.reminders)
         guard expectedPlan.requests.count == 2,
-              let failedIdentifier = expectedPlan.requests.last?.identifier
+            let failedIdentifier = expectedPlan.requests.last?.identifier
         else {
             throw NotificationContractError.unexpectedRequestCount
         }
@@ -273,11 +274,12 @@ private struct NotificationContractHarness {
             categoryIdentifier: NotificationApplicationDelegate.openLinkCategoryIdentifier,
             userInfo: request.content.userInfo
         )
-        let openedURL: URL? = if case let .openedURL(value) = openOutcome {
-            value
-        } else {
-            nil
-        }
+        let openedURL: URL? =
+            if case .openedURL(let value) = openOutcome {
+                value
+            } else {
+                nil
+            }
         await currentStore.delete()
         let missingDestination = await delegate.handleResponse(
             actionIdentifier: UNNotificationDefaultActionIdentifier,
@@ -297,14 +299,15 @@ private struct NotificationContractHarness {
     }
 
     private func plan(reminders: [ReminderSnapshot]) throws -> LogicalPlan {
-        try LogicalNotificationPlanner().plan(PlannerInput(
-            snapshot: CompleteReminderSnapshot(reminders: reminders, tags: []),
-            evaluationNow: evaluationNow,
-            deviceNotificationsEnabled: true,
-            authorizationAllowsScheduling: true,
-            capacity: 60,
-            recurrenceEnvironment: environment
-        ))
+        try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: CompleteReminderSnapshot(reminders: reminders, tags: []),
+                evaluationNow: evaluationNow,
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 60,
+                recurrenceEnvironment: environment
+            ))
     }
 
     private func weekdaySchedule() -> ScheduleDefinition {

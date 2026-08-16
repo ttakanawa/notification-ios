@@ -11,12 +11,14 @@ struct DeleteReminderSection: View {
                 guard !isPersistenceOperationInFlight else { return }
                 onRequestDelete()
             } label: {
-                Text(LocalizedStringResource(
-                    "reminder.action.delete",
-                    table: "Reminder"
-                ))
-                    .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                    .contentShape(Rectangle())
+                Text(
+                    LocalizedStringResource(
+                        "reminder.action.delete",
+                        table: "Reminder"
+                    )
+                )
+                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .foregroundStyle(.red)

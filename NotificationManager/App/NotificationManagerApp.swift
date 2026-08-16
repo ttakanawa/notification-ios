@@ -11,20 +11,20 @@ struct NotificationManagerApp: App {
     var body: some Scene {
         WindowGroup {
             #if DEBUG
-            if ProcessInfo.processInfo.arguments.contains("-ui-testing") {
-                let scenario = Self.uiScenario
-                if ["settings", "data-unavailable", "notification-unavailable"]
-                    .contains(scenario)
-                {
-                    Task15UITestFixtureRoot(scenario: scenario)
+                if ProcessInfo.processInfo.arguments.contains("-ui-testing") {
+                    let scenario = Self.uiScenario
+                    if ["settings", "data-unavailable", "notification-unavailable"]
+                        .contains(scenario)
+                    {
+                        Task15UITestFixtureRoot(scenario: scenario)
+                    } else {
+                        Task14UITestFixtureRoot()
+                    }
                 } else {
-                    Task14UITestFixtureRoot()
+                    AppBootstrapRoot(notificationDelegate: notificationDelegate)
                 }
-            } else {
-                AppBootstrapRoot(notificationDelegate: notificationDelegate)
-            }
             #else
-            AppBootstrapRoot(notificationDelegate: notificationDelegate)
+                AppBootstrapRoot(notificationDelegate: notificationDelegate)
             #endif
         }
     }
@@ -32,7 +32,7 @@ struct NotificationManagerApp: App {
     private static var uiScenario: String {
         let arguments = ProcessInfo.processInfo.arguments
         guard let index = arguments.firstIndex(of: "-ui-scenario"),
-              arguments.indices.contains(index + 1)
+            arguments.indices.contains(index + 1)
         else {
             return "navigation"
         }
@@ -44,23 +44,26 @@ private struct AppBootstrapRoot: View {
     @State private var bootstrapper: AppBootstrapper
 
     init(notificationDelegate: NotificationApplicationDelegate) {
-        _bootstrapper = State(initialValue: AppBootstrapper.production(
-            notificationDelegate: notificationDelegate
-        ))
+        _bootstrapper = State(
+            initialValue: AppBootstrapper.production(
+                notificationDelegate: notificationDelegate
+            ))
     }
 
     var body: some View {
         Group {
             switch bootstrapper.state {
             case .loading:
-                ProgressView(LocalizedStringResource(
-                    "common.app-name",
-                    table: "Common"
-                ))
-                    .accessibilityIdentifier("app-bootstrap.loading")
-            case let .ready(environment):
+                ProgressView(
+                    LocalizedStringResource(
+                        "common.app-name",
+                        table: "Common"
+                    )
+                )
+                .accessibilityIdentifier("app-bootstrap.loading")
+            case .ready(let environment):
                 ReadyAppRoot(environment: environment)
-            case let .dataUnavailable(actions):
+            case .dataUnavailable(let actions):
                 DataUnavailableView(actions: actions)
             }
         }
@@ -75,21 +78,21 @@ private struct ReadyAppRoot: View {
 
     var body: some View {
         content
-        .task { await environment.start() }
-        .onChange(of: scenePhase) { _, phase in
-            Task {
-                switch phase {
-                case .active:
-                    await environment.enterForeground()
-                case .background:
-                    await environment.enterBackground()
-                case .inactive:
-                    break
-                @unknown default:
-                    break
+            .task { await environment.start() }
+            .onChange(of: scenePhase) { _, phase in
+                Task {
+                    switch phase {
+                    case .active:
+                        await environment.enterForeground()
+                    case .background:
+                        await environment.enterBackground()
+                    case .inactive:
+                        break
+                    @unknown default:
+                        break
+                    }
                 }
             }
-        }
     }
 
     @ViewBuilder
@@ -122,9 +125,10 @@ private struct SwiftDataModelImportObserver: View {
     init(
         changeHandler: @escaping @MainActor @Sendable () async -> Void
     ) {
-        _changeObserver = State(initialValue: ModelImportChangeObserver(
-            changeHandler: changeHandler
-        ))
+        _changeObserver = State(
+            initialValue: ModelImportChangeObserver(
+                changeHandler: changeHandler
+            ))
     }
 
     var body: some View {

@@ -125,7 +125,7 @@ final class TagManagementModel {
             switch error {
             case .notFound: return .notFound
             case .duplicateNormalizedName: return .duplicateName
-            case let .invalid(issue):
+            case .invalid(let issue):
                 return errorIdentity(for: issue)
             case .duplicateID, .unavailable: return .storeUnavailable
             }
@@ -142,7 +142,7 @@ final class TagManagementModel {
         case .normalizedNameTooLarge:
             .normalizedNameTooLarge
         case .normalizedNameMismatch, .unsupportedNormalizationVersion,
-             .invalidCreatedAt, .invalidUpdatedAt:
+            .invalidCreatedAt, .invalidUpdatedAt:
             .storeUnavailable
         }
     }

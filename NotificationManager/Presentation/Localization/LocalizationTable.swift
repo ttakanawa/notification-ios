@@ -26,13 +26,15 @@ enum LocalizationTable: String, CaseIterable, Sendable {
         } else if semanticKey.hasPrefix("localization.") {
             self = .notificationText
         } else if semanticKey.hasPrefix("settings.")
-                    || semanticKey.hasPrefix("privacy.") {
+            || semanticKey.hasPrefix("privacy.")
+        {
             self = .settings
         } else if semanticKey.hasPrefix("tags.") {
             self = .tags
         } else if semanticKey.hasPrefix("data_unavailable.")
-                    || semanticKey.hasPrefix("notification_unavailable.")
-                    || semanticKey.hasPrefix("recovery.") {
+            || semanticKey.hasPrefix("notification_unavailable.")
+            || semanticKey.hasPrefix("recovery.")
+        {
             self = .recovery
         } else {
             return nil

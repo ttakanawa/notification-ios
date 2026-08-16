@@ -32,11 +32,13 @@ public struct RepeatRuleValidator: Sendable {
                 throw RepeatCandidateValidationError.invalidCombination
             }
             if candidate.weekdaySetKind == nil, candidate.weekdays.isEmpty {
-                guard let weekday = GregorianDate.weekday(
-                    year: source.year,
-                    month: source.month,
-                    day: source.day
-                ) else {
+                guard
+                    let weekday = GregorianDate.weekday(
+                        year: source.year,
+                        month: source.month,
+                        day: source.day
+                    )
+                else {
                     throw RepeatCandidateValidationError.invalidSourceDate
                 }
                 return .weekly(
@@ -71,7 +73,7 @@ public struct RepeatRuleValidator: Sendable {
             )
         case .monthly:
             guard candidate.weekdaySetKind == nil, candidate.weekdays.isEmpty,
-                  candidate.month == nil, let selector = candidate.selector
+                candidate.month == nil, let selector = candidate.selector
             else {
                 throw RepeatCandidateValidationError.invalidCombination
             }
@@ -81,7 +83,7 @@ public struct RepeatRuleValidator: Sendable {
             return .monthly(interval: candidate.interval, selector: domainSelector(selector))
         case .yearly:
             guard candidate.weekdaySetKind == nil, candidate.weekdays.isEmpty,
-                  let selector = candidate.selector
+                let selector = candidate.selector
             else {
                 throw RepeatCandidateValidationError.invalidCombination
             }
@@ -91,7 +93,7 @@ public struct RepeatRuleValidator: Sendable {
                 }
             } else {
                 guard let month = candidate.month, (1...12).contains(month),
-                      isValidYearlySelector(selector, month: month)
+                    isValidYearlySelector(selector, month: month)
                 else {
                     throw RepeatCandidateValidationError.invalidSelector
                 }
@@ -106,7 +108,7 @@ public struct RepeatRuleValidator: Sendable {
 
     private func requireNoRecurrenceFields(_ candidate: RepeatCandidate) throws {
         guard candidate.weekdaySetKind == nil, candidate.weekdays.isEmpty,
-              candidate.month == nil, candidate.selector == nil
+            candidate.month == nil, candidate.selector == nil
         else {
             throw RepeatCandidateValidationError.invalidCombination
         }
@@ -116,11 +118,11 @@ public struct RepeatRuleValidator: Sendable {
         switch selector {
         case .anchorDay, .lastDay:
             true
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             (1...31).contains(day)
-        case let .ordinalDaySet(ordinal, _):
+        case .ordinalDaySet(let ordinal, _):
             (1...5).contains(ordinal)
-        case let .ordinalWeekday(ordinal, _):
+        case .ordinalWeekday(let ordinal, _):
             (-5 ... -1).contains(ordinal) || (1...5).contains(ordinal)
         case .anchorMonthDay:
             false
@@ -132,13 +134,13 @@ public struct RepeatRuleValidator: Sendable {
         month: Int
     ) -> Bool {
         switch selector {
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             GregorianDate.isPotentiallyValid(month: month, day: day)
         case .lastDay:
             true
-        case let .ordinalDaySet(ordinal, _):
+        case .ordinalDaySet(let ordinal, _):
             (1...5).contains(ordinal)
-        case let .ordinalWeekday(ordinal, _):
+        case .ordinalWeekday(let ordinal, _):
             (-5 ... -1).contains(ordinal) || (1...5).contains(ordinal)
         case .anchorDay, .anchorMonthDay:
             false
@@ -151,13 +153,13 @@ public struct RepeatRuleValidator: Sendable {
             .anchorDay
         case .anchorMonthDay:
             .anchorMonthDay
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             .dayOfMonth(day)
         case .lastDay:
             .lastDay
-        case let .ordinalDaySet(ordinal, daySet):
+        case .ordinalDaySet(let ordinal, let daySet):
             .ordinalDaySet(ordinal: ordinal, daySet: daySet)
-        case let .ordinalWeekday(ordinal, weekday):
+        case .ordinalWeekday(let ordinal, let weekday):
             .ordinalWeekday(ordinal: ordinal, weekday: weekday)
         }
     }
@@ -166,7 +168,7 @@ public struct RepeatRuleValidator: Sendable {
 enum GregorianDate {
     static func weekday(year: Int, month: Int, day: Int) -> Weekday? {
         guard (1...9_999).contains(year), (1...12).contains(month),
-              isValid(year: year, month: month, day: day)
+            isValid(year: year, month: month, day: day)
         else {
             return nil
         }
@@ -188,11 +190,12 @@ enum GregorianDate {
 
     static func isPotentiallyValid(month: Int, day: Int) -> Bool {
         guard (1...12).contains(month), day >= 1 else { return false }
-        let maximum = switch month {
-        case 2: 29
-        case 4, 6, 9, 11: 30
-        default: 31
-        }
+        let maximum =
+            switch month {
+            case 2: 29
+            case 4, 6, 9, 11: 30
+            default: 31
+            }
         return day <= maximum
     }
 

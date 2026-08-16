@@ -1,6 +1,6 @@
 import Foundation
 
-public enum LogicalNotificationRequestValidationError: Error, Sendable, Equatable {
+public enum NotificationRequestValidationError: Error, Sendable, Equatable {
     case reminderIDMismatch
     case invalidSchedule
     case invalidContributingGroups
@@ -11,7 +11,7 @@ public enum LogicalNotificationRequestValidationError: Error, Sendable, Equatabl
     case repeatingPayloadNotDerivable
 }
 
-public struct LogicalNotificationRequestValidationContext: Sendable {
+public struct NotificationRequestValidationContext: Sendable {
     public let evaluationNow: Date
     public let recurrenceEnvironment: any RecurrenceEnvironment
 
@@ -30,25 +30,25 @@ public struct LogicalNotificationRequestValidator: Sendable {
     public func validate(
         _ request: LogicalNotificationRequest,
         for reminder: ReminderSnapshot,
-        context: LogicalNotificationRequestValidationContext
+        context: NotificationRequestValidationContext
     ) throws {
         guard request.reminderID == reminder.id else {
-            throw LogicalNotificationRequestValidationError.reminderIDMismatch
+            throw NotificationRequestValidationError.reminderIDMismatch
         }
-        guard case let .valid(schedule, _, _) = reminder.schedule else {
-            throw LogicalNotificationRequestValidationError.invalidSchedule
+        guard case .valid(let schedule, _, _) = reminder.schedule else {
+            throw NotificationRequestValidationError.invalidSchedule
         }
         guard !request.contributingGroupIDs.isEmpty,
-              request.contributingGroupIDs.allSatisfy({
-                  $0.reminderID == request.reminderID
-                      && isFiniteIntegralSecond($0.baseOccurrenceInstant)
-              })
+            request.contributingGroupIDs.allSatisfy({
+                $0.reminderID == request.reminderID
+                    && isFiniteIntegralSecond($0.baseOccurrenceInstant)
+            })
         else {
-            throw LogicalNotificationRequestValidationError.invalidContributingGroups
+            throw NotificationRequestValidationError.invalidContributingGroups
         }
 
         switch request.payload {
-        case let .oneShot(alertInstant, reasons):
+        case .oneShot(let alertInstant, let reasons):
             try validateOneShot(
                 alertInstant: alertInstant,
                 reasons: reasons,
@@ -57,7 +57,7 @@ public struct LogicalNotificationRequestValidator: Sendable {
                 schedule: schedule,
                 environment: context.recurrenceEnvironment
             )
-        case let .repeating(_, contributors):
+        case .repeating(_, let contributors):
             try validateRepeating(
                 request: request,
                 contributors: contributors,
@@ -78,41 +78,44 @@ public struct LogicalNotificationRequestValidator: Sendable {
         environment: any RecurrenceEnvironment
     ) throws {
         guard !reasons.isEmpty else {
-            throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
+            throw NotificationRequestValidationError.oneShotAlertNotDerivable
         }
 
         var identities: Set<ReasonIdentity> = []
         for reason in reasons {
             guard identities.insert(ReasonIdentity(reason)).inserted else {
-                throw LogicalNotificationRequestValidationError.duplicateContributors
+                throw NotificationRequestValidationError.duplicateContributors
             }
         }
 
-        let expectedGroups = Set(reasons.map {
-            AlertGroupID(
-                reminderID: reminderID,
-                baseOccurrenceInstant: $0.baseOccurrence.instant
-            )
-        })
+        let expectedGroups = Set(
+            reasons.map {
+                AlertGroupID(
+                    reminderID: reminderID,
+                    baseOccurrenceInstant: $0.baseOccurrence.instant
+                )
+            })
         guard groups == expectedGroups else {
-            throw LogicalNotificationRequestValidationError.contributorIdentityMismatch
+            throw NotificationRequestValidationError.contributorIdentityMismatch
         }
 
         for reason in reasons {
             guard reason.alertInstant == alertInstant,
-                  kindIsAllowed(reason.kind, schedule: schedule)
+                kindIsAllowed(reason.kind, schedule: schedule)
             else {
                 if reason.alertInstant == alertInstant {
-                    throw LogicalNotificationRequestValidationError.reasonKindNotAllowed
+                    throw NotificationRequestValidationError.reasonKindNotAllowed
                 }
-                throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
+                throw NotificationRequestValidationError.oneShotAlertNotDerivable
             }
-            guard try reasonIsDerivable(
-                reason,
-                schedule: schedule,
-                environment: environment
-            ) else {
-                throw LogicalNotificationRequestValidationError.oneShotAlertNotDerivable
+            guard
+                try reasonIsDerivable(
+                    reason,
+                    schedule: schedule,
+                    environment: environment
+                )
+            else {
+                throw NotificationRequestValidationError.oneShotAlertNotDerivable
             }
         }
     }
@@ -123,35 +126,36 @@ public struct LogicalNotificationRequestValidator: Sendable {
         groups: Set<AlertGroupID>,
         schedule: ScheduleDefinition,
         reminder: ReminderSnapshot,
-        context: LogicalNotificationRequestValidationContext
+        context: NotificationRequestValidationContext
     ) throws {
         var identities: Set<RepeatingContributorIdentity> = []
         for contributor in contributors {
             guard identities.insert(RepeatingContributorIdentity(contributor)).inserted else {
-                throw LogicalNotificationRequestValidationError.duplicateContributors
+                throw NotificationRequestValidationError.duplicateContributors
             }
         }
         guard groups.count == 1,
-              let group = groups.first,
-              try isBaseOccurrence(
-                  group.baseOccurrenceInstant,
-                  of: schedule,
-                  environment: context.recurrenceEnvironment
-              )
+            let group = groups.first,
+            try isBaseOccurrence(
+                group.baseOccurrenceInstant,
+                of: schedule,
+                environment: context.recurrenceEnvironment
+            )
         else {
-            throw LogicalNotificationRequestValidationError.contributorIdentityMismatch
+            throw NotificationRequestValidationError.contributorIdentityMismatch
         }
 
-        let plan = try LogicalNotificationPlanner().plan(PlannerInput(
-            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
-            evaluationNow: context.evaluationNow,
-            deviceNotificationsEnabled: true,
-            authorizationAllowsScheduling: true,
-            capacity: 60,
-            recurrenceEnvironment: context.recurrenceEnvironment
-        ))
+        let plan = try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+                evaluationNow: context.evaluationNow,
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 60,
+                recurrenceEnvironment: context.recurrenceEnvironment
+            ))
         guard plan.requests.contains(request) else {
-            throw LogicalNotificationRequestValidationError.repeatingPayloadNotDerivable
+            throw NotificationRequestValidationError.repeatingPayloadNotDerivable
         }
     }
 
@@ -161,15 +165,15 @@ public struct LogicalNotificationRequestValidator: Sendable {
         environment: any RecurrenceEnvironment
     ) throws -> Bool {
         guard isFiniteIntegralSecond(reason.alertInstant),
-              let derived = try baseOccurrence(
-                  at: reason.baseOccurrence.instant,
-                  of: schedule,
-                  environment: environment
-              ),
-              sourceComponentsMatch(
-                  reason.baseOccurrence.sourceComponents,
-                  derived.sourceComponents
-              )
+            let derived = try baseOccurrence(
+                at: reason.baseOccurrence.instant,
+                of: schedule,
+                environment: environment
+            ),
+            sourceComponentsMatch(
+                reason.baseOccurrence.sourceComponents,
+                derived.sourceComponents
+            )
         else {
             return false
         }
@@ -178,9 +182,9 @@ public struct LogicalNotificationRequestValidator: Sendable {
             return reason.alertInstant == reason.baseOccurrence.instant
         case .early:
             guard let early = schedule.early,
-                  let timeZone = environment.timeZone(
-                      identifier: schedule.source.timeZoneIdentifier
-                  )
+                let timeZone = environment.timeZone(
+                    identifier: schedule.source.timeZoneIdentifier
+                )
             else {
                 return false
             }
@@ -212,11 +216,11 @@ public struct LogicalNotificationRequestValidator: Sendable {
         environment: any RecurrenceEnvironment
     ) throws -> BaseOccurrence? {
         guard isFiniteIntegralSecond(instant),
-              let upperBound = Calendar(identifier: .gregorian).date(
-                  byAdding: .second,
-                  value: 1,
-                  to: instant
-              )
+            let upperBound = Calendar(identifier: .gregorian).date(
+                byAdding: .second,
+                value: 1,
+                to: instant
+            )
         else {
             return nil
         }

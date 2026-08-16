@@ -48,10 +48,11 @@ struct TimeZonePickerView: View {
         NavigationStack {
             List {
                 TextField(text: $query) {
-                    Text(LocalizedStringResource(
-                        "reminder.form.time-zone-picker.search",
-                        table: "ReminderForm"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.form.time-zone-picker.search",
+                            table: "ReminderForm"
+                        ))
                 }
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -64,10 +65,11 @@ struct TimeZonePickerView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
-            .navigationTitle(LocalizedStringResource(
-                "reminder.form.time-zone-picker.title",
-                table: "ReminderForm"
-            ))
+            .navigationTitle(
+                LocalizedStringResource(
+                    "reminder.form.time-zone-picker.title",
+                    table: "ReminderForm"
+                ))
         }
         .accessibilityIdentifier("reminder-form.time-zone-picker")
         .onChange(of: locale.identifier, initial: true) {
@@ -78,10 +80,12 @@ struct TimeZonePickerView: View {
     @ViewBuilder
     private func choiceRows(_ filteredChoices: [TimeZoneChoice]) -> some View {
         if filteredChoices.isEmpty {
-            Text(LocalizedStringResource(
-                "reminder.form.time-zone-picker.empty",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.time-zone-picker.empty",
+                    table: "ReminderForm"
+                )
+            )
             .foregroundStyle(.secondary)
         } else {
             ForEach(filteredChoices) { choice in

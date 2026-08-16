@@ -1,40 +1,60 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Notifications.RepeatingTriggerPlanner")
-struct NotificationsRepeatingTriggerPlannerTests {
-    @Test func permitsEveryWhitelistedBaseRuleWithExactGregorianResidues() throws {
+struct RepeatingTriggerPlannerTests {
+    @Test func permitsEverySupportedBaseRuleWithExactGregorianResidues() throws {
         let fixtures: [(ScheduleDefinition, [RepeatingTriggerComponents])] = [
             (
                 schedule(rule: .daily(interval: 1)),
                 [.init(timeZoneIdentifier: "Africa/Abidjan", hour: 9, minute: 30, second: 0)]
             ),
             (
-                schedule(rule: .weekly(
-                    interval: 1,
-                    weekdaySetKind: .weekday,
-                    weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
-                )),
+                schedule(
+                    rule: .weekly(
+                        interval: 1,
+                        weekdaySetKind: .weekday,
+                        weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
+                    )),
                 [2, 3, 4, 5, 6].map {
-                    .init(timeZoneIdentifier: "Africa/Abidjan", weekday: $0, hour: 9, minute: 30, second: 0)
+                    .init(
+                        timeZoneIdentifier: "Africa/Abidjan", weekday: $0, hour: 9, minute: 30,
+                        second: 0)
                 }
             ),
             (
                 schedule(rule: .monthly(interval: 1, selector: .anchorDay)),
-                [.init(timeZoneIdentifier: "Africa/Abidjan", day: 4, hour: 9, minute: 30, second: 0)]
+                [
+                    .init(
+                        timeZoneIdentifier: "Africa/Abidjan", day: 4, hour: 9, minute: 30, second: 0
+                    )
+                ]
             ),
             (
                 schedule(rule: .monthly(interval: 1, selector: .dayOfMonth(15))),
-                [.init(timeZoneIdentifier: "Africa/Abidjan", day: 15, hour: 9, minute: 30, second: 0)]
+                [
+                    .init(
+                        timeZoneIdentifier: "Africa/Abidjan", day: 15, hour: 9, minute: 30,
+                        second: 0)
+                ]
             ),
             (
                 schedule(rule: .yearly(interval: 1, month: nil, selector: .anchorMonthDay)),
-                [.init(timeZoneIdentifier: "Africa/Abidjan", month: 8, day: 4, hour: 9, minute: 30, second: 0)]
+                [
+                    .init(
+                        timeZoneIdentifier: "Africa/Abidjan", month: 8, day: 4, hour: 9, minute: 30,
+                        second: 0)
+                ]
             ),
             (
                 schedule(rule: .yearly(interval: 1, month: 12, selector: .dayOfMonth(31))),
-                [.init(timeZoneIdentifier: "Africa/Abidjan", month: 12, day: 31, hour: 9, minute: 30, second: 0)]
+                [
+                    .init(
+                        timeZoneIdentifier: "Africa/Abidjan", month: 12, day: 31, hour: 9,
+                        minute: 30, second: 0)
+                ]
             )
         ]
 
@@ -55,14 +75,20 @@ struct NotificationsRepeatingTriggerPlannerTests {
             early: .init(value: 30, unit: .minutes)
         )
 
-        #expect(try #require(plan(daily)).map(\.components) == [
-            .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 0, second: 0),
-            .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 30, second: 0)
-        ])
-        #expect(try #require(plan(weekly)).map(\.components) == [
-            .init(timeZoneIdentifier: "Africa/Abidjan", weekday: 1, hour: 23, minute: 45, second: 0),
-            .init(timeZoneIdentifier: "Africa/Abidjan", weekday: 2, hour: 0, minute: 15, second: 0)
-        ])
+        #expect(
+            try #require(plan(daily)).map(\.components) == [
+                .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 0, second: 0),
+                .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 30, second: 0)
+            ])
+        #expect(
+            try #require(plan(weekly)).map(\.components) == [
+                .init(
+                    timeZoneIdentifier: "Africa/Abidjan", weekday: 1, hour: 23, minute: 45,
+                    second: 0),
+                .init(
+                    timeZoneIdentifier: "Africa/Abidjan", weekday: 2, hour: 0, minute: 15, second: 0
+                )
+            ])
     }
 
     @Test func earlyOnlyCalendarOffsetsCanRemainDirect() throws {
@@ -79,28 +105,34 @@ struct NotificationsRepeatingTriggerPlannerTests {
             early: .init(value: 1, unit: .days, mainEnabled: false)
         )
 
-        #expect(try #require(plan(daily)).map(\.components) == [
-            .init(timeZoneIdentifier: "Africa/Abidjan", hour: 9, minute: 30, second: 0)
-        ])
-        #expect(try #require(plan(monthly)).map(\.components) == [
-            .init(timeZoneIdentifier: "Africa/Abidjan", day: 14, hour: 9, minute: 30, second: 0)
-        ])
-        #expect(try #require(plan(yearly)).map(\.components) == [
-            .init(timeZoneIdentifier: "Africa/Abidjan", month: 3, day: 14, hour: 9, minute: 30, second: 0)
-        ])
+        #expect(
+            try #require(plan(daily)).map(\.components) == [
+                .init(timeZoneIdentifier: "Africa/Abidjan", hour: 9, minute: 30, second: 0)
+            ])
+        #expect(
+            try #require(plan(monthly)).map(\.components) == [
+                .init(timeZoneIdentifier: "Africa/Abidjan", day: 14, hour: 9, minute: 30, second: 0)
+            ])
+        #expect(
+            try #require(plan(yearly)).map(\.components) == [
+                .init(
+                    timeZoneIdentifier: "Africa/Abidjan", month: 3, day: 14, hour: 9, minute: 30,
+                    second: 0)
+            ])
     }
 
     @Test func startNowAndPastAreDirectButFutureStartRemainsRolling() {
         let past = schedule(source: source(day: 4, hour: 9), rule: .daily(interval: 1))
         let now = schedule(source: source(day: 6, hour: 12, minute: 0), rule: .daily(interval: 1))
-        let future = schedule(source: source(day: 6, hour: 12, minute: 1), rule: .daily(interval: 1))
+        let future = schedule(
+            source: source(day: 6, hour: 12, minute: 1), rule: .daily(interval: 1))
 
         #expect(plan(past) != nil)
         #expect(plan(now) != nil)
         #expect(plan(future) == nil)
     }
 
-    @Test func finiteEndAndEveryNonWhitelistedRuleRemainRolling() {
+    @Test func finiteEndAndEveryUnsupportedRuleRemainRolling() {
         let rolling: [ScheduleDefinition] = [
             schedule(rule: .none),
             schedule(rule: .hourly(interval: 1)),
@@ -109,10 +141,16 @@ struct NotificationsRepeatingTriggerPlannerTests {
             schedule(rule: .monthly(interval: 3, selector: .dayOfMonth(4))),
             schedule(rule: .yearly(interval: 2, month: 8, selector: .dayOfMonth(4))),
             schedule(rule: .monthly(interval: 1, selector: .lastDay)),
-            schedule(rule: .monthly(interval: 1, selector: .ordinalWeekday(ordinal: 2, weekday: .monday))),
-            schedule(rule: .monthly(interval: 1, selector: .ordinalDaySet(ordinal: 1, daySet: .weekday))),
+            schedule(
+                rule: .monthly(interval: 1, selector: .ordinalWeekday(ordinal: 2, weekday: .monday))
+            ),
+            schedule(
+                rule: .monthly(interval: 1, selector: .ordinalDaySet(ordinal: 1, daySet: .weekday))),
             schedule(rule: .yearly(interval: 1, month: 8, selector: .lastDay)),
-            schedule(rule: .yearly(interval: 1, month: 8, selector: .ordinalWeekday(ordinal: -1, weekday: .friday))),
+            schedule(
+                rule: .yearly(
+                    interval: 1, month: 8, selector: .ordinalWeekday(ordinal: -1, weekday: .friday))
+            ),
             schedule(
                 rule: .daily(interval: 1),
                 end: .onDate(.init(year: 2026, month: 12, day: 31))
@@ -149,9 +187,10 @@ struct NotificationsRepeatingTriggerPlannerTests {
         #expect(plan(dynamicDST) == nil)
         #expect(plan(dynamicMonth) == nil)
         #expect(plan(dynamicLeapYear) == nil)
-        #expect(try #require(plan(stableDST)).map(\.components) == [
-            .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 25, second: 0)
-        ])
+        #expect(
+            try #require(plan(stableDST)).map(\.components) == [
+                .init(timeZoneIdentifier: "America/New_York", hour: 9, minute: 25, second: 0)
+            ])
     }
 
     @Test func historicalTokyoTransitionPreventsFalseStaticDailyEarlyResidue() {
@@ -168,10 +207,11 @@ struct NotificationsRepeatingTriggerPlannerTests {
             early: .init(value: 2, unit: .hours, mainEnabled: false)
         )
 
-        #expect(plan(
-            definition,
-            evaluationNow: fixtureDate("1948-05-01T00:00:00Z")
-        ) == nil)
+        #expect(
+            plan(
+                definition,
+                evaluationNow: fixtureDate("1948-05-01T00:00:00Z")
+            ) == nil)
     }
 
     @Test func crossOccurrenceCollisionsRemainRolling() {
@@ -213,7 +253,8 @@ struct NotificationsRepeatingTriggerPlannerTests {
             reasons: [reason, reason]
         )
 
-        let candidates = try #require(plan(schedule(rule: .daily(interval: 1)), physical: [physical]))
+        let candidates = try #require(
+            plan(schedule(rule: .daily(interval: 1)), physical: [physical]))
 
         #expect(candidates.count == 1)
         #expect(candidates[0].contributors.count == 1)
@@ -239,10 +280,13 @@ struct NotificationsRepeatingTriggerPlannerTests {
             ]
         )
 
-        #expect(plan(
-            schedule(rule: .daily(interval: 1), early: .init(value: 1, unit: .hours, mainEnabled: false)),
-            physical: [physical]
-        ) == nil)
+        #expect(
+            plan(
+                schedule(
+                    rule: .daily(interval: 1),
+                    early: .init(value: 1, unit: .hours, mainEnabled: false)),
+                physical: [physical]
+            ) == nil)
     }
 
     @Test func contributorAndCandidateOrderingIsDeterministic() throws {
@@ -272,12 +316,13 @@ struct NotificationsRepeatingTriggerPlannerTests {
         physical: [PhysicalNotification] = [],
         evaluationNow: Date? = nil
     ) -> [RepeatingTriggerCandidate]? {
-        planner.plan(RepeatingTriggerPlanningInput(
-            schedule: schedule,
-            evaluationNow: evaluationNow ?? self.evaluationNow,
-            physicalNotifications: physical,
-            environment: .foundation
-        ))
+        planner.plan(
+            RepeatingTriggerPlanningInput(
+                schedule: schedule,
+                evaluationNow: evaluationNow ?? self.evaluationNow,
+                physicalNotifications: physical,
+                environment: .foundation
+            ))
     }
 
     private func schedule(

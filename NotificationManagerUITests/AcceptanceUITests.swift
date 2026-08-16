@@ -91,7 +91,8 @@ final class AcceptanceUITests: XCTestCase {
     @MainActor
     func testAdaptiveFixtureExposesTheExpectedNavigationContract() {
         let app = launchAcceptanceFixture(scenario: "navigation")
-        let expectedRoot = UIDevice.current.userInterfaceIdiom == .pad
+        let expectedRoot =
+            UIDevice.current.userInterfaceIdiom == .pad
             ? "adaptive-root.regular-split"
             : "adaptive-root.compact-stack"
 

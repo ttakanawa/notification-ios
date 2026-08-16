@@ -224,9 +224,11 @@ final class ReminderFlowUITests: XCTestCase {
         let title = app.textFields["reminder-form.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 2))
         replaceText(in: title, with: "Changed")
+        app.keyboards.buttons["Return"].tap()
 
         let delete = app.buttons["reminder-form.delete"]
         scrollToHittable(delete, in: app)
+        XCTAssertTrue(delete.exists)
         let back = app.buttons["reminder-form.back"]
         let save = app.buttons["reminder-form.save"]
         save.tap()
@@ -379,9 +381,10 @@ final class ReminderFlowUITests: XCTestCase {
             NSPredicate(format: "label CONTAINS %@", "60")
         ).firstMatch
         XCTAssertTrue(confirmationMessage.waitForExistence(timeout: 1))
-        XCTAssertFalse(confirmationMessage.label.contains(
-            "reminder.form.capacity-confirmation.message"
-        ))
+        XCTAssertFalse(
+            confirmationMessage.label.contains(
+                "reminder.form.capacity-confirmation.message"
+            ))
         XCTAssertTrue(confirmationMessage.label.contains("60"))
         app.buttons["reminder-form.capacity-confirm"].tap()
         let alert = app.alerts.firstMatch
@@ -417,10 +420,11 @@ final class ReminderFlowUITests: XCTestCase {
     private func replaceText(in field: XCUIElement, with value: String) {
         field.tap()
         let currentValue = field.value as? String ?? ""
-        field.typeText(String(
-            repeating: XCUIKeyboardKey.delete.rawValue,
-            count: currentValue.count
-        ))
+        field.typeText(
+            String(
+                repeating: XCUIKeyboardKey.delete.rawValue,
+                count: currentValue.count
+            ))
         field.typeText(value)
     }
 
@@ -478,12 +482,14 @@ final class ReminderFlowUITests: XCTestCase {
         ["-AppleLanguages", "(en)", "-AppleLocale", "en_GB"]
     }
 
+    @MainActor
     private func launch(
         scenario: String,
         extraArguments: [String] = []
     ) -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments += ["-ui-testing", "-ui-scenario", scenario]
+        app.launchArguments +=
+            ["-ui-testing", "-ui-scenario", scenario]
             + extraArguments
         app.launch()
         return app

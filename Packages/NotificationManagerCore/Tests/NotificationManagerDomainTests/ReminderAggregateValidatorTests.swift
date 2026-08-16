@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("ReminderAggregateValidatorTests")
@@ -68,7 +69,8 @@ struct ReminderAggregateValidatorTests {
 
     @Test func enforcesCanonicalURLByteBoundary() throws {
         let prefix = "https://example.com/"
-        let exact = prefix + String(repeating: "a", count: ReminderLimits.urlBytes - prefix.utf8.count)
+        let exact =
+            prefix + String(repeating: "a", count: ReminderLimits.urlBytes - prefix.utf8.count)
         try validator.validate(draft(urlString: exact))
 
         #expect(throws: ReminderValidationIssue.urlTooLarge) {
@@ -96,7 +98,8 @@ struct ReminderAggregateValidatorTests {
     }
 
     @Test func enforcesRawScheduleByteBoundaryWhenPreserving() throws {
-        try validator.validate(draft(originalScheduleData: Data(count: ReminderLimits.scheduleBytes)))
+        try validator.validate(
+            draft(originalScheduleData: Data(count: ReminderLimits.scheduleBytes)))
 
         #expect(throws: ReminderValidationIssue.scheduleTooLarge) {
             try validator.validate(
@@ -233,11 +236,20 @@ struct ReminderAggregateValidatorTests {
         )
 
         for source in [
-            SourceWallClock(year: 0, month: 8, day: 4, hour: 9, minute: 30, timeZoneIdentifier: "Asia/Manila"),
-            SourceWallClock(year: 2026, month: 2, day: 30, hour: 9, minute: 30, timeZoneIdentifier: "Asia/Manila"),
-            SourceWallClock(year: 2026, month: 8, day: 4, hour: 24, minute: 0, timeZoneIdentifier: "Asia/Manila"),
-            SourceWallClock(year: 2026, month: 8, day: 4, hour: 9, minute: 60, timeZoneIdentifier: "Asia/Manila"),
-            SourceWallClock(year: 2026, month: 8, day: 4, hour: 9, minute: 30, timeZoneIdentifier: "Etc/Unknown")
+            SourceWallClock(
+                year: 0, month: 8, day: 4, hour: 9, minute: 30, timeZoneIdentifier: "Asia/Manila"),
+            SourceWallClock(
+                year: 2026, month: 2, day: 30, hour: 9, minute: 30,
+                timeZoneIdentifier: "Asia/Manila"),
+            SourceWallClock(
+                year: 2026, month: 8, day: 4, hour: 24, minute: 0, timeZoneIdentifier: "Asia/Manila"
+            ),
+            SourceWallClock(
+                year: 2026, month: 8, day: 4, hour: 9, minute: 60, timeZoneIdentifier: "Asia/Manila"
+            ),
+            SourceWallClock(
+                year: 2026, month: 8, day: 4, hour: 9, minute: 30, timeZoneIdentifier: "Etc/Unknown"
+            )
         ] {
             let schedule = ScheduleDefinition(source: source, rule: .none, end: .never, early: nil)
             #expect(throws: ReminderValidationIssue.invalidSchedule) {
@@ -289,7 +301,8 @@ struct ReminderAggregateValidatorTests {
         ]
 
         for rule in rules {
-            let schedule = ScheduleDefinition(source: validSource, rule: rule, end: .never, early: nil)
+            let schedule = ScheduleDefinition(
+                source: validSource, rule: rule, end: .never, early: nil)
             try validator.validate(
                 draft(scheduleChange: .replace(schedule)),
                 replacementScheduleData: Data()
@@ -307,7 +320,8 @@ struct ReminderAggregateValidatorTests {
         ]
 
         for rule in rules {
-            let schedule = ScheduleDefinition(source: validSource, rule: rule, end: .never, early: nil)
+            let schedule = ScheduleDefinition(
+                source: validSource, rule: rule, end: .never, early: nil)
             #expect(throws: ReminderValidationIssue.invalidSchedule) {
                 try validator.validate(draft(scheduleChange: .replace(schedule)))
             }
@@ -404,7 +418,8 @@ struct ReminderAggregateValidatorTests {
         ]
 
         for rule in invalidRules {
-            let schedule = ScheduleDefinition(source: validSource, rule: rule, end: .never, early: nil)
+            let schedule = ScheduleDefinition(
+                source: validSource, rule: rule, end: .never, early: nil)
             #expect(throws: ReminderValidationIssue.invalidSchedule) {
                 try validator.validate(draft(scheduleChange: .replace(schedule)))
             }
@@ -461,7 +476,8 @@ struct ReminderAggregateValidatorTests {
 
     @Test func rejectsNonfiniteAndFractionalMetadataDates() {
         #expect(throws: ReminderValidationIssue.invalidCreatedAt) {
-            try validator.validate(draft(createdAt: Date(timeIntervalSinceReferenceDate: .infinity)))
+            try validator.validate(
+                draft(createdAt: Date(timeIntervalSinceReferenceDate: .infinity)))
         }
         #expect(throws: ReminderValidationIssue.invalidUpdatedAt) {
             try validator.validate(draft(updatedAt: Date(timeIntervalSince1970: 1.5)))
@@ -514,9 +530,13 @@ struct ReminderAggregateValidatorTests {
     }
 
     private func tagIDs(count: Int) -> Set<UUID> {
-        Set((0..<count).map { value in
-            let suffix = String(format: "%012X", value)
-            return UUID(uuidString: "00000000-0000-0000-0000-\(suffix)")!
-        })
+        Set(
+            (0..<count).map { value in
+                let suffix = String(format: "%012X", value)
+                guard let id = UUID(uuidString: "00000000-0000-0000-0000-\(suffix)") else {
+                    preconditionFailure("Generated tag UUID must be valid: \(suffix)")
+                }
+                return id
+            })
     }
 }

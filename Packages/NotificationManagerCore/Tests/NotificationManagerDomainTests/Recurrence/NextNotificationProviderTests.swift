@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("NextNotificationProviderTests")
@@ -14,12 +15,14 @@ struct NextNotificationProviderTests {
             after: date("2026-08-04T00:00:00Z")
         )
 
-        #expect(minuteResult.notifications.map(\.alertInstant) == [
-            date("2026-08-04T11:55:00Z"), date("2026-08-04T12:00:00Z")
-        ])
-        #expect(hourResult.notifications.map(\.alertInstant) == [
-            date("2026-08-04T10:00:00Z"), date("2026-08-04T12:00:00Z")
-        ])
+        #expect(
+            minuteResult.notifications.map(\.alertInstant) == [
+                date("2026-08-04T11:55:00Z"), date("2026-08-04T12:00:00Z")
+            ])
+        #expect(
+            hourResult.notifications.map(\.alertInstant) == [
+                date("2026-08-04T10:00:00Z"), date("2026-08-04T12:00:00Z")
+            ])
     }
 
     @Test func dailyMinutesAndHoursUseFixedDurations() throws {
@@ -42,12 +45,14 @@ struct NextNotificationProviderTests {
             limit: 2
         )
 
-        #expect(minuteResult.notifications.map(\.alertInstant) == [
-            date("2026-08-04T11:55:00Z"), date("2026-08-05T11:55:00Z")
-        ])
-        #expect(hourResult.notifications.map(\.alertInstant) == [
-            date("2026-08-04T10:00:00Z"), date("2026-08-05T10:00:00Z")
-        ])
+        #expect(
+            minuteResult.notifications.map(\.alertInstant) == [
+                date("2026-08-04T11:55:00Z"), date("2026-08-05T11:55:00Z")
+            ])
+        #expect(
+            hourResult.notifications.map(\.alertInstant) == [
+                date("2026-08-04T10:00:00Z"), date("2026-08-05T10:00:00Z")
+            ])
     }
 
     @Test func oneShotAndDailyDaysAndWeeksUseSourceCalendar() throws {
@@ -83,9 +88,10 @@ struct NextNotificationProviderTests {
         )
 
         #expect(oneShot.notifications.map(\.alertInstant) == [date("2026-10-31T13:30:00Z")])
-        #expect(daily.notifications.map(\.alertInstant) == [
-            date("2026-10-25T13:30:00Z"), date("2026-10-26T13:30:00Z")
-        ])
+        #expect(
+            daily.notifications.map(\.alertInstant) == [
+                date("2026-10-25T13:30:00Z"), date("2026-10-26T13:30:00Z")
+            ])
     }
 
     @Test func hourlyAllEarlyUnitsUseFixedElapsedDurations() throws {
@@ -176,9 +182,10 @@ struct NextNotificationProviderTests {
             limit: 2
         )
 
-        #expect(result.notifications.map(\.alertInstant) == [
-            date("2026-08-05T09:00:00Z"), date("2026-08-06T09:00:00Z")
-        ])
+        #expect(
+            result.notifications.map(\.alertInstant) == [
+                date("2026-08-05T09:00:00Z"), date("2026-08-06T09:00:00Z")
+            ])
         #expect(result.didSkipPastEarly)
         #expect(!result.exhausted)
     }
@@ -249,9 +256,10 @@ struct NextNotificationProviderTests {
         #expect(result.notifications[0].alertInstant == date("2026-08-04T09:30:00Z"))
         #expect(result.notifications[0].reasons.map(\.kind) == [.main, .early])
         #expect(result.notifications[0].primaryReason.kind == .main)
-        #expect(result.notifications[0].contributingBaseOccurrences.map(\.instant) == [
-            date("2026-08-04T09:30:00Z"), date("2026-08-05T09:30:00Z")
-        ])
+        #expect(
+            result.notifications[0].contributingBaseOccurrences.map(\.instant) == [
+                date("2026-08-04T09:30:00Z"), date("2026-08-05T09:30:00Z")
+            ])
     }
 
     @Test func mergesHourlyOneDayCollisionAndKeepsStableReasonOrder() throws {
@@ -267,9 +275,10 @@ struct NextNotificationProviderTests {
 
         #expect(result.notifications[0].alertInstant == date("2026-08-04T09:30:00Z"))
         #expect(result.notifications[0].reasons.map(\.kind) == [.main, .early])
-        #expect(result.notifications[0].contributingBaseOccurrences.map(\.instant) == [
-            date("2026-08-04T09:30:00Z"), date("2026-08-05T09:30:00Z")
-        ])
+        #expect(
+            result.notifications[0].contributingBaseOccurrences.map(\.instant) == [
+                date("2026-08-04T09:30:00Z"), date("2026-08-05T09:30:00Z")
+            ])
         #expect(result.observedFoundationResultCount <= 1_024)
     }
 
@@ -305,8 +314,11 @@ struct NextNotificationProviderTests {
             reminderID: reminderID,
             alertInstant: date("2026-08-04T09:00:00Z"),
             reasons: [
-                EffectiveAlert(kind: .early, baseOccurrence: first, alertInstant: date("2026-08-04T09:00:00Z")),
-                EffectiveAlert(kind: .early, baseOccurrence: second, alertInstant: date("2026-08-04T09:00:00Z"))
+                EffectiveAlert(
+                    kind: .early, baseOccurrence: first, alertInstant: date("2026-08-04T09:00:00Z")),
+                EffectiveAlert(
+                    kind: .early, baseOccurrence: second, alertInstant: date("2026-08-04T09:00:00Z")
+                )
             ]
         )
 
@@ -406,8 +418,12 @@ private func date(_ value: String) -> Date {
 
 private func utcDate(year: Int, month: Int, day: Int) -> Date {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-    guard let result = calendar.date(from: DateComponents(year: year, month: month, day: day)) else {
+    guard let utc = TimeZone(secondsFromGMT: 0) else {
+        preconditionFailure("Foundation must provide the zero-offset time zone")
+    }
+    calendar.timeZone = utc
+    guard let result = calendar.date(from: DateComponents(year: year, month: month, day: day))
+    else {
         preconditionFailure("Invalid UTC fixture")
     }
     return result

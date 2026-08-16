@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManager
 
 struct LocalizedRepeatFormatterTests {
@@ -160,8 +161,10 @@ struct LocalizedRepeatFormatterTests {
         let formatter = LocalizedRepeatFormatter()
         for (rule, english, japanese) in fixtures {
             let schedule = fixtureSchedule(rule: rule)
-            #expect(formatter.summary(for: schedule, locale: Locale(identifier: "en_US")) == english)
-            #expect(formatter.summary(for: schedule, locale: Locale(identifier: "ja_JP")) == japanese)
+            #expect(
+                formatter.summary(for: schedule, locale: Locale(identifier: "en_US")) == english)
+            #expect(
+                formatter.summary(for: schedule, locale: Locale(identifier: "ja_JP")) == japanese)
         }
     }
 

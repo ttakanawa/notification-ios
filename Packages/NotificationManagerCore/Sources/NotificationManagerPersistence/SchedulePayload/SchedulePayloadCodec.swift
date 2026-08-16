@@ -14,7 +14,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
 
     public func decode(_ data: Data) -> ScheduleReadState {
         guard let probe = try? StrictJSONValue.probeEnvelope(data),
-              probe.format == Self.format
+            probe.format == Self.format
         else {
             return .corrupt(originalData: data)
         }
@@ -50,10 +50,12 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
             let decoded = payload.makeDomain()
             var issues = decoded.combinationIssues
             if let definition = decoded.definition {
-                issues.append(contentsOf: ReminderAggregateValidator().scheduleIssues(for: definition))
+                issues.append(
+                    contentsOf: ReminderAggregateValidator().scheduleIssues(for: definition))
                 issues = issues.removingDuplicates()
                 if issues.isEmpty {
-                    return .valid(definition, sourceVersion: Self.currentVersion, originalData: originalData)
+                    return .valid(
+                        definition, sourceVersion: Self.currentVersion, originalData: originalData)
                 }
             }
             return .domainInvalid(
@@ -83,8 +85,8 @@ private struct RawPayload {
             requiredKeys: ["format", "payload", "version"]
         )
         guard envelope["format"]?.stringValue == SchedulePayloadCodec.format,
-              envelope["version"]?.integer(as: UInt32.self) == SchedulePayloadCodec.currentVersion,
-              let payloadValue = envelope["payload"]
+            envelope["version"]?.integer(as: UInt32.self) == SchedulePayloadCodec.currentVersion,
+            let payloadValue = envelope["payload"]
         else {
             throw PayloadStructureError.invalid
         }
@@ -92,9 +94,15 @@ private struct RawPayload {
             exactKeys: ["source", "rule", "end", "early"],
             requiredKeys: ["source", "rule", "end"]
         )
-        source = try Self.decodeSource(payload["source"]!)
-        rule = try RawRule(payload["rule"]!)
-        end = try RawEnd(payload["end"]!)
+        guard let sourceValue = payload["source"],
+            let ruleValue = payload["rule"],
+            let endValue = payload["end"]
+        else {
+            throw PayloadStructureError.invalid
+        }
+        source = try Self.decodeSource(sourceValue)
+        rule = try RawRule(ruleValue)
+        end = try RawEnd(endValue)
         early = try payload["early"].map(Self.decodeEarly)
     }
 
@@ -199,7 +207,7 @@ private struct RawRule {
             weekdaySetKind = nil
         }
         if let value = object["weekdays"] {
-            guard case let .array(values) = value else { throw PayloadStructureError.invalid }
+            guard case .array(let values) = value else { throw PayloadStructureError.invalid }
             weekdays = try values.map {
                 guard let weekday = Weekday(rawValue: try $0.requireString()) else {
                     throw PayloadStructureError.invalid
@@ -230,11 +238,14 @@ private struct RawRule {
             }
             let expected: Set<String> = ["type", "interval", "weekdaySetKind", "weekdays"]
             return PartialDomain(
-                value: .weekly(interval: interval, weekdaySetKind: weekdaySetKind, weekdays: weekdays),
+                value: .weekly(
+                    interval: interval, weekdaySetKind: weekdaySetKind, weekdays: weekdays),
                 issues: keys == expected ? [] : [.invalidWeekdaySet]
             )
         case "monthly":
-            guard let interval, let selectorResult = selector?.makeDomain(), let selector = selectorResult.value else {
+            guard let interval, let selectorResult = selector?.makeDomain(),
+                let selector = selectorResult.value
+            else {
                 return PartialDomain(value: nil, issues: [.invalidSelector])
             }
             let expected: Set<String> = ["type", "interval", "selector"]
@@ -243,10 +254,13 @@ private struct RawRule {
                 issues: (keys == expected ? [] : [.invalidSelector]) + selectorResult.issues
             )
         case "yearly":
-            guard let interval, let selectorResult = selector?.makeDomain(), let selector = selectorResult.value else {
+            guard let interval, let selectorResult = selector?.makeDomain(),
+                let selector = selectorResult.value
+            else {
                 return PartialDomain(value: nil, issues: [.invalidSelector])
             }
-            let expected: Set<String> = month == nil
+            let expected: Set<String> =
+                month == nil
                 ? ["type", "interval", "selector"]
                 : ["type", "interval", "selector", "month"]
             return PartialDomain(
@@ -284,10 +298,12 @@ private struct RawSelector {
         )
         keys = Set(object.keys)
         type = try object.requireString("type")
-        guard [
-            "anchorDay", "anchorMonthDay", "dayOfMonth", "lastDay",
-            "ordinalDaySet", "ordinalWeekday"
-        ].contains(type) else {
+        guard
+            [
+                "anchorDay", "anchorMonthDay", "dayOfMonth", "lastDay",
+                "ordinalDaySet", "ordinalWeekday"
+            ].contains(type)
+        else {
             throw PayloadStructureError.invalid
         }
         switch type {
@@ -352,7 +368,9 @@ private struct RawSelector {
         }
     }
 
-    private func exact(_ value: RepeatSelector, expectedKeys: Set<String>) -> PartialDomain<RepeatSelector> {
+    private func exact(_ value: RepeatSelector, expectedKeys: Set<String>) -> PartialDomain<
+        RepeatSelector
+    > {
         PartialDomain(value: value, issues: keys == expectedKeys ? [] : [.invalidSelector])
     }
 }
@@ -405,48 +423,50 @@ private struct PartialDomain<Value> {
     let issues: [ScheduleValidationIssue]
 }
 
-private extension StrictJSONValue {
-    func requireObject(exactKeys allowed: Set<String>, requiredKeys: Set<String>) throws -> [String: StrictJSONValue] {
+extension StrictJSONValue {
+    fileprivate func requireObject(exactKeys allowed: Set<String>, requiredKeys: Set<String>) throws
+        -> [String: StrictJSONValue]
+    {
         guard let object = objectValue,
-              Set(object.keys).isSubset(of: allowed),
-              requiredKeys.isSubset(of: Set(object.keys))
+            Set(object.keys).isSubset(of: allowed),
+            requiredKeys.isSubset(of: Set(object.keys))
         else {
             throw PayloadStructureError.invalid
         }
         return object
     }
 
-    func requireString() throws -> String {
+    fileprivate func requireString() throws -> String {
         guard let value = stringValue else { throw PayloadStructureError.invalid }
         return value
     }
 }
 
-private extension Dictionary where Key == String, Value == StrictJSONValue {
-    func requireKeys(_ keys: Set<String>) throws {
+extension Dictionary where Key == String, Value == StrictJSONValue {
+    fileprivate func requireKeys(_ keys: Set<String>) throws {
         guard keys.isSubset(of: Set(self.keys)) else {
             throw PayloadStructureError.invalid
         }
     }
 
-    func requireString(_ key: String) throws -> String {
+    fileprivate func requireString(_ key: String) throws -> String {
         guard let value = self[key]?.stringValue else { throw PayloadStructureError.invalid }
         return value
     }
 
-    func requireBool(_ key: String) throws -> Bool {
-        guard let value = self[key]?.boolValue else { throw PayloadStructureError.invalid }
+    fileprivate func requireBool(_ key: String) throws -> Bool {
+        guard case .bool(let value)? = self[key] else { throw PayloadStructureError.invalid }
         return value
     }
 
-    func requireInteger(_ key: String) throws -> Int {
+    fileprivate func requireInteger(_ key: String) throws -> Int {
         guard let value = self[key]?.integer(as: Int.self) else {
             throw PayloadStructureError.invalid
         }
         return value
     }
 
-    func optionalInteger(_ key: String) throws -> Int? {
+    fileprivate func optionalInteger(_ key: String) throws -> Int? {
         guard let value = self[key] else { return nil }
         guard let integer = value.integer(as: Int.self) else {
             throw PayloadStructureError.invalid
@@ -455,9 +475,12 @@ private extension Dictionary where Key == String, Value == StrictJSONValue {
     }
 }
 
-private extension Weekday {
-    init?(rawValue: String) {
-        guard let index = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+extension Weekday {
+    fileprivate init?(rawValue: String) {
+        guard
+            let index = [
+                "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"
+            ]
             .firstIndex(of: rawValue)
         else {
             return nil
@@ -466,8 +489,8 @@ private extension Weekday {
     }
 }
 
-private extension WeekdaySetKind {
-    init?(rawValue: String) {
+extension WeekdaySetKind {
+    fileprivate init?(rawValue: String) {
         switch rawValue {
         case "explicit": self = .explicit
         case "weekday": self = .weekday
@@ -477,8 +500,8 @@ private extension WeekdaySetKind {
     }
 }
 
-private extension DaySet {
-    init?(rawValue: String) {
+extension DaySet {
+    fileprivate init?(rawValue: String) {
         switch rawValue {
         case "weekday": self = .weekday
         case "weekend": self = .weekend
@@ -487,8 +510,8 @@ private extension DaySet {
     }
 }
 
-private extension EarlyReminderUnit {
-    init?(rawValue: String) {
+extension EarlyReminderUnit {
+    fileprivate init?(rawValue: String) {
         switch rawValue {
         case "minutes": self = .minutes
         case "hours": self = .hours
@@ -499,8 +522,8 @@ private extension EarlyReminderUnit {
     }
 }
 
-private extension Array where Element == ScheduleValidationIssue {
-    func removingDuplicates() -> Self {
+extension Array where Element == ScheduleValidationIssue {
+    fileprivate func removingDuplicates() -> Self {
         reduce(into: []) { result, issue in
             if !result.contains(issue) { result.append(issue) }
         }

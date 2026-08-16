@@ -18,7 +18,7 @@ struct CompactScheduleTimeFormatter: Sendable {
     ) -> CompactScheduleTimePresentation {
         let localTime = formatTime(instant, timeZone: deviceTimeZone, locale: locale)
         guard let sourceTimeZoneIdentifier,
-              let sourceTimeZone = TimeZone(identifier: sourceTimeZoneIdentifier)
+            let sourceTimeZone = TimeZone(identifier: sourceTimeZoneIdentifier)
         else {
             return CompactScheduleTimePresentation(
                 localTime: localTime,
@@ -56,13 +56,14 @@ struct CompactScheduleTimeFormatter: Sendable {
         timeZone: TimeZone,
         locale: Locale
     ) -> String {
-        instant.formatted(Date.FormatStyle(
-            date: .omitted,
-            time: .shortened,
-            locale: locale,
-            calendar: Calendar(identifier: .gregorian),
-            timeZone: timeZone
-        ))
+        instant.formatted(
+            Date.FormatStyle(
+                date: .omitted,
+                time: .shortened,
+                locale: locale,
+                calendar: Calendar(identifier: .gregorian),
+                timeZone: timeZone
+            ))
     }
 
     private func sourceZoneLabel(
@@ -70,7 +71,8 @@ struct CompactScheduleTimeFormatter: Sendable {
         at instant: Date,
         locale: Locale
     ) -> String {
-        let style: TimeZone.NameStyle = timeZone.isDaylightSavingTime(for: instant)
+        let style: TimeZone.NameStyle =
+            timeZone.isDaylightSavingTime(for: instant)
             ? .shortDaylightSaving
             : .shortStandard
         return timeZone.localizedName(for: style, locale: locale)
@@ -133,9 +135,10 @@ struct CompactScheduleTimeFormatter: Sendable {
         var calendar = Calendar(identifier: .gregorian)
         calendar.locale = locale
         formatter.calendar = calendar
-        let magnitude = formatter.string(
-            from: DateComponents(day: abs(offset))
-        ) ?? String(abs(offset))
+        let magnitude =
+            formatter.string(
+                from: DateComponents(day: abs(offset))
+            ) ?? String(abs(offset))
         let sign = offset < 0 ? "-" : "+"
         return "\(sign)\(magnitude)".uppercased(with: locale)
     }

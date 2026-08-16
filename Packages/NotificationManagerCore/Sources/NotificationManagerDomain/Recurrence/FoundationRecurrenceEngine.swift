@@ -53,20 +53,23 @@ public struct FoundationRecurrenceEngine: Sendable {
     ) throws -> AnySequence<BaseOccurrence> {
         try validateRule(schedule.rule)
         guard range.lowerBound.timeIntervalSinceReferenceDate.isFinite,
-              range.upperBound.timeIntervalSinceReferenceDate.isFinite
+            range.upperBound.timeIntervalSinceReferenceDate.isFinite
         else {
             throw FoundationRecurrenceError.invalidRange
         }
-        guard let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier) else {
+        guard let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier)
+        else {
             throw SourceWallClockResolutionError.unknownTimeZone
         }
         let calendar = environment.gregorianCalendar(in: timeZone)
         let anchor = try SourceWallClockResolver().resolve(schedule.source, calendar: calendar)
-        guard let effectiveRange = try effectiveRange(
-            requested: range,
-            schedule: schedule,
-            calendar: calendar
-        ) else {
+        guard
+            let effectiveRange = try effectiveRange(
+                requested: range,
+                schedule: schedule,
+                calendar: calendar
+            )
+        else {
             return emptySequence()
         }
 
@@ -74,7 +77,7 @@ public struct FoundationRecurrenceEngine: Sendable {
         case .none:
             guard effectiveRange.contains(anchor) else { return emptySequence() }
             return AnySequence([occurrence(at: anchor, calendar: calendar, timeZone: timeZone)])
-        case let .hourly(interval):
+        case .hourly(let interval):
             return try hourlyOccurrences(
                 anchor: anchor,
                 interval: interval,
@@ -84,10 +87,12 @@ public struct FoundationRecurrenceEngine: Sendable {
             )
         case .daily, .weekly, .monthly, .yearly:
             let mapping = try recurrenceMapping(for: schedule, calendar: calendar)
-            let includesAnchor = effectiveRange.contains(anchor)
+            let includesAnchor =
+                effectiveRange.contains(anchor)
                 && candidateIsValid(anchor, mapping: mapping, calendar: calendar)
                 && anchorMatches(mapping.rule, anchor: anchor, calendar: calendar)
-            let recurrenceLowerBound = includesAnchor
+            let recurrenceLowerBound =
+                includesAnchor
                 ? max(effectiveRange.lowerBound, anchor.addingTimeInterval(1))
                 : effectiveRange.lowerBound
             guard recurrenceLowerBound < effectiveRange.upperBound else {
@@ -99,10 +104,12 @@ public struct FoundationRecurrenceEngine: Sendable {
                 return emptySequence()
             }
             let recurrenceRange = recurrenceLowerBound..<effectiveRange.upperBound
-            observe?(.calendarQuery(CalendarRecurrenceQueryPlan(
-                anchor: anchor,
-                range: recurrenceRange
-            )))
+            observe?(
+                .calendarQuery(
+                    CalendarRecurrenceQueryPlan(
+                        anchor: anchor,
+                        range: recurrenceRange
+                    )))
             let values = mapping.rule.recurrences(of: anchor, in: recurrenceRange)
                 .lazy
                 .map { date in
@@ -129,11 +136,11 @@ public struct FoundationRecurrenceEngine: Sendable {
         switch rule {
         case .none:
             interval = nil
-        case let .hourly(value),
-             let .daily(value),
-             let .weekly(value, _, _),
-             let .monthly(value, _),
-             let .yearly(value, _, _):
+        case .hourly(let value),
+            .daily(let value),
+            .weekly(let value, _, _),
+            .monthly(let value, _),
+            .yearly(let value, _, _):
             interval = value
         }
         if let interval, !(1...9_999).contains(interval) {
@@ -146,16 +153,18 @@ public struct FoundationRecurrenceEngine: Sendable {
         schedule: ScheduleDefinition,
         calendar: Calendar
     ) throws -> Range<Date>? {
-        guard let supportedUpperBound = calendar.date(
-            from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
-        ) else {
+        guard
+            let supportedUpperBound = calendar.date(
+                from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
+            )
+        else {
             throw FoundationRecurrenceError.arithmeticOverflow
         }
         let upperBound: Date
         switch schedule.end {
         case .never:
             upperBound = min(requested.upperBound, supportedUpperBound)
-        case let .onDate(end):
+        case .onDate(let end):
             let endSource = SourceWallClock(
                 year: end.year,
                 month: end.month,
@@ -186,9 +195,9 @@ public struct FoundationRecurrenceEngine: Sendable {
 
         let anchorInterval = anchor.timeIntervalSince1970
         guard anchorInterval.isFinite,
-              anchorInterval.rounded(FloatingPointRoundingRule.towardZero) == anchorInterval,
-              anchorInterval >= Double(Int64.min),
-              anchorInterval <= Double(Int64.max)
+            anchorInterval.rounded(FloatingPointRoundingRule.towardZero) == anchorInterval,
+            anchorInterval >= Double(Int64.min),
+            anchorInterval <= Double(Int64.max)
         else {
             throw FoundationRecurrenceError.arithmeticOverflow
         }
@@ -211,13 +220,15 @@ public struct FoundationRecurrenceEngine: Sendable {
             throw FoundationRecurrenceError.arithmeticOverflow
         }
         let firstInstant = Date(timeIntervalSince1970: Double(firstSeconds))
-        observe?(.hourlyQuery(HourlyRecurrenceQueryPlan(
-            anchor: anchor,
-            range: range,
-            stepSeconds: step,
-            firstIndex: firstIndex,
-            firstInstant: firstInstant
-        )))
+        observe?(
+            .hourlyQuery(
+                HourlyRecurrenceQueryPlan(
+                    anchor: anchor,
+                    range: range,
+                    stepSeconds: step,
+                    firstIndex: firstIndex,
+                    firstInstant: firstInstant
+                )))
 
         return AnySequence {
             var nextSeconds: Int64? = firstSeconds
@@ -252,7 +263,7 @@ public struct FoundationRecurrenceEngine: Sendable {
         switch schedule.rule {
         case .none, .hourly:
             throw FoundationRecurrenceError.invalidRule
-        case let .daily(interval):
+        case .daily(let interval):
             return RecurrenceMapping(
                 rule: .daily(
                     calendar: calendar,
@@ -264,7 +275,7 @@ public struct FoundationRecurrenceEngine: Sendable {
                     seconds: time.seconds
                 )
             )
-        case let .weekly(interval, _, weekdays):
+        case .weekly(let interval, _, let weekdays):
             guard !weekdays.isEmpty else { throw FoundationRecurrenceError.invalidRule }
             return RecurrenceMapping(
                 rule: .weekly(
@@ -278,7 +289,7 @@ public struct FoundationRecurrenceEngine: Sendable {
                     seconds: time.seconds
                 )
             )
-        case let .monthly(interval, selector):
+        case .monthly(let interval, let selector):
             let fields = try selectorFields(selector, source: schedule.source)
             return RecurrenceMapping(
                 rule: .monthly(
@@ -294,7 +305,7 @@ public struct FoundationRecurrenceEngine: Sendable {
                     setPositions: fields.setPositions
                 )
             )
-        case let .yearly(interval, month, selector):
+        case .yearly(let interval, let month, let selector):
             let resolvedMonth: Int
             let resolvedSelector: RepeatSelector
             let fixedYearlyDate: FixedYearlyDate?
@@ -308,7 +319,7 @@ public struct FoundationRecurrenceEngine: Sendable {
             } else if let month {
                 resolvedMonth = month
                 resolvedSelector = selector
-                if case let .dayOfMonth(day) = selector {
+                if case .dayOfMonth(let day) = selector {
                     fixedYearlyDate = FixedYearlyDate(month: month, day: day)
                 } else {
                     fixedYearlyDate = nil
@@ -348,24 +359,25 @@ public struct FoundationRecurrenceEngine: Sendable {
             return SelectorFields(daysOfTheMonth: [source.day])
         case .anchorMonthDay:
             throw FoundationRecurrenceError.invalidRule
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             guard (1...31).contains(day) else { throw FoundationRecurrenceError.invalidRule }
             return SelectorFields(daysOfTheMonth: [day])
         case .lastDay:
             return SelectorFields(daysOfTheMonth: [-1])
-        case let .ordinalDaySet(ordinal, daySet):
+        case .ordinalDaySet(let ordinal, let daySet):
             guard (1...5).contains(ordinal) else { throw FoundationRecurrenceError.invalidRule }
-            let weekdays: [Weekday] = switch daySet {
-            case .weekday:
-                [.monday, .tuesday, .wednesday, .thursday, .friday]
-            case .weekend:
-                [.saturday, .sunday]
-            }
+            let weekdays: [Weekday] =
+                switch daySet {
+                case .weekday:
+                    [.monday, .tuesday, .wednesday, .thursday, .friday]
+                case .weekend:
+                    [.saturday, .sunday]
+                }
             return SelectorFields(
                 weekdays: weekdays.map { .every(foundationWeekday($0)) },
                 setPositions: [ordinal]
             )
-        case let .ordinalWeekday(ordinal, weekday):
+        case .ordinalWeekday(let ordinal, let weekday):
             guard (-5 ... -1).contains(ordinal) || (1...5).contains(ordinal) else {
                 throw FoundationRecurrenceError.invalidRule
             }

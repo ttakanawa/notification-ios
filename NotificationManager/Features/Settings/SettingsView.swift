@@ -21,22 +21,25 @@ struct SettingsView: View {
                 .disabled(model.isWorking)
                 .accessibilityIdentifier("settings.notifications-this-device")
 
-                Text(LocalizedStringResource(
-                    "settings.notifications.explanation",
-                    table: "Settings"
-                ))
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                Text(
+                    LocalizedStringResource(
+                        "settings.notifications.explanation",
+                        table: "Settings"
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
 
                 LabeledContent {
                     Text(model.authorization.rawStatus.localizedResource)
                         .accessibilityIdentifier("settings.authorization-status")
                 } label: {
-                    Text(LocalizedStringResource(
-                        "settings.authorization.title",
-                        table: "Settings"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "settings.authorization.title",
+                            table: "Settings"
+                        ))
                 }
 
                 Text(verbatim: authorizationRawValue)
@@ -62,21 +65,24 @@ struct SettingsView: View {
                         error.localizedResource,
                         systemImage: "exclamationmark.triangle"
                     )
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("settings.action-error")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("settings.action-error")
                 }
             } header: {
-                Text(LocalizedStringResource(
-                    "settings.section.notifications",
-                    table: "Settings"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "settings.section.notifications",
+                        table: "Settings"
+                    ))
             }
 
-            Section(LocalizedStringResource(
-                "settings.section.organization",
-                table: "Settings"
-            )) {
+            Section(
+                LocalizedStringResource(
+                    "settings.section.organization",
+                    table: "Settings"
+                )
+            ) {
                 NavigationLink {
                     TagManagementView(model: tagModel)
                 } label: {
@@ -104,10 +110,12 @@ struct SettingsView: View {
                 .accessibilityIdentifier("settings.about-privacy")
             }
         }
-        .navigationTitle(LocalizedStringResource(
-            "settings.title",
-            table: "Settings"
-        ))
+        .navigationTitle(
+            LocalizedStringResource(
+                "settings.title",
+                table: "Settings"
+            )
+        )
         .task { await model.load() }
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {

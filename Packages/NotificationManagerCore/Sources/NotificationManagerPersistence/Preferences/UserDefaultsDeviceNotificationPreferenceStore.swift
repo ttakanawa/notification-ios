@@ -1,7 +1,7 @@
 import Foundation
 import NotificationManagerApplication
 
-public actor UserDefaultsDeviceNotificationPreferenceStore: DeviceNotificationPreferenceStore {
+public actor UserDefaultsNotificationPreferenceStore: DeviceNotificationPreferenceStore {
     public static let defaultKey = "notificationsOnThisDevice"
 
     private let userDefaults: UserDefaults
@@ -9,7 +9,7 @@ public actor UserDefaultsDeviceNotificationPreferenceStore: DeviceNotificationPr
 
     public init(
         suiteName: String? = nil,
-        key: String = UserDefaultsDeviceNotificationPreferenceStore.defaultKey
+        key: String = UserDefaultsNotificationPreferenceStore.defaultKey
     ) {
         if let suiteName {
             guard let userDefaults = UserDefaults(suiteName: suiteName) else {

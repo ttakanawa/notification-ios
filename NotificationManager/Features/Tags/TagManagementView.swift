@@ -12,20 +12,24 @@ struct TagManagementView: View {
     var body: some View {
         List {
             Section {
-                TextField(LocalizedStringResource(
-                    "tags.field.name",
-                    table: "Tags"
-                ), text: $newName, prompt: nil)
-                    .submitLabel(.done)
-                    .onSubmit(createTag)
-                    .accessibilityIdentifier("tags.management.new-name")
+                TextField(
+                    LocalizedStringResource(
+                        "tags.field.name",
+                        table: "Tags"
+                    ), text: $newName, prompt: nil
+                )
+                .submitLabel(.done)
+                .onSubmit(createTag)
+                .accessibilityIdentifier("tags.management.new-name")
 
-                Button(LocalizedStringResource(
-                    "tags.action.create",
-                    table: "Tags"
-                ), action: createTag)
-                    .disabled(model.isWorking || newName.isEmpty)
-                    .accessibilityIdentifier("tags.management.create")
+                Button(
+                    LocalizedStringResource(
+                        "tags.action.create",
+                        table: "Tags"
+                    ), action: createTag
+                )
+                .disabled(model.isWorking || newName.isEmpty)
+                .accessibilityIdentifier("tags.management.create")
             }
 
             Section {
@@ -35,11 +39,13 @@ struct TagManagementView: View {
                     .accessibilityIdentifier("tags.management.count")
 
                 if model.tags.isEmpty {
-                    Text(LocalizedStringResource(
-                        "tags.management.empty",
-                        table: "Tags"
-                    ))
-                        .foregroundStyle(.secondary)
+                    Text(
+                        LocalizedStringResource(
+                            "tags.management.empty",
+                            table: "Tags"
+                        )
+                    )
+                    .foregroundStyle(.secondary)
                 }
 
                 ForEach(model.tags, id: \.id) { tag in
@@ -59,7 +65,7 @@ struct TagManagementView: View {
                                 ),
                                 systemImage: "pencil"
                             )
-                                .labelStyle(.iconOnly)
+                            .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
                         .accessibilityIdentifier(
@@ -76,7 +82,7 @@ struct TagManagementView: View {
                                 ),
                                 systemImage: "trash"
                             )
-                                .labelStyle(.iconOnly)
+                            .labelStyle(.iconOnly)
                         }
                         .buttonStyle(.borderless)
                         .accessibilityIdentifier(
@@ -92,25 +98,30 @@ struct TagManagementView: View {
                         error.localizedResource,
                         systemImage: "exclamationmark.triangle"
                     )
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier("tags.management.error")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("tags.management.error")
                 }
             }
         }
-        .navigationTitle(LocalizedStringResource(
-            "tags.management.title",
-            table: "Tags"
-        ))
-        .task { await model.load() }
-        .alert(LocalizedStringResource(
-            "tags.action.rename",
-            table: "Tags"
-        ), isPresented: renamePresented) {
-            TextField(LocalizedStringResource(
-                "tags.field.name",
+        .navigationTitle(
+            LocalizedStringResource(
+                "tags.management.title",
                 table: "Tags"
-            ), text: $renameName, prompt: nil)
+            )
+        )
+        .task { await model.load() }
+        .alert(
+            LocalizedStringResource(
+                "tags.action.rename",
+                table: "Tags"
+            ), isPresented: renamePresented
+        ) {
+            TextField(
+                LocalizedStringResource(
+                    "tags.field.name",
+                    table: "Tags"
+                ), text: $renameName, prompt: nil)
             Button {
                 guard let renameTagID else { return }
                 let value = renameName
@@ -120,23 +131,29 @@ struct TagManagementView: View {
                     }
                 }
             } label: {
-                Text(LocalizedStringResource(
-                    "tags.action.rename",
-                    table: "Tags"
-                ))
-                    .accessibilityIdentifier("tags.management.rename-confirm")
+                Text(
+                    LocalizedStringResource(
+                        "tags.action.rename",
+                        table: "Tags"
+                    )
+                )
+                .accessibilityIdentifier("tags.management.rename-confirm")
             }
-            Button(LocalizedStringResource(
-                "reminder.action.cancel",
-                table: "Reminder"
-            ), role: .cancel) {
+            Button(
+                LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ), role: .cancel
+            ) {
                 renameTagID = nil
             }
         }
-        .alert(LocalizedStringResource(
-            "tags.delete-confirmation.title",
-            table: "Tags"
-        ), isPresented: deletePresented) {
+        .alert(
+            LocalizedStringResource(
+                "tags.delete-confirmation.title",
+                table: "Tags"
+            ), isPresented: deletePresented
+        ) {
             Button(role: .destructive) {
                 guard let deleteTagID else { return }
                 Task {
@@ -145,23 +162,28 @@ struct TagManagementView: View {
                     }
                 }
             } label: {
-                Text(LocalizedStringResource(
-                    "tags.action.delete",
-                    table: "Tags"
-                ))
-                    .accessibilityIdentifier("tags.management.delete-confirm")
+                Text(
+                    LocalizedStringResource(
+                        "tags.action.delete",
+                        table: "Tags"
+                    )
+                )
+                .accessibilityIdentifier("tags.management.delete-confirm")
             }
-            Button(LocalizedStringResource(
-                "reminder.action.cancel",
-                table: "Reminder"
-            ), role: .cancel) {
+            Button(
+                LocalizedStringResource(
+                    "reminder.action.cancel",
+                    table: "Reminder"
+                ), role: .cancel
+            ) {
                 deleteTagID = nil
             }
         } message: {
-            Text(LocalizedStringResource(
-                "tags.delete-confirmation.message",
-                table: "Tags"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "tags.delete-confirmation.message",
+                    table: "Tags"
+                ))
         }
         .announcesAccessibilityErrors(
             model.actionError.map { [$0.accessibilityIdentity] } ?? []

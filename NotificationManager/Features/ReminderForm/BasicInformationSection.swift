@@ -6,23 +6,25 @@ struct BasicInformationSection: View {
     var body: some View {
         Section {
             TextField(text: $model.title) {
-                Text(LocalizedStringResource(
-                    "reminder.field.title",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.field.title",
+                        table: "ReminderForm"
+                    ))
             }
-                .textInputAutocapitalization(.sentences)
-                .accessibilityIdentifier("reminder-form.title")
+            .textInputAutocapitalization(.sentences)
+            .accessibilityIdentifier("reminder-form.title")
 
             if let issue = model.titleFieldIssue {
                 fieldError(issue, identifier: "reminder-form.title-error")
             }
 
             TextField(text: optionalTextBinding(\.notes), axis: .vertical) {
-                Text(LocalizedStringResource(
-                    "reminder.field.notes",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.field.notes",
+                        table: "ReminderForm"
+                    ))
             }
             .lineLimit(3...8)
             .accessibilityIdentifier("reminder-form.notes")
@@ -32,10 +34,11 @@ struct BasicInformationSection: View {
             }
 
             TextField(text: optionalTextBinding(\.urlString)) {
-                Text(LocalizedStringResource(
-                    "reminder.field.url",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.field.url",
+                        table: "ReminderForm"
+                    ))
             }
             .textInputAutocapitalization(.never)
             .keyboardType(.URL)
@@ -45,15 +48,17 @@ struct BasicInformationSection: View {
                 fieldError(issue, identifier: "reminder-form.url-error")
             }
         } header: {
-            Text(LocalizedStringResource(
-                "reminder.form.section.basic-information",
-                table: "ReminderForm"
-            ))
-                .background {
-                    AccessibilityIdentifierContainer(
-                        identifier: "reminder-form.section.basic-information"
-                    )
-                }
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.section.basic-information",
+                    table: "ReminderForm"
+                )
+            )
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.section.basic-information"
+                )
+            }
         }
         .accessibilityElement(children: .contain)
     }

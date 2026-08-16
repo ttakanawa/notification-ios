@@ -35,10 +35,11 @@ final class AppEnvironment {
     init(
         notificationHandlingActivation: @escaping NotificationHandlingActivation = {}
     ) {
-        let actions = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { command in .saved(command.reminderID) },
-            delete: { _ in }
-        ))
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            ))
         let listModel = ReminderListModel(
             snapshot: ReminderListSnapshot(
                 generation: 0,
@@ -100,7 +101,7 @@ final class AppEnvironment {
     static func production(
         container: ModelContainer,
         notificationDelegate: NotificationApplicationDelegate,
-        preferenceStore: UserDefaultsDeviceNotificationPreferenceStore,
+        preferenceStore: UserDefaultsNotificationPreferenceStore,
         authorizationService: NotificationAuthorizationService,
         notificationCenter: SystemNotificationCenterClient,
         cleanupService: NotificationCleanupService
@@ -168,28 +169,29 @@ final class AppEnvironment {
                 await relay.refreshPresentation()
             }
         )
-        let actions = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { command in
-                guard let snapshot = try await repository.reminder(id: command.reminderID)
-                else {
-                    throw AppEnvironmentError.reminderNotFound(command.reminderID)
-                }
-                var draft = ReminderDraft(snapshot: snapshot)
-                draft.enabled = command.enabled
-                let outcome = try await saveUseCase.execute(
-                    draft: draft,
-                    capacityConsent: command.capacityConsent
-                )
-                if case .saved = outcome {
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in
+                    guard let snapshot = try await repository.reminder(id: command.reminderID)
+                    else {
+                        throw AppEnvironmentError.reminderNotFound(command.reminderID)
+                    }
+                    var draft = ReminderDraft(snapshot: snapshot)
+                    draft.enabled = command.enabled
+                    let outcome = try await saveUseCase.execute(
+                        draft: draft,
+                        capacityConsent: command.capacityConsent
+                    )
+                    if case .saved = outcome {
+                        await relay.refreshPresentation()
+                    }
+                    return outcome
+                },
+                delete: { reminderID in
+                    try await deleteUseCase.execute(reminderID: reminderID)
                     await relay.refreshPresentation()
                 }
-                return outcome
-            },
-            delete: { reminderID in
-                try await deleteUseCase.execute(reminderID: reminderID)
-                await relay.refreshPresentation()
-            }
-        ))
+            ))
         let listModel = ReminderListModel(
             snapshot: ReminderListSnapshot(
                 generation: 0,
@@ -250,7 +252,7 @@ final class AppEnvironment {
                 },
                 routeResponse: { destination in
                     switch destination {
-                    case let .reminderEdit(reminderID):
+                    case .reminderEdit(let reminderID):
                         router.showReminder(reminderID)
                     case .notificationUnavailable:
                         router.showNotificationUnavailable()
@@ -354,11 +356,12 @@ final class AppEnvironment {
             register($0, tags: snapshot.tags, deviceState: deviceState, now: now)
         }
         snapshotGeneration &+= 1
-        listModel.publish(ReminderListSnapshot(
-            generation: snapshotGeneration,
-            items: items,
-            availableTags: snapshot.tags.map(Self.tagPresentation)
-        ))
+        listModel.publish(
+            ReminderListSnapshot(
+                generation: snapshotGeneration,
+                items: items,
+                availableTags: snapshot.tags.map(Self.tagPresentation)
+            ))
     }
 
     @discardableResult
@@ -371,22 +374,24 @@ final class AppEnvironment {
         let tagByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
         let presentations = reminder.tagIDs.compactMap { tagByID[$0] }
             .map(Self.tagPresentation)
-        let status = (try? ReminderStatusCalculator().status(
-            schedule: reminder.schedule,
-            enabled: reminder.enabled,
-            after: now,
-            environment: FoundationRecurrenceEnvironment()
-        )) ?? ReminderStatus(primary: .invalidSchedule, secondary: [])
-        let schedule = reminder.validSchedule
-        let physical = schedule.flatMap {
-            try? NextNotificationProvider().nextPhysicalNotifications(
-                for: reminder.id,
-                schedule: $0,
+        let status =
+            (try? ReminderStatusCalculator().status(
+                schedule: reminder.schedule,
+                enabled: reminder.enabled,
                 after: now,
-                limit: 3,
                 environment: FoundationRecurrenceEnvironment()
-            ).notifications
-        } ?? []
+            )) ?? ReminderStatus(primary: .invalidSchedule, secondary: [])
+        let schedule = reminder.validSchedule
+        let physical =
+            schedule.flatMap {
+                try? NextNotificationProvider().nextPhysicalNotifications(
+                    for: reminder.id,
+                    schedule: $0,
+                    after: now,
+                    limit: 3,
+                    environment: FoundationRecurrenceEnvironment()
+                ).notifications
+            } ?? []
         let next = physical.map {
             PhysicalNotificationPresentation(
                 notification: $0,
@@ -401,19 +406,21 @@ final class AppEnvironment {
             .filter { $0.key.reminderID == reminder.id }
             .sorted { $0.key.baseOccurrenceInstant < $1.key.baseOccurrenceInstant }
         let earliestOutcome = groupValues.first?.value
-        let displayedEarliestOutcome = deviceState.globalFailure == nil
+        let displayedEarliestOutcome =
+            deviceState.globalFailure == nil
             ? earliestOutcome
             : .unscheduledError
-        let deviceStatus = DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: status.primary,
-            deviceNotificationsEnabled: deviceState.deviceNotificationsEnabled,
-            authorization: deviceState.authorization.state,
-            earliestGroupOutcome: displayedEarliestOutcome,
-            laterGroupOutcomes: groupValues.dropFirst().map(\.value),
-            reconcileInProgressOrQueued: deviceState.reconcileInProgressOrQueued,
-            earliestRequestPresentOrLatestAddSucceeded:
-                displayedEarliestOutcome == .scheduled
-        ))
+        let deviceStatus = DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: status.primary,
+                deviceNotificationsEnabled: deviceState.deviceNotificationsEnabled,
+                authorization: deviceState.authorization.state,
+                earliestGroupOutcome: displayedEarliestOutcome,
+                laterGroupOutcomes: groupValues.dropFirst().map(\.value),
+                reconcileInProgressOrQueued: deviceState.reconcileInProgressOrQueued,
+                earliestRequestPresentOrAddSucceeded:
+                    displayedEarliestOutcome == .scheduled
+            ))
         let item = ReminderListItemPresentation(
             id: reminder.id,
             title: reminder.title,
@@ -436,13 +443,14 @@ final class AppEnvironment {
             updatedAt: reminder.updatedAt
         )
         if router.formModel(for: reminder.id) == nil {
-            router.registerFormIfAbsent(ReminderFormModel(
-                snapshot: reminder,
-                savedRepeatPresentation: repeatSummary.map(SavedRepeatPresentation.standard),
-                now: now,
-                actions: formActions,
-                availableTags: presentations
-            ))
+            router.registerFormIfAbsent(
+                ReminderFormModel(
+                    snapshot: reminder,
+                    savedRepeatPresentation: repeatSummary.map(SavedRepeatPresentation.standard),
+                    now: now,
+                    actions: formActions,
+                    availableTags: presentations
+                ))
         }
         return item
     }
@@ -458,11 +466,13 @@ final class AppEnvironment {
 
 @MainActor
 final class NotificationResponseSnapshotPreparer {
-    typealias PrepareSnapshot = @MainActor @Sendable () async ->
+    typealias PrepareSnapshot =
+        @MainActor @Sendable () async ->
         LatestPresentationRefreshResult<CompleteReminderSnapshot>
-    typealias CoalesceSnapshot = @MainActor @Sendable (
-        PresentationRefreshGeneration
-    ) async -> LatestPresentationRefreshTerminalResult<CompleteReminderSnapshot>
+    typealias CoalesceSnapshot =
+        @MainActor @Sendable (
+            PresentationRefreshGeneration
+        ) async -> LatestPresentationRefreshTerminalResult<CompleteReminderSnapshot>
 
     private let prepareSnapshot: PrepareSnapshot
     private let coalesceSnapshot: CoalesceSnapshot
@@ -479,14 +489,14 @@ final class NotificationResponseSnapshotPreparer {
         guard !Task.isCancelled else { return nil }
         let snapshot: CompleteReminderSnapshot
         switch await prepareSnapshot() {
-        case let .accepted(value):
+        case .accepted(let value):
             snapshot = value
         case .unavailable:
             return nil
-        case let .superseded(generation):
+        case .superseded(let generation):
             guard !Task.isCancelled else { return nil }
             switch await coalesceSnapshot(generation) {
-            case let .accepted(value):
+            case .accepted(let value):
                 snapshot = value
             case .unavailable, .cancelled:
                 return nil
@@ -525,16 +535,16 @@ final class LatestPresentationRefreshCoordinator<
     private let loadSnapshot: LoadSnapshot
     private let publish: Publish
     private var generation: UInt64 = 0
-    private var latestTerminalResult: (
-        generation: PresentationRefreshGeneration,
-        result: LatestPresentationRefreshTerminalResult<Snapshot>
-    )?
-    private var terminalResultWaiters: [
-        UUID: CheckedContinuation<
+    private var latestTerminalResult:
+        (
+            generation: PresentationRefreshGeneration,
+            result: LatestPresentationRefreshTerminalResult<Snapshot>
+        )?
+    private var terminalResultWaiters:
+        [UUID: CheckedContinuation<
             LatestPresentationRefreshTerminalResult<Snapshot>,
             Never
-        >
-    ] = [:]
+        >] = [:]
 
     init(
         loadSnapshot: @escaping LoadSnapshot,
@@ -623,15 +633,17 @@ final class LatestPresentationRefreshCoordinator<
         latestTerminalResult = (refreshGeneration, result)
         let waiters = Array(terminalResultWaiters.values)
         terminalResultWaiters.removeAll()
-        waiters.forEach { $0.resume(returning: result) }
+        for waiter in waiters {
+            waiter.resume(returning: result)
+        }
     }
 
     private func currentTerminalResult(
         after supersededGeneration: PresentationRefreshGeneration
     ) -> LatestPresentationRefreshTerminalResult<Snapshot>? {
         guard let latestTerminalResult,
-              latestTerminalResult.generation.value == generation,
-              latestTerminalResult.generation != supersededGeneration
+            latestTerminalResult.generation.value == generation,
+            latestTerminalResult.generation != supersededGeneration
         else {
             return nil
         }
@@ -646,9 +658,10 @@ final class LatestPresentationRefreshCoordinator<
 
 @MainActor
 final class SchedulingStatePresentationObserver {
-    typealias Refresh = @MainActor @Sendable (
-        DeviceSchedulingStateSnapshot
-    ) async -> Void
+    typealias Refresh =
+        @MainActor @Sendable (
+            DeviceSchedulingStateSnapshot
+        ) async -> Void
 
     private let stateStore: DeviceSchedulingStateStore
     private let refreshPresentation: Refresh
@@ -704,9 +717,9 @@ private final class AppEnvironmentRelay {
     }
 }
 
-private extension ReminderSnapshot {
-    var validSchedule: ScheduleDefinition? {
-        guard case let .valid(schedule, _, _) = self.schedule else { return nil }
+extension ReminderSnapshot {
+    fileprivate var validSchedule: ScheduleDefinition? {
+        guard case .valid(let schedule, _, _) = self.schedule else { return nil }
         return schedule
     }
 }
@@ -720,9 +733,9 @@ enum ReminderNextPresentationProjector {
         let codec = NotificationIdentifierCodec()
         let authoritative = state.nextTriggerDates.compactMap { identifier, date -> Date? in
             guard state.materializedKinds[identifier] == .repeating,
-                  state.pendingOrAddedIdentifiers.contains(identifier),
-                  case let .currentRepeating(identifierReminderID, _) = codec.classify(identifier),
-                  identifierReminderID == reminderID
+                state.pendingOrAddedIdentifiers.contains(identifier),
+                case .currentRepeating(let identifierReminderID, _) = codec.classify(identifier),
+                identifierReminderID == reminderID
             else {
                 return nil
             }

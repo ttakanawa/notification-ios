@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("App bootstrap")
@@ -14,9 +15,10 @@ struct AppBootstrapperTests {
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             installHandler: { _, categories in
                 trace.record(.notificationDelegateInstalled)
-                #expect(categories.map(\.identifier) == [
-                    NotificationApplicationDelegate.openLinkCategoryIdentifier
-                ])
+                #expect(
+                    categories.map(\.identifier) == [
+                        NotificationApplicationDelegate.openLinkCategoryIdentifier
+                    ])
             }
         )
         let bootstrapper = AppBootstrapper(
@@ -38,10 +40,11 @@ struct AppBootstrapperTests {
 
         await bootstrapper.start()
 
-        #expect(trace.events == [
-            .notificationDelegateInstalled,
-            .containerOpenStarted
-        ])
+        #expect(
+            trace.events == [
+                .notificationDelegateInstalled,
+                .containerOpenStarted
+            ])
         guard case .dataUnavailable = bootstrapper.state else {
             Issue.record("A failed store open must publish the recovery state")
             return
@@ -94,7 +97,7 @@ struct AppBootstrapperTests {
 
         await gate.resolve(2)
         await retry.value
-        guard case let .ready(environment) = bootstrapper.state else {
+        guard case .ready(let environment) = bootstrapper.state else {
             Issue.record("The newer retry should make the environment ready")
             return
         }
@@ -102,7 +105,7 @@ struct AppBootstrapperTests {
 
         await gate.reject(1)
         await original.value
-        guard case let .ready(environment) = bootstrapper.state else {
+        guard case .ready(let environment) = bootstrapper.state else {
             Issue.record("A stale failure must not replace the newer success")
             return
         }
@@ -228,7 +231,7 @@ struct AppBootstrapperTests {
         await bootstrapper.start()
         await bootstrapper.retry()
 
-        guard case let .ready(environment) = bootstrapper.state else {
+        guard case .ready(let environment) = bootstrapper.state else {
             Issue.record("Retry after ready must preserve the ready state")
             return
         }
@@ -385,7 +388,9 @@ private actor BootstrapAttemptGate {
         nextAttempt += 1
         let waiters = attemptWaiters
         attemptWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         return nextAttempt
     }
 

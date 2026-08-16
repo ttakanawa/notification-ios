@@ -33,14 +33,14 @@ public struct RepeatingTriggerComponents: Sendable, Equatable, Hashable {
 
     public func validated() throws -> RepeatingTriggerComponents {
         guard TimeZone(identifier: timeZoneIdentifier) != nil,
-              month.map({ (1...12).contains($0) }) ?? true,
-              day.map({ (1...31).contains($0) }) ?? true,
-              weekday.map({ (1...7).contains($0) }) ?? true,
-              (0...23).contains(hour),
-              (0...59).contains(minute),
-              second == 0,
-              hasAllowedShape,
-              hasValidFixedMonthDay
+            month.map({ (1...12).contains($0) }) ?? true,
+            day.map({ (1...31).contains($0) }) ?? true,
+            weekday.map({ (1...7).contains($0) }) ?? true,
+            (0...23).contains(hour),
+            (0...59).contains(minute),
+            second == 0,
+            hasAllowedShape,
+            hasValidFixedMonthDay
         else {
             throw NotificationIdentifierCodecError.invalidRepeatingComponents
         }
@@ -50,9 +50,9 @@ public struct RepeatingTriggerComponents: Sendable, Equatable, Hashable {
     private var hasAllowedShape: Bool {
         switch (month, day, weekday) {
         case (nil, nil, nil),
-             (nil, nil, .some),
-             (nil, .some, nil),
-             (.some, .some, nil):
+            (nil, nil, .some),
+            (nil, .some, nil),
+            (.some, .some, nil):
             true
         default:
             false
@@ -61,11 +61,12 @@ public struct RepeatingTriggerComponents: Sendable, Equatable, Hashable {
 
     private var hasValidFixedMonthDay: Bool {
         guard let month, let day else { return true }
-        let maximumDay = switch month {
-        case 2: 29
-        case 4, 6, 9, 11: 30
-        default: 31
-        }
+        let maximumDay =
+            switch month {
+            case 2: 29
+            case 4, 6, 9, 11: 30
+            default: 31
+            }
         return day <= maximumDay
     }
 }

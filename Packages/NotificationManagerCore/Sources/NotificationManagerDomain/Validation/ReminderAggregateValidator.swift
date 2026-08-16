@@ -97,14 +97,14 @@ public struct ReminderAggregateValidator: Sendable {
                 throw ReminderValidationIssue.missingScheduleData
             }
             scheduleData = originalScheduleData
-        case let .replace(schedule):
+        case .replace(let schedule):
             guard let source = draft.source,
-                  ScheduleDefinition(
-                      source: source,
-                      rule: draft.rule,
-                      end: draft.end,
-                      early: draft.early
-                  ) == schedule
+                ScheduleDefinition(
+                    source: source,
+                    rule: draft.rule,
+                    end: draft.end,
+                    early: draft.early
+                ) == schedule
             else {
                 throw ReminderValidationIssue.scheduleFieldsDoNotMatchReplacement
             }
@@ -121,7 +121,8 @@ public struct ReminderAggregateValidator: Sendable {
             throw ReminderValidationIssue.scheduleTooLarge
         }
 
-        guard titleBytes + notesBytes + urlBytes + scheduleBytes <= ReminderLimits.aggregateBytes else {
+        guard titleBytes + notesBytes + urlBytes + scheduleBytes <= ReminderLimits.aggregateBytes
+        else {
             throw ReminderValidationIssue.aggregateTooLarge
         }
         guard draft.tagIDs.count <= ReminderLimits.tagCount else {
@@ -150,7 +151,8 @@ public struct ReminderAggregateValidator: Sendable {
     public func scheduleIssues(for schedule: ScheduleDefinition) -> [ScheduleValidationIssue] {
         var issues = sourceIssues(for: schedule.source)
         issues.append(contentsOf: ruleIssues(for: schedule.rule))
-        issues.append(contentsOf: endIssues(for: schedule.end, source: schedule.source, rule: schedule.rule))
+        issues.append(
+            contentsOf: endIssues(for: schedule.end, source: schedule.source, rule: schedule.rule))
 
         if let early = schedule.early, !(1...9_999).contains(early.value) {
             issues.append(.earlyValueOutOfRange)
@@ -179,21 +181,21 @@ public struct ReminderAggregateValidator: Sendable {
         switch rule {
         case .none:
             return []
-        case let .hourly(interval), let .daily(interval):
+        case .hourly(let interval), .daily(let interval):
             return Self.intervalIsValid(interval) ? [] : [.intervalOutOfRange]
-        case let .weekly(interval, kind, weekdays):
+        case .weekly(let interval, let kind, let weekdays):
             var issues: [ScheduleValidationIssue] = []
             if !Self.intervalIsValid(interval) { issues.append(.intervalOutOfRange) }
             if !Self.isValidWeekdaySet(kind: kind, weekdays: weekdays) {
                 issues.append(.invalidWeekdaySet)
             }
             return issues
-        case let .monthly(interval, selector):
+        case .monthly(let interval, let selector):
             var issues: [ScheduleValidationIssue] = []
             if !Self.intervalIsValid(interval) { issues.append(.intervalOutOfRange) }
             if !Self.isValidMonthlySelector(selector) { issues.append(.invalidSelector) }
             return issues
-        case let .yearly(interval, month, selector):
+        case .yearly(let interval, let month, let selector):
             var issues: [ScheduleValidationIssue] = []
             if !Self.intervalIsValid(interval) { issues.append(.intervalOutOfRange) }
             if let month, !(1...12).contains(month) { issues.append(.invalidMonth) }
@@ -212,7 +214,7 @@ public struct ReminderAggregateValidator: Sendable {
         switch end {
         case .never:
             return []
-        case let .onDate(date):
+        case .onDate(let date):
             if case .none = rule { return [.endNotAllowed] }
             guard Self.isValidDate(year: date.year, month: date.month, day: date.day) else {
                 return [.invalidEndDate]
@@ -237,8 +239,8 @@ public struct ReminderAggregateValidator: Sendable {
 
     private static func isValidWeekdaySet(kind: WeekdaySetKind, weekdays: [Weekday]) -> Bool {
         guard !weekdays.isEmpty,
-              Set(weekdays).count == weekdays.count,
-              weekdays == weekdays.sorted(by: { $0.rawValue < $1.rawValue })
+            Set(weekdays).count == weekdays.count,
+            weekdays == weekdays.sorted(by: { $0.rawValue < $1.rawValue })
         else {
             return false
         }
@@ -256,11 +258,11 @@ public struct ReminderAggregateValidator: Sendable {
         switch selector {
         case .anchorDay, .lastDay:
             return true
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             return (1...31).contains(day)
-        case let .ordinalDaySet(ordinal, _):
+        case .ordinalDaySet(let ordinal, _):
             return (1...5).contains(ordinal)
-        case let .ordinalWeekday(ordinal, _):
+        case .ordinalWeekday(let ordinal, _):
             return (-5 ... -1).contains(ordinal) || (1...5).contains(ordinal)
         case .anchorMonthDay:
             return false
@@ -273,13 +275,13 @@ public struct ReminderAggregateValidator: Sendable {
         }
         guard (1...12).contains(month) else { return false }
         switch selector {
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             return isValidDate(year: 2_000, month: month, day: day)
         case .lastDay:
             return true
-        case let .ordinalDaySet(ordinal, _):
+        case .ordinalDaySet(let ordinal, _):
             return (1...5).contains(ordinal)
-        case let .ordinalWeekday(ordinal, _):
+        case .ordinalWeekday(let ordinal, _):
             return (-5 ... -1).contains(ordinal) || (1...5).contains(ordinal)
         case .anchorDay, .anchorMonthDay:
             return false
@@ -293,7 +295,8 @@ public struct ReminderAggregateValidator: Sendable {
         let daysInMonth: Int
         switch month {
         case 2:
-            let isLeapYear = year.isMultiple(of: 4)
+            let isLeapYear =
+                year.isMultiple(of: 4)
                 && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
             daysInMonth = isLeapYear ? 29 : 28
         case 4, 6, 9, 11:

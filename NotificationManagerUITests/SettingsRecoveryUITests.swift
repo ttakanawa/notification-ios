@@ -61,7 +61,8 @@ final class SettingsRecoveryUITests: XCTestCase {
     func testNotificationUnavailableScreenNeverDisplaysReminderContentOrLink() {
         let app = launch(scenario: "notification-unavailable")
 
-        XCTAssertTrue(app.otherElements["notification-unavailable.root"].waitForExistence(timeout: 2))
+        XCTAssertTrue(
+            app.otherElements["notification-unavailable.root"].waitForExistence(timeout: 2))
         XCTAssertFalse(app.staticTexts["Sensitive Visa Title"].exists)
         XCTAssertFalse(app.staticTexts["Sensitive Notes"].exists)
         XCTAssertFalse(app.links["https://sensitive.example"].exists)

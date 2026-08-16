@@ -12,12 +12,12 @@ public struct TagNameNormalizerV1: TagNameNormalizing, Sendable {
         var lowerBound = input.startIndex
         var upperBound = input.endIndex
         while lowerBound < upperBound,
-              UnicodeNormalizationDataV1.isWhiteSpace(input[lowerBound])
+            UnicodeNormalizationDataV1.isWhiteSpace(input[lowerBound])
         {
             lowerBound += 1
         }
         while upperBound > lowerBound,
-              UnicodeNormalizationDataV1.isWhiteSpace(input[upperBound - 1])
+            UnicodeNormalizationDataV1.isWhiteSpace(input[upperBound - 1])
         {
             upperBound -= 1
         }
@@ -36,7 +36,10 @@ public struct TagNameNormalizerV1: TagNameNormalizing, Sendable {
         var scalarView = String.UnicodeScalarView()
         scalarView.reserveCapacity(normalizedScalars.count)
         for scalar in normalizedScalars {
-            scalarView.append(UnicodeScalar(scalar)!)
+            guard let unicodeScalar = UnicodeScalar(scalar) else {
+                preconditionFailure("Normalization data must contain valid Unicode scalars")
+            }
+            scalarView.append(unicodeScalar)
         }
         let normalized = String(scalarView)
 
@@ -130,8 +133,8 @@ enum UnicodeNormalizationDataV1 {
         for scalar in scalars.dropFirst() {
             let currentClass = canonicalCombiningClass(of: scalar)
             if let starterIndex,
-               (previousClass == 0 || previousClass < currentClass),
-               let composite = composite(starter: starter, combining: scalar)
+                previousClass == 0 || previousClass < currentClass,
+                let composite = composite(starter: starter, combining: scalar)
             {
                 output[starterIndex] = composite
                 starter = composite
@@ -171,10 +174,10 @@ enum UnicodeNormalizationDataV1 {
         let sCount = lCount * nCount
         guard scalar >= sBase, scalar < sBase + sCount else { return nil }
         let index = scalar - sBase
-        let l = lBase + index / nCount
-        let v = vBase + (index % nCount) / tCount
-        let t = tBase + index % tCount
-        return t == tBase ? [l, v] : [l, v, t]
+        let leading = lBase + index / nCount
+        let vowel = vBase + (index % nCount) / tCount
+        let trailing = tBase + index % tCount
+        return trailing == tBase ? [leading, vowel] : [leading, vowel, trailing]
     }
 
     private static func composeHangul(starter: UInt32, combining: UInt32) -> UInt32? {
@@ -189,13 +192,13 @@ enum UnicodeNormalizationDataV1 {
         let sCount = lCount * nCount
 
         if starter >= lBase, starter < lBase + lCount,
-           combining >= vBase, combining < vBase + vCount
+            combining >= vBase, combining < vBase + vCount
         {
             return sBase + (starter - lBase) * nCount + (combining - vBase) * tCount
         }
         if starter >= sBase, starter < sBase + sCount,
-           (starter - sBase) % tCount == 0,
-           combining > tBase, combining < tBase + tCount
+            (starter - sBase) % tCount == 0,
+            combining > tBase, combining < tBase + tCount
         {
             return starter + combining - tBase
         }
@@ -215,10 +218,11 @@ enum UnicodeNormalizationDataV1 {
     }
 
     private static func parseScalarMappings(_ records: String) -> [UInt32: [UInt32]] {
-        Dictionary(uniqueKeysWithValues: records.split(separator: "\n").map { line in
-            let fields = line.split(separator: ";", omittingEmptySubsequences: false)
-            return (UInt32(fields[0], radix: 16)!, parseScalars(fields[1]))
-        })
+        Dictionary(
+            uniqueKeysWithValues: records.split(separator: "\n").map { line in
+                let fields = line.split(separator: ";", omittingEmptySubsequences: false)
+                return (requiredHexScalar(fields[0]), parseScalars(fields[1]))
+            })
     }
 
     private static func parseRanges(_ records: String) -> [ScalarRange] {
@@ -235,28 +239,43 @@ enum UnicodeNormalizationDataV1 {
             return ScalarRange(
                 lowerBound: bounds.lower,
                 upperBound: bounds.upper,
-                value: UInt8(fields[1])!
+                value: requiredCombiningClass(fields[1])
             )
         }.sorted { $0.lowerBound < $1.lowerBound }
     }
 
     private static func parseCompositions(_ records: String) -> [UInt64: UInt32] {
-        Dictionary(uniqueKeysWithValues: records.split(separator: "\n").map { line in
-            let fields = line.split(separator: ";", omittingEmptySubsequences: false)
-            let pair = parseScalars(fields[0])
-            let key = (UInt64(pair[0]) << 21) | UInt64(pair[1])
-            return (key, UInt32(fields[1], radix: 16)!)
-        })
+        Dictionary(
+            uniqueKeysWithValues: records.split(separator: "\n").map { line in
+                let fields = line.split(separator: ";", omittingEmptySubsequences: false)
+                let pair = parseScalars(fields[0])
+                let key = (UInt64(pair[0]) << 21) | UInt64(pair[1])
+                return (key, requiredHexScalar(fields[1]))
+            })
     }
 
     private static func parseBounds(_ field: Substring) -> (lower: UInt32, upper: UInt32) {
         let components = field.split(separator: ".")
-        let lower = UInt32(components[0], radix: 16)!
-        return (lower, components.count == 1 ? lower : UInt32(components[1], radix: 16)!)
+        let lower = requiredHexScalar(components[0])
+        return (lower, components.count == 1 ? lower : requiredHexScalar(components[1]))
     }
 
     private static func parseScalars(_ field: Substring) -> [UInt32] {
-        field.split(separator: " ").map { UInt32($0, radix: 16)! }
+        field.split(separator: " ").map(requiredHexScalar)
+    }
+
+    private static func requiredHexScalar(_ field: Substring) -> UInt32 {
+        guard let scalar = UInt32(field, radix: 16) else {
+            preconditionFailure("Unicode normalization data contains an invalid hexadecimal scalar")
+        }
+        return scalar
+    }
+
+    private static func requiredCombiningClass(_ field: Substring) -> UInt8 {
+        guard let value = UInt8(field) else {
+            preconditionFailure("Unicode normalization data contains an invalid combining class")
+        }
+        return value
     }
 
     private static func rangeValue(

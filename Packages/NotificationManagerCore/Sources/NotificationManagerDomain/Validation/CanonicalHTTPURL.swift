@@ -12,10 +12,10 @@ public struct CanonicalHTTPURL: Sendable, Equatable {
     public init(_ value: String) throws {
         let forbidden = CharacterSet.whitespacesAndNewlines.union(.controlCharacters)
         guard !value.isEmpty,
-              value.unicodeScalars.allSatisfy({ !forbidden.contains($0) }),
-              Self.hasValidPercentEscapes(value),
-              Self.hasValidExplicitPort(value),
-              var components = URLComponents(string: value)
+            value.unicodeScalars.allSatisfy({ !forbidden.contains($0) }),
+            Self.hasValidPercentEscapes(value),
+            Self.hasValidExplicitPort(value),
+            var components = URLComponents(string: value)
         else {
             throw CanonicalHTTPURLError.malformed
         }
@@ -43,10 +43,10 @@ public struct CanonicalHTTPURL: Sendable, Equatable {
         }
 
         guard let result = components.string,
-              let reparsed = URLComponents(string: result),
-              reparsed.scheme == scheme,
-              let host = reparsed.host,
-              !host.isEmpty
+            let reparsed = URLComponents(string: result),
+            reparsed.scheme == scheme,
+            let host = reparsed.host,
+            !host.isEmpty
         else {
             throw CanonicalHTTPURLError.malformed
         }
@@ -59,8 +59,8 @@ public struct CanonicalHTTPURL: Sendable, Equatable {
         while index < bytes.endIndex {
             if bytes[index] == 0x25 {
                 guard index + 2 < bytes.endIndex,
-                      isHexDigit(bytes[index + 1]),
-                      isHexDigit(bytes[index + 2])
+                    isHexDigit(bytes[index + 1]),
+                    isHexDigit(bytes[index + 2])
                 else {
                     return false
                 }
@@ -101,8 +101,8 @@ public struct CanonicalHTTPURL: Sendable, Equatable {
 
         guard let portText else { return true }
         guard !portText.isEmpty,
-              portText.allSatisfy(\.isNumber),
-              let port = Int(portText)
+            portText.allSatisfy(\.isNumber),
+            let port = Int(portText)
         else {
             return false
         }

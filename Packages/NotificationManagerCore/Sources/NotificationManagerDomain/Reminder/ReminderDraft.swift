@@ -53,12 +53,21 @@ public struct ReminderDraft: Sendable, Equatable {
         createdAt: Date,
         updatedAt: Date
     ) {
-        let scheduleFields: (SourceWallClock?, RepeatRule, RepeatEnd, EarlyReminder?)
+        let effectiveSource: SourceWallClock?
+        let effectiveRule: RepeatRule
+        let effectiveEnd: RepeatEnd
+        let effectiveEarly: EarlyReminder?
         switch scheduleChange {
         case .preserveOriginal:
-            scheduleFields = (source, rule, end, early)
-        case let .replace(schedule):
-            scheduleFields = (schedule.source, schedule.rule, schedule.end, schedule.early)
+            effectiveSource = source
+            effectiveRule = rule
+            effectiveEnd = end
+            effectiveEarly = early
+        case .replace(let schedule):
+            effectiveSource = schedule.source
+            effectiveRule = schedule.rule
+            effectiveEnd = schedule.end
+            effectiveEarly = schedule.early
         }
 
         self.id = id
@@ -66,12 +75,12 @@ public struct ReminderDraft: Sendable, Equatable {
         self.notes = notes
         self.urlString = urlString
         self.enabled = enabled
-        date = scheduleFields.0.map { SourceDate(year: $0.year, month: $0.month, day: $0.day) }
-        time = scheduleFields.0.map { SourceTime(hour: $0.hour, minute: $0.minute) }
-        timeZoneIdentifier = scheduleFields.0?.timeZoneIdentifier
-        self.rule = scheduleFields.1
-        self.end = scheduleFields.2
-        self.early = scheduleFields.3
+        date = effectiveSource.map { SourceDate(year: $0.year, month: $0.month, day: $0.day) }
+        time = effectiveSource.map { SourceTime(hour: $0.hour, minute: $0.minute) }
+        timeZoneIdentifier = effectiveSource?.timeZoneIdentifier
+        self.rule = effectiveRule
+        self.end = effectiveEnd
+        self.early = effectiveEarly
         self.scheduleChange = scheduleChange
         self.originalScheduleData = originalScheduleData
         self.tagIDs = tagIDs
@@ -87,14 +96,14 @@ public struct ReminderDraft: Sendable, Equatable {
     public init(snapshot: ReminderSnapshot) {
         let editableSchedule: ScheduleRepairSeed
         switch snapshot.schedule {
-        case let .valid(schedule, _, _):
+        case .valid(let schedule, _, _):
             editableSchedule = ScheduleRepairSeed(
                 source: schedule.source,
                 rule: schedule.rule,
                 end: schedule.end,
                 early: schedule.early
             )
-        case let .domainInvalid(repairSeed, _, _):
+        case .domainInvalid(let repairSeed, _, _):
             editableSchedule = repairSeed
         case .unsupportedFuture, .corrupt:
             editableSchedule = ScheduleRepairSeed()
@@ -134,13 +143,13 @@ public struct ReminderDraft: Sendable, Equatable {
     }
 }
 
-private extension ScheduleReadState {
-    var originalData: Data {
+extension ScheduleReadState {
+    fileprivate var originalData: Data {
         switch self {
-        case let .valid(_, _, originalData),
-             let .unsupportedFuture(_, originalData),
-             let .corrupt(originalData),
-             let .domainInvalid(_, originalData, _):
+        case .valid(_, _, let originalData),
+            .unsupportedFuture(_, let originalData),
+            .corrupt(let originalData),
+            .domainInvalid(_, let originalData, _):
             originalData
         }
     }

@@ -66,7 +66,8 @@ struct SourceDateTimePresentationFormatter: Sendable {
                 timeZone: timeZone
             )
         )
-        let isolatedIdentifier = Self.leftToRightIsolate
+        let isolatedIdentifier =
+            Self.leftToRightIsolate
             + timeZoneIdentifier
             + Self.popDirectionalIsolate
         let format = localizer.value(for: key, locale: locale)

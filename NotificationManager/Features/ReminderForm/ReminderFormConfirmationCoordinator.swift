@@ -95,7 +95,7 @@ final class ReminderFormConfirmationCoordinator {
 
     func confirmCapacity() {
         guard let context = capacityContext,
-              beginPersistenceOperation()
+            beginPersistenceOperation()
         else {
             return
         }
@@ -144,7 +144,7 @@ final class ReminderFormConfirmationCoordinator {
         alertContext = nil
         pendingCapacityConfirmationContext = nil
         switch context.model.saveState {
-        case let .requiresCapacityConfirmation(warning):
+        case .requiresCapacityConfirmation(let warning):
             capacityContext = context
             capacityWarning = warning
         case .requiresExpiredScheduleConfirmation:

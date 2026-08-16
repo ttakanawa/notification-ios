@@ -8,56 +8,63 @@ public struct RepeatingTriggerPlanner: Sendable {
     ) -> [RepeatingTriggerCandidate]? {
         let schedule = input.schedule
         guard input.evaluationNow.timeIntervalSinceReferenceDate.isFinite,
-              ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty,
-              case .never = schedule.end,
-              let timeZone = input.environment.timeZone(
-                  identifier: schedule.source.timeZoneIdentifier
-              )
+            ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty,
+            case .never = schedule.end,
+            let timeZone = input.environment.timeZone(
+                identifier: schedule.source.timeZoneIdentifier
+            )
         else {
             return nil
         }
 
         let calendar = input.environment.gregorianCalendar(in: timeZone)
-        guard let anchor = try? SourceWallClockResolver().resolve(
-            schedule.source,
-            calendar: calendar
-        ), anchor <= input.evaluationNow,
-              !hasObservedCrossOccurrenceCollision(input.physicalNotifications),
-              let rulePlan = whitelistedRulePlan(for: schedule)
+        guard
+            let anchor = try? SourceWallClockResolver().resolve(
+                schedule.source,
+                calendar: calendar
+            ), anchor <= input.evaluationNow,
+            !hasObservedCrossOccurrenceCollision(input.physicalNotifications),
+            let rulePlan = supportedRulePlan(for: schedule)
         else {
             return nil
         }
 
-        var paths: [(components: RepeatingTriggerComponents, contributor: RepeatingTriggerContributor)] = []
+        var paths:
+            [(components: RepeatingTriggerComponents, contributor: RepeatingTriggerContributor)] =
+                []
         for baseComponents in rulePlan.baseComponents {
             if schedule.early?.mainEnabled != false {
-                paths.append((
-                    components: baseComponents,
-                    contributor: RepeatingTriggerContributor(
-                        kind: .main,
-                        sourceComponents: baseComponents
-                    )
-                ))
+                paths.append(
+                    (
+                        components: baseComponents,
+                        contributor: RepeatingTriggerContributor(
+                            kind: .main,
+                            sourceComponents: baseComponents
+                        )
+                    ))
             }
             if let early = schedule.early {
-                guard let earlyComponents = staticEarlyComponents(
-                    from: baseComponents,
-                    cadence: rulePlan.cadence,
-                    early: early,
-                    schedule: schedule,
-                    evaluationNow: input.evaluationNow,
-                    timeZone: timeZone,
-                    calendar: calendar
-                ) else {
+                guard
+                    let earlyComponents = staticEarlyComponents(
+                        from: baseComponents,
+                        cadence: rulePlan.cadence,
+                        early: early,
+                        schedule: schedule,
+                        evaluationNow: input.evaluationNow,
+                        timeZone: timeZone,
+                        calendar: calendar
+                    )
+                else {
                     return nil
                 }
-                paths.append((
-                    components: earlyComponents,
-                    contributor: RepeatingTriggerContributor(
-                        kind: .early,
-                        sourceComponents: baseComponents
-                    )
-                ))
+                paths.append(
+                    (
+                        components: earlyComponents,
+                        contributor: RepeatingTriggerContributor(
+                            kind: .early,
+                            sourceComponents: baseComponents
+                        )
+                    ))
             }
         }
 
@@ -76,19 +83,22 @@ public struct RepeatingTriggerPlanner: Sendable {
                     contributors: contributors
                 )
             } else {
-                candidates.append(RepeatingTriggerCandidate(
-                    components: path.components,
-                    contributors: [path.contributor]
-                ))
+                candidates.append(
+                    RepeatingTriggerCandidate(
+                        components: path.components,
+                        contributors: [path.contributor]
+                    ))
             }
         }
 
-        guard candidates.allSatisfy({
-            (try? $0.components.validated()) != nil
-                && $0.contributors.allSatisfy {
-                    (try? $0.sourceComponents.validated()) != nil
-                }
-        }) else {
+        guard
+            candidates.allSatisfy({
+                (try? $0.components.validated()) != nil
+                    && $0.contributors.allSatisfy {
+                        (try? $0.sourceComponents.validated()) != nil
+                    }
+            })
+        else {
             return nil
         }
 
@@ -97,60 +107,68 @@ public struct RepeatingTriggerPlanner: Sendable {
         }
     }
 
-    private func whitelistedRulePlan(for schedule: ScheduleDefinition) -> RulePlan? {
+    private func supportedRulePlan(for schedule: ScheduleDefinition) -> RulePlan? {
         let source = schedule.source
         let zone = source.timeZoneIdentifier
         let time = (source.hour, source.minute)
 
         switch schedule.rule {
         case .daily(interval: 1):
-            return RulePlan(cadence: .daily, baseComponents: [
-                trigger(zone: zone, hour: time.0, minute: time.1)
-            ])
-        case let .weekly(interval: 1, _, weekdays):
-            return RulePlan(cadence: .weekly, baseComponents: weekdays.map {
-                trigger(
-                    zone: zone,
-                    weekday: foundationWeekday($0),
-                    hour: time.0,
-                    minute: time.1
-                )
-            })
-        case let .monthly(interval: 1, selector):
+            return RulePlan(
+                cadence: .daily,
+                baseComponents: [
+                    trigger(zone: zone, hour: time.0, minute: time.1)
+                ])
+        case .weekly(interval: 1, _, let weekdays):
+            return RulePlan(
+                cadence: .weekly,
+                baseComponents: weekdays.map {
+                    trigger(
+                        zone: zone,
+                        weekday: foundationWeekday($0),
+                        hour: time.0,
+                        minute: time.1
+                    )
+                })
+        case .monthly(interval: 1, let selector):
             let day: Int
             switch selector {
             case .anchorDay:
                 day = source.day
-            case let .dayOfMonth(fixedDay):
+            case .dayOfMonth(let fixedDay):
                 day = fixedDay
             default:
                 return nil
             }
-            return RulePlan(cadence: .monthly, baseComponents: [
-                trigger(zone: zone, day: day, hour: time.0, minute: time.1)
-            ])
-        case let .yearly(interval: 1, month, selector):
+            return RulePlan(
+                cadence: .monthly,
+                baseComponents: [
+                    trigger(zone: zone, day: day, hour: time.0, minute: time.1)
+                ])
+        case .yearly(interval: 1, let month, let selector):
             let fixedMonth: Int
             let fixedDay: Int
             switch (month, selector) {
             case (nil, .anchorMonthDay):
                 fixedMonth = source.month
                 fixedDay = source.day
-            case let (.some(value), .dayOfMonth(day)):
+            case (.some(let value), .dayOfMonth(let day)):
                 fixedMonth = value
                 fixedDay = day
             default:
                 return nil
             }
-            return RulePlan(cadence: .yearly, baseComponents: [
-                trigger(
-                    zone: zone,
-                    month: fixedMonth,
-                    day: fixedDay,
-                    hour: time.0,
-                    minute: time.1
-                )
-            ])
+            return RulePlan(
+                cadence: .yearly,
+                baseComponents: [
+                    trigger(
+                        zone: zone,
+                        month: fixedMonth,
+                        day: fixedDay,
+                        hour: time.0,
+                        minute: time.1
+                    )
+                ])
         default:
             return nil
         }
@@ -165,21 +183,24 @@ public struct RepeatingTriggerPlanner: Sendable {
         timeZone: TimeZone,
         calendar: Calendar
     ) -> RepeatingTriggerComponents? {
-        guard let result = structuralEarlyComponents(
-            from: base,
-            cadence: cadence,
-            early: early,
-            schedule: schedule
-        ), futureTransitionsPreserve(
-            result,
-            from: base,
-            cadence: cadence,
-            early: early,
-            schedule: schedule,
-            evaluationNow: evaluationNow,
-            timeZone: timeZone,
-            calendar: calendar
-        ) else {
+        guard
+            let result = structuralEarlyComponents(
+                from: base,
+                cadence: cadence,
+                early: early,
+                schedule: schedule
+            ),
+            futureTransitionsPreserve(
+                result,
+                from: base,
+                cadence: cadence,
+                early: early,
+                schedule: schedule,
+                evaluationNow: evaluationNow,
+                timeZone: timeZone,
+                calendar: calendar
+            )
+        else {
             return nil
         }
         return result
@@ -192,27 +213,31 @@ public struct RepeatingTriggerPlanner: Sendable {
         schedule: ScheduleDefinition
     ) -> RepeatingTriggerComponents? {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        calendar.timeZone = .gmt
         var result: RepeatingTriggerComponents?
         for source in gregorianStructuralSources(
             cadence: cadence,
             base: base,
             originalSource: schedule.source
         ) {
-            guard let baseInstant = try? SourceWallClockResolver().resolve(
-                source,
-                calendar: calendar
-            ), let alertInstant = try? earlyAlertInstant(
-                for: baseInstant,
-                early: early,
-                rule: schedule.rule,
-                calendar: calendar
-            ), let components = normalizedComponents(
-                of: alertInstant,
-                cadence: cadence,
-                timeZoneIdentifier: base.timeZoneIdentifier,
-                calendar: calendar
-            ) else {
+            guard
+                let baseInstant = try? SourceWallClockResolver().resolve(
+                    source,
+                    calendar: calendar
+                ),
+                let alertInstant = try? earlyAlertInstant(
+                    for: baseInstant,
+                    early: early,
+                    rule: schedule.rule,
+                    calendar: calendar
+                ),
+                let components = normalizedComponents(
+                    of: alertInstant,
+                    cadence: cadence,
+                    timeZoneIdentifier: base.timeZoneIdentifier,
+                    calendar: calendar
+                )
+            else {
                 return nil
             }
             if let result, result != components { return nil }
@@ -227,7 +252,8 @@ public struct RepeatingTriggerPlanner: Sendable {
         originalSource: SourceWallClock
     ) -> [SourceWallClock] {
         var sources: [SourceWallClock] = []
-        let years: Range<Int> = cadence == .daily || cadence == .weekly
+        let years: Range<Int> =
+            cadence == .daily || cadence == .weekly
             ? 2_000..<2_001
             : 2_000..<2_400
 
@@ -240,23 +266,25 @@ public struct RepeatingTriggerPlanner: Sendable {
                     case .daily:
                         guard month == 1, day == 15 else { continue }
                     case .weekly:
-                        guard gregorianWeekday(year: year, month: month, day: day)
-                            == base.weekday,
-                              month == 1
+                        guard
+                            gregorianWeekday(year: year, month: month, day: day)
+                                == base.weekday,
+                            month == 1
                         else { continue }
                     case .monthly:
                         guard day == base.day else { continue }
                     case .yearly:
                         guard day == base.day else { continue }
                     }
-                    sources.append(SourceWallClock(
-                        year: year,
-                        month: month,
-                        day: day,
-                        hour: originalSource.hour,
-                        minute: originalSource.minute,
-                        timeZoneIdentifier: "Etc/GMT"
-                    ))
+                    sources.append(
+                        SourceWallClock(
+                            year: year,
+                            month: month,
+                            day: day,
+                            hour: originalSource.hour,
+                            minute: originalSource.minute,
+                            timeZoneIdentifier: "Etc/GMT"
+                        ))
                 }
             }
         }
@@ -304,25 +332,29 @@ public struct RepeatingTriggerPlanner: Sendable {
                 transition.addingTimeInterval(-1),
                 evaluationNow.addingTimeInterval(-1)
             )
-            guard let occurrence = nextOccurrence(
-                after: occurrenceSearchStart,
-                matching: base,
-                calendar: calendar
-            ) else {
+            guard
+                let occurrence = nextOccurrence(
+                    after: occurrenceSearchStart,
+                    matching: base,
+                    calendar: calendar
+                )
+            else {
                 return false
             }
             if occurrence <= transition.addingTimeInterval(duration) {
-                guard let alert = try? earlyAlertInstant(
-                    for: occurrence,
-                    early: early,
-                    rule: schedule.rule,
-                    calendar: calendar
-                ), let actual = normalizedComponents(
-                    of: alert,
-                    cadence: cadence,
-                    timeZoneIdentifier: base.timeZoneIdentifier,
-                    calendar: calendar
-                ), actual == expected
+                guard
+                    let alert = try? earlyAlertInstant(
+                        for: occurrence,
+                        early: early,
+                        rule: schedule.rule,
+                        calendar: calendar
+                    ),
+                    let actual = normalizedComponents(
+                        of: alert,
+                        cadence: cadence,
+                        timeZoneIdentifier: base.timeZoneIdentifier,
+                        calendar: calendar
+                    ), actual == expected
                 else {
                     return false
                 }
@@ -368,8 +400,8 @@ public struct RepeatingTriggerPlanner: Sendable {
             from: instant
         )
         guard let hour = values.hour,
-              let minute = values.minute,
-              values.second == 0
+            let minute = values.minute,
+            values.second == 0
         else {
             return nil
         }
@@ -410,8 +442,7 @@ public struct RepeatingTriggerPlanner: Sendable {
         notifications.contains { notification in
             var occurrenceInstants: [Date] = []
             for reason in notification.reasons
-                where !occurrenceInstants.contains(reason.baseOccurrence.instant)
-            {
+            where !occurrenceInstants.contains(reason.baseOccurrence.instant) {
                 occurrenceInstants.append(reason.baseOccurrence.instant)
             }
             return occurrenceInstants.count > 1
@@ -435,7 +466,8 @@ public struct RepeatingTriggerPlanner: Sendable {
         let day = components.day.map { String(format: "%02d", $0) } ?? "--"
         let weekday = components.weekday.map(String.init) ?? "-"
         return "\(components.timeZoneIdentifier)|\(month)|\(day)|\(weekday)|"
-            + String(format: "%02d:%02d:%02d", components.hour, components.minute, components.second)
+            + String(
+                format: "%02d:%02d:%02d", components.hour, components.minute, components.second)
     }
 
     private func trigger(
@@ -468,13 +500,16 @@ public struct RepeatingTriggerPlanner: Sendable {
 
     private func gregorianWeekday(year: Int, month: Int, day: Int) -> Int? {
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
-        guard let date = calendar.date(from: DateComponents(
-            year: year,
-            month: month,
-            day: day,
-            hour: 12
-        )) else {
+        calendar.timeZone = .gmt
+        guard
+            let date = calendar.date(
+                from: DateComponents(
+                    year: year,
+                    month: month,
+                    day: day,
+                    hour: 12
+                ))
+        else {
             return nil
         }
         return calendar.component(.weekday, from: date)
@@ -483,7 +518,8 @@ public struct RepeatingTriggerPlanner: Sendable {
     private func maximumGregorianDay(year: Int, month: Int) -> Int {
         switch month {
         case 2:
-            let leap = year.isMultiple(of: 4)
+            let leap =
+                year.isMultiple(of: 4)
                 && (!year.isMultiple(of: 100) || year.isMultiple(of: 400))
             return leap ? 29 : 28
         case 4, 6, 9, 11:

@@ -1,4 +1,5 @@
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Parsing.RepeatRuleValidator")
@@ -13,18 +14,43 @@ struct ParsingRepeatRuleValidatorTests {
         )
 
         let rule = try validator.validate(candidate, source: .repeatFixture)
-        #expect(rule == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.monday, .wednesday, .friday]))
+        #expect(
+            rule
+                == .weekly(
+                    interval: 1, weekdaySetKind: .explicit,
+                    weekdays: [.monday, .wednesday, .friday]))
     }
 
     @Test func mapsEverySupportedCandidateFamilyToTask2DomainTypes() throws {
         let fixtures: [(RepeatCandidate, RepeatRule)] = [
             (.init(frequency: .hourly, interval: 1), .hourly(interval: 1)),
             (.init(frequency: .daily, interval: 2), .daily(interval: 2)),
-            (.init(frequency: .weekly, interval: 1, weekdaySetKind: .weekday, weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]), .weekly(interval: 1, weekdaySetKind: .weekday, weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday])),
-            (.init(frequency: .monthly, interval: 4, selector: .anchorDay), .monthly(interval: 4, selector: .anchorDay)),
-            (.init(frequency: .yearly, interval: 5, month: nil, selector: .anchorMonthDay), .yearly(interval: 5, month: nil, selector: .anchorMonthDay)),
-            (.init(frequency: .yearly, interval: 1, month: 2, selector: .dayOfMonth(29)), .yearly(interval: 1, month: 2, selector: .dayOfMonth(29))),
-            (.init(frequency: .monthly, interval: 1, selector: .ordinalWeekday(ordinal: -5, weekday: .sunday)), .monthly(interval: 1, selector: .ordinalWeekday(ordinal: -5, weekday: .sunday)))
+            (
+                .init(
+                    frequency: .weekly, interval: 1, weekdaySetKind: .weekday,
+                    weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]),
+                .weekly(
+                    interval: 1, weekdaySetKind: .weekday,
+                    weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday])
+            ),
+            (
+                .init(frequency: .monthly, interval: 4, selector: .anchorDay),
+                .monthly(interval: 4, selector: .anchorDay)
+            ),
+            (
+                .init(frequency: .yearly, interval: 5, month: nil, selector: .anchorMonthDay),
+                .yearly(interval: 5, month: nil, selector: .anchorMonthDay)
+            ),
+            (
+                .init(frequency: .yearly, interval: 1, month: 2, selector: .dayOfMonth(29)),
+                .yearly(interval: 1, month: 2, selector: .dayOfMonth(29))
+            ),
+            (
+                .init(
+                    frequency: .monthly, interval: 1,
+                    selector: .ordinalWeekday(ordinal: -5, weekday: .sunday)),
+                .monthly(interval: 1, selector: .ordinalWeekday(ordinal: -5, weekday: .sunday))
+            )
         ]
 
         for (candidate, expected) in fixtures {
@@ -41,7 +67,9 @@ struct ParsingRepeatRuleValidatorTests {
             weekdays: [.tuesday]
         )
 
-        #expect(try validator.validate(anchor, source: .repeatFixture) == validator.validate(explicit, source: .repeatFixture))
+        #expect(
+            try validator.validate(anchor, source: .repeatFixture)
+                == validator.validate(explicit, source: .repeatFixture))
     }
 
     @Test func rejectsUnsupportedGeneratedCandidateAndInvalidFieldCombinations() {
@@ -59,8 +87,12 @@ struct ParsingRepeatRuleValidatorTests {
             .init(frequency: .monthly, interval: 1, month: 1, selector: .anchorDay),
             .init(frequency: .monthly, interval: 1, selector: .anchorMonthDay),
             .init(frequency: .monthly, interval: 1, selector: .dayOfMonth(0)),
-            .init(frequency: .monthly, interval: 1, selector: .ordinalDaySet(ordinal: 6, daySet: .weekday)),
-            .init(frequency: .monthly, interval: 1, selector: .ordinalWeekday(ordinal: 0, weekday: .monday)),
+            .init(
+                frequency: .monthly, interval: 1,
+                selector: .ordinalDaySet(ordinal: 6, daySet: .weekday)),
+            .init(
+                frequency: .monthly, interval: 1,
+                selector: .ordinalWeekday(ordinal: 0, weekday: .monday)),
             .init(frequency: .yearly, interval: 1, month: nil, selector: .anchorDay),
             .init(frequency: .yearly, interval: 1, month: 13, selector: .dayOfMonth(1)),
             .init(frequency: .yearly, interval: 1, month: 4, selector: .dayOfMonth(31)),
@@ -86,9 +118,12 @@ struct ParsingRepeatRuleValidatorTests {
             .ordinalWeekday(ordinal: 5, weekday: .sunday)
         ]
         for selector in selectors {
-            _ = try validator.validate(.init(frequency: .monthly, interval: 1, selector: selector), source: .repeatFixture)
+            _ = try validator.validate(
+                .init(frequency: .monthly, interval: 1, selector: selector), source: .repeatFixture)
         }
-        _ = try validator.validate(.init(frequency: .yearly, interval: 1, month: 2, selector: .dayOfMonth(29)), source: .repeatFixture)
+        _ = try validator.validate(
+            .init(frequency: .yearly, interval: 1, month: 2, selector: .dayOfMonth(29)),
+            source: .repeatFixture)
     }
 
     private let validator = RepeatRuleValidator()

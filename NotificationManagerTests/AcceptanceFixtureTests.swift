@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Acceptance fixtures")
@@ -41,11 +42,12 @@ struct AcceptanceFixtureTests {
         #expect(result.firstOverlapInstant == acceptanceDate("2026-11-01T05:30:00Z"))
         #expect(result.nonLeapYearOccurrences.isEmpty)
         #expect(result.nextLeapOccurrence == acceptanceDate("2028-02-29T07:30:00Z"))
-        #expect(result.hourlyInstants == [
-            acceptanceDate("2026-03-08T05:30:00Z"),
-            acceptanceDate("2026-03-08T06:30:00Z"),
-            acceptanceDate("2026-03-08T07:30:00Z")
-        ])
+        #expect(
+            result.hourlyInstants == [
+                acceptanceDate("2026-03-08T05:30:00Z"),
+                acceptanceDate("2026-03-08T06:30:00Z"),
+                acceptanceDate("2026-03-08T07:30:00Z")
+            ])
         #expect(result.hourlySourceHours == [0, 1, 3])
     }
 
@@ -177,22 +179,25 @@ private struct AcceptanceHarness {
             updatedAt: date("2026-05-01T00:00:00Z")
         )
         let evaluationNow = date("2026-06-01T14:00:00Z")
-        let plan = try LogicalNotificationPlanner().plan(PlannerInput(
-            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
-            evaluationNow: evaluationNow,
-            deviceNotificationsEnabled: true,
-            authorizationAllowsScheduling: true,
-            capacity: 60,
-            recurrenceEnvironment: environment
-        ))
-        let repeatingComponents = plan.requests.compactMap { request -> RepeatingTriggerComponents? in
-            guard case let .repeating(components, _) = request.payload else { return nil }
+        let plan = try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+                evaluationNow: evaluationNow,
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 60,
+                recurrenceEnvironment: environment
+            ))
+        let repeatingComponents: [RepeatingTriggerComponents] = plan.requests.compactMap {
+            guard case .repeating(let components, _) = $0.payload else { return nil }
             return components
         }
-        guard let mondayRequest = plan.requests.first(where: { request in
-            guard case let .repeating(components, _) = request.payload else { return false }
-            return components.weekday == 2
-        }) else {
+        guard
+            let mondayRequest = plan.requests.first(where: { request in
+                guard case .repeating(let components, _) = request.payload else { return false }
+                return components.weekday == 2
+            })
+        else {
             throw AcceptanceFixtureError.missingMondayRequest
         }
         let materialized = try NotificationRequestMaterializer(
@@ -267,11 +272,13 @@ private struct AcceptanceHarness {
             early: nil
         )
         let engine = FoundationRecurrenceEngine()
-        let nonLeap = try Array(engine.baseOccurrences(
-            for: leapSchedule,
-            in: date("2025-01-01T00:00:00Z")..<date("2026-01-01T00:00:00Z"),
-            environment: environment
-        )).map(\.instant)
+        let nonLeap = try Array(
+            engine.baseOccurrences(
+                for: leapSchedule,
+                in: date("2025-01-01T00:00:00Z")..<date("2026-01-01T00:00:00Z"),
+                environment: environment
+            )
+        ).map(\.instant)
         let nextLeap = try engine.baseOccurrences(
             for: leapSchedule,
             in: date("2028-02-28T00:00:00Z")..<date("2028-03-02T00:00:00Z"),
@@ -291,11 +298,12 @@ private struct AcceptanceHarness {
             end: .never,
             early: nil
         )
-        let hourly = try Array(engine.baseOccurrences(
-            for: hourlySchedule,
-            in: date("2026-03-08T05:30:00Z")..<date("2026-03-08T08:30:00Z"),
-            environment: environment
-        ))
+        let hourly = try Array(
+            engine.baseOccurrences(
+                for: hourlySchedule,
+                in: date("2026-03-08T05:30:00Z")..<date("2026-03-08T08:30:00Z"),
+                environment: environment
+            ))
         return FoundationPolicyAcceptanceResult(
             gapInstant: gap,
             firstOverlapInstant: overlap,
@@ -465,42 +473,46 @@ private struct AcceptanceHarness {
             createdAt: date("2039-12-01T00:00:00Z"),
             updatedAt: date("2039-12-01T00:00:00Z")
         )
-        let plan = try LogicalNotificationPlanner().plan(PlannerInput(
-            snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
-            evaluationNow: date("2039-12-01T00:00:00Z"),
-            deviceNotificationsEnabled: true,
-            authorizationAllowsScheduling: true,
-            capacity: 1,
-            recurrenceEnvironment: environment
-        ))
+        let plan = try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
+                evaluationNow: date("2039-12-01T00:00:00Z"),
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 1,
+                recurrenceEnvironment: environment
+            ))
         let earliestOutcome = plan.outcomes.values.first
-        let capacityStatus = DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: .active,
-            deviceNotificationsEnabled: true,
-            authorization: .allowed,
-            earliestGroupOutcome: earliestOutcome,
-            laterGroupOutcomes: [],
-            reconcileInProgressOrQueued: false,
-            earliestRequestPresentOrLatestAddSucceeded: false
-        ))
-        let laterCapacityStatus = DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: .active,
-            deviceNotificationsEnabled: true,
-            authorization: .allowed,
-            earliestGroupOutcome: .scheduled,
-            laterGroupOutcomes: [.unscheduledCapacity],
-            reconcileInProgressOrQueued: false,
-            earliestRequestPresentOrLatestAddSucceeded: true
-        ))
-        let expiredDeviceStatus = DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: status.primary,
-            deviceNotificationsEnabled: true,
-            authorization: .allowed,
-            earliestGroupOutcome: nil,
-            laterGroupOutcomes: [],
-            reconcileInProgressOrQueued: false,
-            earliestRequestPresentOrLatestAddSucceeded: false
-        ))
+        let capacityStatus = DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: .active,
+                deviceNotificationsEnabled: true,
+                authorization: .allowed,
+                earliestGroupOutcome: earliestOutcome,
+                laterGroupOutcomes: [],
+                reconcileInProgressOrQueued: false,
+                earliestRequestPresentOrAddSucceeded: false
+            ))
+        let laterCapacityStatus = DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: .active,
+                deviceNotificationsEnabled: true,
+                authorization: .allowed,
+                earliestGroupOutcome: .scheduled,
+                laterGroupOutcomes: [.unscheduledCapacity],
+                reconcileInProgressOrQueued: false,
+                earliestRequestPresentOrAddSucceeded: true
+            ))
+        let expiredDeviceStatus = DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: status.primary,
+                deviceNotificationsEnabled: true,
+                authorization: .allowed,
+                earliestGroupOutcome: nil,
+                laterGroupOutcomes: [],
+                reconcileInProgressOrQueued: false,
+                earliestRequestPresentOrAddSucceeded: false
+            ))
         return StatusPolicyAcceptanceResult(
             pastOneShotStatus: status.primary,
             earliestGroupOutcome: earliestOutcome,
@@ -532,7 +544,8 @@ private struct AcceptanceHarness {
             createdAt: date("2040-06-01T00:00:00Z"),
             updatedAt: date("2040-06-01T00:00:00Z")
         )
-        guard let outcome = try? await SaveReminderUseCase(
+        guard
+            let outcome = try? await SaveReminderUseCase(
                 repository: AcceptanceReminderRepository(),
                 scheduleCodec: AcceptanceScheduleCodec(),
                 preferenceStore: AcceptancePreferenceStore(),
@@ -567,16 +580,17 @@ private struct AcceptanceHarness {
         early: EarlyReminder,
         after: Date
     ) throws -> TimeInterval {
-        let value = try required(notifications(
-            schedule: ScheduleDefinition(
-                source: source,
-                rule: .hourly(interval: 1),
-                end: .never,
-                early: early
-            ),
-            after: after,
-            limit: 1
-        ).first)
+        let value = try required(
+            notifications(
+                schedule: ScheduleDefinition(
+                    source: source,
+                    rule: .hourly(interval: 1),
+                    end: .never,
+                    early: early
+                ),
+                after: after,
+                limit: 1
+            ).first)
         return value.primaryReason.baseOccurrence.instant.timeIntervalSince(value.alertInstant)
     }
 
@@ -584,9 +598,10 @@ private struct AcceptanceHarness {
         schedule: ScheduleDefinition,
         range: Range<Date>
     ) throws -> BaseOccurrence {
-        guard let value = try FoundationRecurrenceEngine()
-            .baseOccurrences(for: schedule, in: range, environment: environment)
-            .first(where: { _ in true })
+        guard
+            let value = try FoundationRecurrenceEngine()
+                .baseOccurrences(for: schedule, in: range, environment: environment)
+                .first(where: { _ in true })
         else {
             throw AcceptanceFixtureError.missingOccurrence
         }
@@ -652,7 +667,7 @@ private actor AcceptanceReminderRepository: ReminderRepository {
     func save(_ mutation: EncodedReminderMutation) throws -> ReminderSnapshot {
         let schedule: ScheduleReadState
         switch mutation.command {
-        case let .create(scheduleData), let .replaceSchedule(scheduleData):
+        case .create(let scheduleData), .replaceSchedule(let scheduleData):
             schedule = .corrupt(originalData: scheduleData)
         case .updateMetadataPreservingCurrentSchedule:
             schedule = reminders[mutation.id]?.schedule ?? .corrupt(originalData: Data())

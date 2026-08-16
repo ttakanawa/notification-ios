@@ -55,12 +55,80 @@ public struct NextNotificationProvider: Sendable {
             )
         }
 
-        guard let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier) else {
+        guard let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier)
+        else {
             throw SourceWallClockResolutionError.unknownTimeZone
         }
         let calendar = environment.gregorianCalendar(in: timeZone)
         let observations = FoundationCandidateObservationCounter()
         let engine = FoundationRecurrenceEngine(observe: observations.record)
+        var streams = try alertStreams(
+            schedule: schedule,
+            evaluationNow: evaluationNow,
+            calendar: calendar,
+            engine: engine,
+            environment: environment
+        )
+
+        var heads: [EffectiveAlert?] = []
+        for index in streams.indices {
+            heads.append(try streams[index].next())
+        }
+        var notifications: [PhysicalNotification] = []
+        var didSkipPastEarly = false
+
+        while notifications.count < requestedCount {
+            guard let pendingInstant = heads.compactMap({ $0?.alertInstant }).min() else { break }
+            var reasons: [EffectiveAlert] = []
+            for index in streams.indices {
+                while let head = heads[index], head.alertInstant == pendingInstant {
+                    reasons.append(head)
+                    heads[index] = try streams[index].next()
+                }
+            }
+            guard pendingInstant > evaluationNow else {
+                if reasons.contains(where: { $0.kind == .early }) {
+                    didSkipPastEarly = true
+                }
+                continue
+            }
+
+            if let early = schedule.early {
+                for reason in reasons where reason.kind == .main {
+                    if try earlyAlertInstant(
+                        for: reason.baseOccurrence.instant,
+                        early: early,
+                        rule: schedule.rule,
+                        calendar: calendar
+                    ) <= evaluationNow {
+                        didSkipPastEarly = true
+                    }
+                }
+            }
+
+            notifications.append(
+                PhysicalNotification(
+                    reminderID: reminderID,
+                    alertInstant: pendingInstant,
+                    reasons: reasons
+                ))
+        }
+
+        return NextNotificationResult(
+            notifications: notifications,
+            exhausted: heads.allSatisfy { $0 == nil },
+            didSkipPastEarly: didSkipPastEarly,
+            observedFoundationResultCount: observations.count
+        )
+    }
+
+    private func alertStreams(
+        schedule: ScheduleDefinition,
+        evaluationNow: Date,
+        calendar: Calendar,
+        engine: FoundationRecurrenceEngine,
+        environment: any RecurrenceEnvironment
+    ) throws -> [AlertPathStream] {
         var streams: [AlertPathStream] = []
         if schedule.early?.mainEnabled != false {
             let mainSchedule = ScheduleDefinition(
@@ -100,56 +168,7 @@ public struct NextNotificationProvider: Sendable {
                 streams.append(stream)
             }
         }
-
-        var heads: [EffectiveAlert?] = []
-        for index in streams.indices {
-            heads.append(try streams[index].next())
-        }
-        var notifications: [PhysicalNotification] = []
-        var didSkipPastEarly = false
-
-        while notifications.count < requestedCount {
-            guard let pendingInstant = heads.compactMap({ $0?.alertInstant }).min() else { break }
-            var reasons: [EffectiveAlert] = []
-            for index in streams.indices {
-                while let head = heads[index], head.alertInstant == pendingInstant {
-                    reasons.append(head)
-                    heads[index] = try streams[index].next()
-                }
-            }
-            guard pendingInstant > evaluationNow else {
-                if reasons.contains(where: { $0.kind == .early }) {
-                    didSkipPastEarly = true
-                }
-                continue
-            }
-
-            if let early = schedule.early {
-                for reason in reasons where reason.kind == .main {
-                    if try earlyAlertInstant(
-                        for: reason.baseOccurrence.instant,
-                        early: early,
-                        rule: schedule.rule,
-                        calendar: calendar
-                    ) <= evaluationNow {
-                        didSkipPastEarly = true
-                    }
-                }
-            }
-
-            notifications.append(PhysicalNotification(
-                reminderID: reminderID,
-                alertInstant: pendingInstant,
-                reasons: reasons
-            ))
-        }
-
-        return NextNotificationResult(
-            notifications: notifications,
-            exhausted: heads.allSatisfy { $0 == nil },
-            didSkipPastEarly: didSkipPastEarly,
-            observedFoundationResultCount: observations.count
-        )
+        return streams
     }
 
     private func alertStream(
@@ -159,11 +178,13 @@ public struct NextNotificationProvider: Sendable {
         engine: FoundationRecurrenceEngine,
         environment: any RecurrenceEnvironment
     ) throws -> AlertPathStream? {
-        guard let range = try recurrenceRange(
-            schedule: schedule,
-            evaluationNow: evaluationNow,
-            calendar: calendar
-        ) else {
+        guard
+            let range = try recurrenceRange(
+                schedule: schedule,
+                evaluationNow: evaluationNow,
+                calendar: calendar
+            )
+        else {
             return nil
         }
         let sequence = try engine.baseOccurrences(
@@ -171,11 +192,12 @@ public struct NextNotificationProvider: Sendable {
             in: range,
             environment: environment
         )
-        return AlertPathStream(groups: AlertGroupCursor(
-            baseOccurrences: sequence.makeIterator(),
-            schedule: schedule,
-            calendar: calendar
-        ))
+        return AlertPathStream(
+            groups: AlertGroupCursor(
+                baseOccurrences: sequence.makeIterator(),
+                schedule: schedule,
+                calendar: calendar
+            ))
     }
 
     private func recurrenceRange(
@@ -183,11 +205,14 @@ public struct NextNotificationProvider: Sendable {
         evaluationNow: Date,
         calendar: Calendar
     ) throws -> Range<Date>? {
-        guard let supportedLowerBound = calendar.date(
-            from: DateComponents(year: 1, month: 1, day: 1, hour: 0, minute: 0, second: 0)
-        ), let supportedUpperBound = calendar.date(
-            from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
-        ) else {
+        guard
+            let supportedLowerBound = calendar.date(
+                from: DateComponents(year: 1, month: 1, day: 1, hour: 0, minute: 0, second: 0)
+            ),
+            let supportedUpperBound = calendar.date(
+                from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
+            )
+        else {
             throw NextNotificationProviderError.arithmeticOverflow
         }
 
@@ -197,12 +222,13 @@ public struct NextNotificationProvider: Sendable {
             candidates.append(evaluationNow)
         }
         if let early = schedule.early {
-            candidates.append(try baseCandidate(
-                after: evaluationNow,
-                early: early,
-                rule: schedule.rule,
-                calendar: calendar
-            ))
+            candidates.append(
+                try baseCandidate(
+                    after: evaluationNow,
+                    early: early,
+                    rule: schedule.rule,
+                    calendar: calendar
+                ))
         }
         guard let candidate = candidates.min() else {
             return nil
@@ -212,33 +238,33 @@ public struct NextNotificationProvider: Sendable {
         switch schedule.rule {
         case .none:
             proposedLowerBound = min(anchor, candidate)
-        case let .hourly(interval):
+        case .hourly(let interval):
             proposedLowerBound = try addingFixedSeconds(
                 -Int64(interval) * 3_600,
                 to: candidate
             )
-        case let .daily(interval):
+        case .daily(let interval):
             proposedLowerBound = try addingCalendar(
                 .day,
                 value: -interval,
                 to: candidate,
                 calendar: calendar
             )
-        case let .weekly(interval, _, _):
+        case .weekly(let interval, _, _):
             proposedLowerBound = try addingCalendar(
                 .weekOfYear,
                 value: -interval,
                 to: candidate,
                 calendar: calendar
             )
-        case let .monthly(interval, _):
+        case .monthly(let interval, _):
             proposedLowerBound = try addingCalendar(
                 .month,
                 value: -interval,
                 to: candidate,
                 calendar: calendar
             )
-        case let .yearly(interval, _, _):
+        case .yearly(let interval, _, _):
             proposedLowerBound = try addingCalendar(
                 .year,
                 value: -interval,
@@ -264,7 +290,8 @@ public struct NextNotificationProvider: Sendable {
         case (.weeks, .hourly):
             return try addingFixedSeconds(Int64(early.value) * 604_800, to: evaluationNow)
         case (.days, _):
-            return try addingCalendar(.day, value: early.value, to: evaluationNow, calendar: calendar)
+            return try addingCalendar(
+                .day, value: early.value, to: evaluationNow, calendar: calendar)
         case (.weeks, _):
             return try addingCalendar(
                 .weekOfYear,

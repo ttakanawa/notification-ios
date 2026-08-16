@@ -23,13 +23,14 @@ public struct SourceWallClockResolver: Sendable {
     }
 
     func resolve(_ source: SourceWallClock, calendar: Calendar) throws -> Date {
-        guard Self.isValidGregorianDate(
-            year: source.year,
-            month: source.month,
-            day: source.day
-        ),
-        (0...23).contains(source.hour),
-        (0...59).contains(source.minute)
+        guard
+            Self.isValidGregorianDate(
+                year: source.year,
+                month: source.month,
+                day: source.day
+            ),
+            (0...23).contains(source.hour),
+            (0...59).contains(source.minute)
         else {
             throw SourceWallClockResolutionError.invalidComponents
         }
@@ -51,21 +52,23 @@ public struct SourceWallClockResolver: Sendable {
             throw SourceWallClockResolutionError.invalidComponents
         }
         let probe = nominal.addingTimeInterval(-Self.fixedProbeMargin)
-        guard let result = calendar.nextDate(
-            after: probe,
-            matching: components,
-            matchingPolicy: .nextTimePreservingSmallerComponents,
-            repeatedTimePolicy: .first,
-            direction: .forward
-        ) else {
+        guard
+            let result = calendar.nextDate(
+                after: probe,
+                matching: components,
+                matchingPolicy: .nextTimePreservingSmallerComponents,
+                repeatedTimePolicy: .first,
+                direction: .forward
+            )
+        else {
             throw SourceWallClockResolutionError.unsupportedResult
         }
 
         let interval = result.timeIntervalSinceReferenceDate
         let resultYear = calendar.component(.year, from: result)
         guard interval.isFinite,
-              interval.rounded(FloatingPointRoundingRule.towardZero) == interval,
-              (1...9_999).contains(resultYear)
+            interval.rounded(FloatingPointRoundingRule.towardZero) == interval,
+            (1...9_999).contains(resultYear)
         else {
             throw SourceWallClockResolutionError.unsupportedResult
         }
@@ -76,14 +79,15 @@ public struct SourceWallClockResolver: Sendable {
         guard (1...9_999).contains(year), (1...12).contains(month), day >= 1 else {
             return false
         }
-        let maximumDay = switch month {
-        case 2:
-            isLeapYear(year) ? 29 : 28
-        case 4, 6, 9, 11:
-            30
-        default:
-            31
-        }
+        let maximumDay =
+            switch month {
+            case 2:
+                isLeapYear(year) ? 29 : 28
+            case 4, 6, 9, 11:
+                30
+            default:
+                31
+            }
         return day <= maximumDay
     }
 

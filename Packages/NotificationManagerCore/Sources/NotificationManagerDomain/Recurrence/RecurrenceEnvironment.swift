@@ -19,8 +19,8 @@ public struct FoundationRecurrenceEnvironment: RecurrenceEnvironment, Sendable {
     }
 }
 
-public extension RecurrenceEnvironment where Self == FoundationRecurrenceEnvironment {
-    static var foundation: FoundationRecurrenceEnvironment {
+extension RecurrenceEnvironment where Self == FoundationRecurrenceEnvironment {
+    public static var foundation: FoundationRecurrenceEnvironment {
         FoundationRecurrenceEnvironment()
     }
 }

@@ -43,11 +43,13 @@ public struct PresetRepeatRuleFactory: Sendable {
                 weekdays: [.saturday, .sunday]
             )
         case .weekly, .biweekly:
-            guard let weekday = GregorianDate.weekday(
-                year: source.year,
-                month: source.month,
-                day: source.day
-            ) else {
+            guard
+                let weekday = GregorianDate.weekday(
+                    year: source.year,
+                    month: source.month,
+                    day: source.day
+                )
+            else {
                 throw PresetRepeatRuleFactoryError.invalidSourceDate
             }
             return .weekly(

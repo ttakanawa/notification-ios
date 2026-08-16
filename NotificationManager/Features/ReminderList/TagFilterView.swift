@@ -29,7 +29,8 @@ struct TagFilterView: View {
                             Image(systemName: selectedTagID == tag.id ? "checkmark" : "tag")
                         }
                     }
-                    .accessibilityIdentifier("reminder.tag-filter.\(tag.id.uuidString.lowercased())")
+                    .accessibilityIdentifier(
+                        "reminder.tag-filter.\(tag.id.uuidString.lowercased())")
                 }
             } label: {
                 Label {
@@ -37,7 +38,7 @@ struct TagFilterView: View {
                 } icon: {
                     Image(systemName: "line.3.horizontal.decrease.circle")
                 }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
             .accessibilityIdentifier("reminder.tag-filter.menu")
         }
@@ -45,7 +46,7 @@ struct TagFilterView: View {
 
     private var selectedTagName: String {
         guard let selectedTagID,
-              let tag = tags.first(where: { $0.id == selectedTagID })
+            let tag = tags.first(where: { $0.id == selectedTagID })
         else {
             return String(
                 localized: "reminder.tag-filter.all",

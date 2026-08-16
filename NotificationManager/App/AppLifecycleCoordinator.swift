@@ -1,8 +1,9 @@
 import CoreData
 import Foundation
 import NotificationManagerApplication
+
 #if canImport(UIKit)
-import UIKit
+    import UIKit
 #endif
 
 enum AppLifecycleTrigger: Sendable, Equatable {
@@ -26,17 +27,17 @@ struct AppLifecycleNotificationNames: Sendable {
     let modelImported: Notification.Name
 
     static let system = AppLifecycleNotificationNames(
-        significantTimeChanged: platformSignificantTimeChangeNotification,
+        significantTimeChanged: significantTimeChangeNotification,
         timeZoneChanged: .NSSystemTimeZoneDidChange,
         localeChanged: NSLocale.currentLocaleDidChangeNotification,
         modelImported: .NSPersistentStoreRemoteChange
     )
 
-    private static var platformSignificantTimeChangeNotification: Notification.Name {
+    private static var significantTimeChangeNotification: Notification.Name {
         #if canImport(UIKit)
-        UIApplication.significantTimeChangeNotification
+            UIApplication.significantTimeChangeNotification
         #else
-        Notification.Name("notification-manager.significant-time-change")
+            Notification.Name("notification-manager.significant-time-change")
         #endif
     }
 }
@@ -110,13 +111,13 @@ final class AppLifecycleCoordinator {
             await requestReconcile(.modelChanged)
         case .notificationPresentationCompleted, .notificationResponseCompleted:
             guard sceneIsForeground,
-                  let permit = foregroundPermitAuthority.currentPermit()
+                let permit = foregroundPermitAuthority.currentPermit()
             else {
                 return
             }
             await requestForegroundReconcile(permit)
         case .modelSnapshotChanged, .significantTimeChanged, .timeZoneChanged,
-             .localeChanged:
+            .localeChanged:
             eligibilityIndexStore.markStale()
             await refreshModelSnapshot()
             await requestReconcile(.modelChanged)
@@ -152,16 +153,17 @@ final class AppLifecycleCoordinator {
         trigger: AppLifecycleTrigger
     ) {
         let eligibilityIndexStore = self.eligibilityIndexStore
-        observerTokens.append(notificationCenter.addObserver(
-            forName: name,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            eligibilityIndexStore.markStale()
-            Task { @MainActor [weak self] in
-                await self?.handle(trigger)
-            }
-        })
+        observerTokens.append(
+            notificationCenter.addObserver(
+                forName: name,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                eligibilityIndexStore.markStale()
+                Task { @MainActor [weak self] in
+                    await self?.handle(trigger)
+                }
+            })
     }
 
     private func beginSceneTransition() -> UInt64 {

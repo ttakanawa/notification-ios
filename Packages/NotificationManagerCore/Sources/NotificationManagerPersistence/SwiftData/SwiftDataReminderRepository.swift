@@ -90,7 +90,8 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         do {
             var previousCandidate: CompleteReminderSnapshot?
             for attempt in 1...snapshotAttemptLimit {
-                guard let candidate = try collectStableCompleteSnapshotCandidate(attempt: attempt) else {
+                guard let candidate = try collectStableCompleteSnapshotCandidate(attempt: attempt)
+                else {
                     previousCandidate = nil
                     continue
                 }
@@ -170,7 +171,7 @@ public actor SwiftDataReminderRepository: ReminderRepository {
             let record: ReminderRecordV1
             let finalScheduleData: Data
             switch mutation.command {
-            case let .create(scheduleData):
+            case .create(let scheduleData):
                 guard existing == nil else {
                     throw PersistenceError.duplicateReminderID(mutation.id)
                 }
@@ -191,7 +192,7 @@ public actor SwiftDataReminderRepository: ReminderRepository {
                 }
                 record = existing
                 finalScheduleData = existing.scheduleData
-            case let .replaceSchedule(scheduleData):
+            case .replaceSchedule(let scheduleData):
                 guard let existing else {
                     throw PersistenceError.reminderNotFound(mutation.id)
                 }
@@ -337,13 +338,13 @@ public actor SwiftDataReminderRepository: ReminderRepository {
 
     private static func tagRepositoryError(_ error: PersistenceError) -> TagRepositoryError {
         switch error {
-        case let .tagNotFound(id):
+        case .tagNotFound(let id):
             .notFound(id)
-        case let .duplicateTagID(id):
+        case .duplicateTagID(let id):
             .duplicateID(id)
-        case let .duplicateNormalizedTagName(name):
+        case .duplicateNormalizedTagName(let name):
             .duplicateNormalizedName(name)
-        case let .invalidTag(issue):
+        case .invalidTag(let issue):
             .invalid(issue)
         default:
             .unavailable
@@ -538,7 +539,9 @@ private enum StoreIdentity: Hashable, Sendable {
 private final class StoreCoordinator: @unchecked Sendable {
     private let lock = NSLock()
 
-    func withCriticalSection<Result: Sendable>(_ operation: () throws -> Result) rethrows -> Result {
+    func withCriticalSection<Result: Sendable>(
+        _ operation: () throws -> Result
+    ) rethrows -> Result {
         // This operation is deliberately synchronous. Allowing suspension while locked would
         // reopen check-then-save races through actor reentrancy.
         lock.lock()

@@ -3,10 +3,13 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import SwiftData
 import Testing
+
 @testable import NotificationManagerPersistence
 
 @Suite(.serialized) struct SwiftDataReminderRepositoryTests {
-    @Test func versionedSchemaHasCloudKitCompatibleOptionalInverseRelationshipsAndExactEncryption() throws {
+    @Test func versionedSchemaHasCloudKitCompatibleOptionalInverseRelationshipsAndExactEncryption()
+        throws
+    {
         let schema = Schema(versionedSchema: NotificationManagerSchemaV1.self)
         let reminder = try #require(schema.entities.first { $0.name == "ReminderRecordV1" })
         let tag = try #require(schema.entities.first { $0.name == "TagRecordV1" })
@@ -38,7 +41,9 @@ import Testing
     @Test func migrationPlanStartsAtV1WithNoStages() {
         #expect(NotificationManagerSchemaV1.versionIdentifier == Schema.Version(1, 0, 0))
         #expect(NotificationManagerMigrationPlan.schemas.count == 1)
-        #expect(NotificationManagerMigrationPlan.schemas.first?.versionIdentifier == Schema.Version(1, 0, 0))
+        #expect(
+            NotificationManagerMigrationPlan.schemas.first?.versionIdentifier
+                == Schema.Version(1, 0, 0))
         #expect(NotificationManagerMigrationPlan.stages.isEmpty)
     }
 
@@ -104,7 +109,8 @@ import Testing
     @Test func completeSnapshotRetriesAnExternalRelationshipUpdate() async throws {
         let container = try ModelContainerFactory.inMemory()
         try insertRelatedReminderAndTag(in: container)
-        try insertTag(id: TestValues.otherTagID, name: "Work", normalizedName: "work", in: container)
+        try insertTag(
+            id: TestValues.otherTagID, name: "Work", normalizedName: "work", in: container)
         try prunePersistentHistory(in: container)
         let injections = LockedCounter()
         let repository = SwiftDataReminderRepository(
@@ -140,7 +146,7 @@ import Testing
         #expect(snapshot.reminders.first?.updatedAt == TestValues.later)
     }
 
-    @Test func completeSnapshotRetriesAnExternalTagDeleteAndRelationshipNullification() async throws {
+    @Test func completeSnapshotRetriesExternalTagDeleteAndRelationshipNullification() async throws {
         let container = try ModelContainerFactory.inMemory()
         try insertRelatedReminderAndTag(in: container)
         try prunePersistentHistory(in: container)
@@ -183,7 +189,8 @@ import Testing
                 _ = injections.increment()
                 let context = ModelContext(container)
                 context.autosaveEnabled = false
-                let reminder = try #require(context.fetch(FetchDescriptor<ReminderRecordV1>()).first)
+                let reminder = try #require(
+                    context.fetch(FetchDescriptor<ReminderRecordV1>()).first)
                 field.mutate(reminder, attempt: attempt)
                 try context.save()
                 try prunePersistentHistory(in: container)
@@ -246,10 +253,11 @@ import Testing
         try updateScheduleData(current, in: container)
 
         let saved = try await repository.save(staleMetadataMutation)
+        let persisted = try #require(try await repository.reminder(id: TestValues.reminderID))
 
         #expect(saved.title == "Metadata edit")
         #expect(rawScheduleData(saved.schedule) == current)
-        #expect(rawScheduleData(try await repository.reminder(id: TestValues.reminderID)!.schedule) == current)
+        #expect(rawScheduleData(persisted.schedule) == current)
     }
 
     @Test func metadataOnlyMappingsPreserveUnsupportedAndCorruptRawBytesExactly() async throws {
@@ -259,22 +267,25 @@ import Testing
             #"{"format":"notification-manager.schedule","future":true,"version":4294967295}"#.utf8
         )
         try insertReminder(scheduleData: unsupported, in: container)
-        let unsupportedEdit = try await repository.save(.fixture(
-            title: "Metadata edit",
-            command: .updateMetadataPreservingCurrentSchedule,
-            updatedAt: TestValues.later
-        ))
+        let unsupportedEdit = try await repository.save(
+            .fixture(
+                title: "Metadata edit",
+                command: .updateMetadataPreservingCurrentSchedule,
+                updatedAt: TestValues.later
+            ))
         #expect(rawScheduleData(unsupportedEdit.schedule) == unsupported)
 
         let corrupt = Data([0xFF, 0x00, 0x7B])
         try updateScheduleData(corrupt, in: container)
-        let corruptEdit = try await repository.save(.fixture(
-            title: "Second metadata edit",
-            command: .updateMetadataPreservingCurrentSchedule,
-            updatedAt: TestValues.latest
-        ))
+        let corruptEdit = try await repository.save(
+            .fixture(
+                title: "Second metadata edit",
+                command: .updateMetadataPreservingCurrentSchedule,
+                updatedAt: TestValues.latest
+            ))
+        let persisted = try #require(try await repository.reminder(id: TestValues.reminderID))
         #expect(rawScheduleData(corruptEdit.schedule) == corrupt)
-        #expect(rawScheduleData(try await repository.reminder(id: TestValues.reminderID)!.schedule) == corrupt)
+        #expect(rawScheduleData(persisted.schedule) == corrupt)
     }
 
     @Test func metadataUpdateValidatesTheFinalAggregateUsingCurrentScheduleBytes() async throws {
@@ -286,10 +297,11 @@ import Testing
         )
 
         await #expect(throws: PersistenceError.invalidReminder(.scheduleTooLarge)) {
-            try await repository.save(.fixture(
-                command: .updateMetadataPreservingCurrentSchedule,
-                updatedAt: TestValues.later
-            ))
+            try await repository.save(
+                .fixture(
+                    command: .updateMetadataPreservingCurrentSchedule,
+                    updatedAt: TestValues.later
+                ))
         }
 
         #expect(try await repository.reminder(id: TestValues.reminderID)?.title == "Reminder")
@@ -297,9 +309,10 @@ import Testing
 
     @Test func replacingAValidScheduleReturnsSemanticallyEquivalentDecodedSnapshot() async throws {
         let repository = try SwiftDataReminderRepository.inMemory()
-        _ = try await repository.save(.fixture(
-            command: .create(scheduleData: TestValues.validScheduleData)
-        ))
+        _ = try await repository.save(
+            .fixture(
+                command: .create(scheduleData: TestValues.validScheduleData)
+            ))
         let definition = TestValues.schedule
         let encoded = try SchedulePayloadCodec().encodeCurrent(definition)
 
@@ -310,7 +323,7 @@ import Testing
             )
         )
 
-        guard case let .valid(decoded, version, originalData) = updated.schedule else {
+        guard case .valid(let decoded, let version, let originalData) = updated.schedule else {
             Issue.record("Expected a valid replacement schedule")
             return
         }
@@ -329,11 +342,12 @@ import Testing
         let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule)
 
         await #expect(throws: blocked.expectedError) {
-            try await repository.save(.fixture(
-                title: "Must not publish",
-                command: .replaceSchedule(scheduleData: replacement),
-                updatedAt: TestValues.later
-            ))
+            try await repository.save(
+                .fixture(
+                    title: "Must not publish",
+                    command: .replaceSchedule(scheduleData: replacement),
+                    updatedAt: TestValues.later
+                ))
         }
 
         let persisted = try #require(await repository.reminder(id: TestValues.reminderID))
@@ -347,10 +361,11 @@ import Testing
         let repository = SwiftDataReminderRepository(container: container)
         let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule)
 
-        let saved = try await repository.save(.fixture(
-            command: .replaceSchedule(scheduleData: replacement),
-            updatedAt: TestValues.later
-        ))
+        let saved = try await repository.save(
+            .fixture(
+                command: .replaceSchedule(scheduleData: replacement),
+                updatedAt: TestValues.later
+            ))
 
         guard case .valid = saved.schedule else {
             Issue.record("Expected the domain-invalid schedule to be repaired")
@@ -361,9 +376,10 @@ import Testing
 
     @Test func reminderUpdateAfterDeleteDoesNotResurrectTheDeletedRow() async throws {
         let repository = try SwiftDataReminderRepository.inMemory()
-        _ = try await repository.save(.fixture(
-            command: .create(scheduleData: TestValues.validScheduleData)
-        ))
+        _ = try await repository.save(
+            .fixture(
+                command: .create(scheduleData: TestValues.validScheduleData)
+            ))
         let staleUpdate = EncodedReminderMutation.fixture(
             title: "Stale",
             command: .updateMetadataPreservingCurrentSchedule,
@@ -380,16 +396,18 @@ import Testing
 
     @Test func reminderCreateRejectsAnOccupiedIDWithoutOverwritingIt() async throws {
         let repository = try SwiftDataReminderRepository.inMemory()
-        let original = try await repository.save(.fixture(
-            command: .create(scheduleData: TestValues.validScheduleData)
-        ))
+        let original = try await repository.save(
+            .fixture(
+                command: .create(scheduleData: TestValues.validScheduleData)
+            ))
 
         await #expect(throws: PersistenceError.duplicateReminderID(TestValues.reminderID)) {
-            try await repository.save(.fixture(
-                title: "Collision",
-                command: .create(scheduleData: TestValues.validScheduleData),
-                updatedAt: TestValues.later
-            ))
+            try await repository.save(
+                .fixture(
+                    title: "Collision",
+                    command: .create(scheduleData: TestValues.validScheduleData),
+                    updatedAt: TestValues.later
+                ))
         }
 
         #expect(try await repository.reminder(id: TestValues.reminderID) == original)
@@ -496,7 +514,7 @@ import Testing
         #expect(snapshot.tags.first?.id == TestValues.tagID)
     }
 
-    @Test func concurrentRepositoriesForOneContainerAllowExactlyOneNormalizedTagName() async throws {
+    @Test func concurrentRepositoriesAllowOneNormalizedTagNamePerContainer() async throws {
         let container = try ModelContainerFactory.inMemory()
         let firstRepository = SwiftDataReminderRepository(container: container)
         let secondRepository = SwiftDataReminderRepository(container: container)
@@ -633,9 +651,9 @@ import Testing
         }
         defaultsA.removePersistentDomain(forName: suiteA)
         defaultsB.removePersistentDomain(forName: suiteB)
-        let first = UserDefaultsDeviceNotificationPreferenceStore(suiteName: suiteA)
-        let sameSuite = UserDefaultsDeviceNotificationPreferenceStore(suiteName: suiteA)
-        let otherSuite = UserDefaultsDeviceNotificationPreferenceStore(suiteName: suiteB)
+        let first = UserDefaultsNotificationPreferenceStore(suiteName: suiteA)
+        let sameSuite = UserDefaultsNotificationPreferenceStore(suiteName: suiteA)
+        let otherSuite = UserDefaultsNotificationPreferenceStore(suiteName: suiteB)
 
         #expect(await first.isEnabled() == false)
         await first.setEnabled(true)
@@ -670,9 +688,15 @@ private enum TestValues {
         end: .never,
         early: EarlyReminder(value: 5, unit: .minutes)
     )
-    static let validScheduleData = try! SchedulePayloadCodec().encodeCurrent(schedule)
+    static let validScheduleData: Data = {
+        guard let data = try? SchedulePayloadCodec().encodeCurrent(schedule) else {
+            preconditionFailure("Valid schedule fixture must encode")
+        }
+        return data
+    }()
     static let domainInvalidScheduleData = Data(
-        #"{"format":"notification-manager.schedule","payload":{"end":{"type":"never"},"rule":{"interval":0,"type":"daily"},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}"#.utf8
+        #"{"format":"notification-manager.schedule","payload":{"end":{"type":"never"},"rule":{"interval":0,"type":"daily"},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}"#
+            .utf8
     )
 }
 
@@ -761,7 +785,11 @@ enum TagPersistedField: CaseIterable, Sendable {
 }
 
 private func mutationUUID(attempt: Int, prefix: String) -> UUID {
-    UUID(uuidString: "\(prefix)-4444-4444-8444-00000000000\(attempt)")!
+    let value = "\(prefix)-4444-4444-8444-00000000000\(attempt)"
+    guard let id = UUID(uuidString: value) else {
+        preconditionFailure("Invalid mutation UUID fixture: \(value)")
+    }
+    return id
 }
 
 private func mutationDate(attempt: Int, multiplier: Int) -> Date {
@@ -771,8 +799,8 @@ private func mutationDate(attempt: Int, multiplier: Int) -> Date {
     )
 }
 
-private extension EncodedReminderMutation {
-    static func fixture(
+extension EncodedReminderMutation {
+    fileprivate static func fixture(
         title: String = "Reminder",
         command: ReminderMutationCommand = .create(scheduleData: TestValues.validScheduleData),
         tagIDs: Set<UUID> = [],
@@ -792,13 +820,15 @@ private extension EncodedReminderMutation {
     }
 }
 
-private extension EncodedTagMutation {
-    static func fixture(
+extension EncodedTagMutation {
+    fileprivate static func fixture(
         id: UUID,
         name: String,
         command: TagMutationCommand = .create
     ) -> EncodedTagMutation {
-        let normalizedName = try! TagNameNormalizerV1().normalize(name)
+        guard let normalizedName = try? TagNameNormalizerV1().normalize(name) else {
+            preconditionFailure("Valid tag fixture name must normalize: \(name)")
+        }
         return EncodedTagMutation(
             id: id,
             name: name,
@@ -811,8 +841,8 @@ private extension EncodedTagMutation {
     }
 }
 
-private extension TagRecordV1 {
-    static func fixture(id: UUID, name: String) -> TagRecordV1 {
+extension TagRecordV1 {
+    fileprivate static func fixture(id: UUID, name: String) -> TagRecordV1 {
         TagRecordV1(
             id: id,
             name: name,
@@ -900,7 +930,7 @@ private func installSaveBarrier(
         queue: nil
     ) { notification in
         guard let context = notification.object as? ModelContext,
-              containers.contains(where: { $0 === context.container })
+            containers.contains(where: { $0 === context.container })
         else { return }
         barrier.arriveAndWait()
     }
@@ -929,25 +959,27 @@ private func insertRelatedReminderAndTag(in container: ModelContainer) throws {
 private func insertReminder(scheduleData: Data, in container: ModelContainer) throws {
     let context = ModelContext(container)
     context.autosaveEnabled = false
-    context.insert(ReminderRecordV1(
-        id: TestValues.reminderID,
-        title: "Reminder",
-        notes: "Notes",
-        urlString: "https://example.com/reminder",
-        enabled: true,
-        scheduleData: scheduleData,
-        createdAt: TestValues.created,
-        updatedAt: TestValues.created
-    ))
+    context.insert(
+        ReminderRecordV1(
+            id: TestValues.reminderID,
+            title: "Reminder",
+            notes: "Notes",
+            urlString: "https://example.com/reminder",
+            enabled: true,
+            scheduleData: scheduleData,
+            createdAt: TestValues.created,
+            updatedAt: TestValues.created
+        ))
     try context.save()
 }
 
 private func updateScheduleData(_ scheduleData: Data, in container: ModelContainer) throws {
     let context = ModelContext(container)
     context.autosaveEnabled = false
-    let reminder = try #require(context.fetch(FetchDescriptor<ReminderRecordV1>()).first {
-        $0.id == TestValues.reminderID
-    })
+    let reminder = try #require(
+        context.fetch(FetchDescriptor<ReminderRecordV1>()).first {
+            $0.id == TestValues.reminderID
+        })
     reminder.scheduleData = scheduleData
     try context.save()
 }
@@ -985,10 +1017,10 @@ private func persistentHistoryCount(in container: ModelContainer) throws -> Int 
 
 private func rawScheduleData(_ state: ScheduleReadState) -> Data {
     switch state {
-    case let .valid(_, _, originalData),
-         let .unsupportedFuture(_, originalData),
-         let .corrupt(originalData),
-         let .domainInvalid(_, originalData, _):
+    case .valid(_, _, let originalData),
+        .unsupportedFuture(_, let originalData),
+        .corrupt(let originalData),
+        .domainInvalid(_, let originalData, _):
         originalData
     }
 }

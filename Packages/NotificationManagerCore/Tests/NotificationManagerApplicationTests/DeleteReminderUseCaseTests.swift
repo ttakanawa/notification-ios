@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManagerApplication
 
 @Suite("DeleteReminderUseCase")
@@ -25,11 +26,12 @@ struct DeleteReminderUseCaseTests {
 
         try await useCase.execute(reminderID: TestApplicationValues.reminderID)
 
-        #expect(trace.events == [
-            .repositoryDeleted,
-            .notificationsCleaned,
-            .reconcileRequested
-        ])
+        #expect(
+            trace.events == [
+                .repositoryDeleted,
+                .notificationsCleaned,
+                .reconcileRequested
+            ])
         #expect(await cleanup.reminderIDs == [TestApplicationValues.reminderID])
         #expect(await reconciler.reasons == [.reminderDeleted(TestApplicationValues.reminderID)])
     }
@@ -67,10 +69,11 @@ struct DeleteReminderUseCaseTests {
             createdAt: testDate("2026-08-01T00:00:00Z"),
             updatedAt: testDate("2026-08-01T00:00:00Z")
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [reminder],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [reminder],
+                tags: []
+            ))
         let cleanup = RecordingNotificationCleanup()
         let reconciler = RecordingReconcileRequester()
         let useCase = DeleteReminderUseCase(

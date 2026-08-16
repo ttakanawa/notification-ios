@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManagerApplication
 
 @Suite("TagManagementUseCase")

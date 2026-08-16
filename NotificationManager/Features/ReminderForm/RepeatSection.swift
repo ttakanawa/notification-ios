@@ -11,10 +11,11 @@ struct RepeatSection: View {
                 LabeledContent {
                     Text(verbatim: summary)
                 } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.form.repeat.current-value",
-                        table: "ReminderForm"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.form.repeat.current-value",
+                            table: "ReminderForm"
+                        ))
                 }
                 .background {
                     AccessibilityIdentifierContainer(
@@ -27,10 +28,11 @@ struct RepeatSection: View {
                         Text(verbatim: disclosure)
                             .textSelection(.enabled)
                     } label: {
-                        Text(LocalizedStringResource(
-                            "reminder.form.custom.canonical-disclosure",
-                            table: "ReminderForm"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.form.custom.canonical-disclosure",
+                                table: "ReminderForm"
+                            ))
                     }
                 }
             }
@@ -41,10 +43,11 @@ struct RepeatSection: View {
                         .disabled(choice.requiresSourceDate && model.sourceDate == nil)
                 }
             } label: {
-                Text(LocalizedStringResource(
-                    "reminder.field.repeat",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.field.repeat",
+                        table: "ReminderForm"
+                    ))
             }
             .disabled(!model.scheduleFieldsAreEditable)
             .accessibilityIdentifier("reminder-form.repeat-picker")
@@ -53,10 +56,11 @@ struct RepeatSection: View {
                 Button {
                     model.beginCustomReplacement()
                 } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.form.custom.replace",
-                        table: "ReminderForm"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.form.custom.replace",
+                            table: "ReminderForm"
+                        ))
                 }
                 .disabled(!model.scheduleFieldsAreEditable)
                 .accessibilityIdentifier("reminder-form.custom.replace")
@@ -68,19 +72,24 @@ struct RepeatSection: View {
 
             if model.repeatRule != .none {
                 Picker(selection: repeatEndBinding) {
-                    Text(LocalizedStringResource(
-                        "reminder.repeat-end.never",
-                        table: "ReminderForm"
-                    )).tag(false)
-                    Text(LocalizedStringResource(
-                        "reminder.repeat-end.on-date",
-                        table: "ReminderForm"
-                    )).tag(true)
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.repeat-end.never",
+                            table: "ReminderForm"
+                        )
+                    ).tag(false)
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.repeat-end.on-date",
+                            table: "ReminderForm"
+                        )
+                    ).tag(true)
                 } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.field.repeat-end",
-                        table: "ReminderForm"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.repeat-end",
+                            table: "ReminderForm"
+                        ))
                 }
                 .disabled(!model.scheduleFieldsAreEditable)
                 .accessibilityIdentifier("reminder-form.repeat-end-picker")
@@ -126,15 +135,17 @@ struct RepeatSection: View {
                 .accessibilityIdentifier("reminder-form.early-past-warning")
             }
         } header: {
-            Text(LocalizedStringResource(
-                "reminder.form.section.repeat",
-                table: "ReminderForm"
-            ))
-                .background {
-                    AccessibilityIdentifierContainer(
-                        identifier: "reminder-form.section.repeat"
-                    )
-                }
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.section.repeat",
+                    table: "ReminderForm"
+                )
+            )
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.section.repeat"
+                )
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -168,7 +179,7 @@ struct RepeatSection: View {
     }
 
     private var repeatEndDateAccessibilityValue: String? {
-        guard case let .onDate(value) = model.repeatEnd else { return nil }
+        guard case .onDate(let value) = model.repeatEnd else { return nil }
         return String(format: "%04d-%02d-%02d", value.year, value.month, value.day)
     }
 
@@ -193,18 +204,19 @@ struct PhysicalNotificationPreviewView: View {
             ForEach(Array(notification.reasons.enumerated()), id: \.offset) { index, reason in
                 LabeledContent {
                     VStack(alignment: .trailing, spacing: 2) {
-                        let reasonResource: LocalizedStringResource = switch reason.kind {
-                        case .main:
-                            LocalizedStringResource(
-                                "reminder.reason.main",
-                                table: "Reminder"
-                            )
-                        case .early:
-                            LocalizedStringResource(
-                                "reminder.reason.early",
-                                table: "Reminder"
-                            )
-                        }
+                        let reasonResource: LocalizedStringResource =
+                            switch reason.kind {
+                            case .main:
+                                LocalizedStringResource(
+                                    "reminder.reason.main",
+                                    table: "Reminder"
+                                )
+                            case .early:
+                                LocalizedStringResource(
+                                    "reminder.reason.early",
+                                    table: "Reminder"
+                                )
+                            }
                         Label(reasonResource, systemImage: "bell")
                         Text(
                             verbatim: sourceFormatter.instant(
@@ -216,15 +228,17 @@ struct PhysicalNotificationPreviewView: View {
                     }
                 } label: {
                     if index == 0 {
-                        Text(LocalizedStringResource(
-                            "reminder.next.primary-reason",
-                            table: "Reminder"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.next.primary-reason",
+                                table: "Reminder"
+                            ))
                     } else {
-                        Text(LocalizedStringResource(
-                            "reminder.next.secondary-reason",
-                            table: "Reminder"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.next.secondary-reason",
+                                table: "Reminder"
+                            ))
                     }
                 }
                 .font(.caption)
@@ -245,10 +259,11 @@ struct PhysicalNotificationPreviewView: View {
                         )
                     )
                 } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.next.source-time",
-                        table: "Reminder"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.next.source-time",
+                            table: "Reminder"
+                        ))
                 }
                 Text(verbatim: sourceTimeZoneIdentifier ?? "")
                     .font(.caption2)
@@ -258,10 +273,11 @@ struct PhysicalNotificationPreviewView: View {
             LabeledContent {
                 Text(notification.alertInstant, format: .dateTime)
             } label: {
-                Text(LocalizedStringResource(
-                    "reminder.next.device-time",
-                    table: "Reminder"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.next.device-time",
+                        table: "Reminder"
+                    ))
             }
 
         }
@@ -300,32 +316,33 @@ private enum RepeatChoice: String, CaseIterable, Identifiable {
             self = .custom
             return
         }
-        self = switch rule {
-        case .none: .doesNotRepeat
-        case .hourly(interval: 1): .hourly
-        case .daily(interval: 1): .daily
-        case .weekly(
-            interval: 1,
-            weekdaySetKind: .weekday,
-            weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
-        ): .weekdays
-        case .weekly(
-            interval: 1,
-            weekdaySetKind: .weekend,
-            weekdays: [.saturday, .sunday]
-        ): .weekends
-        case let .weekly(interval: 1, weekdaySetKind: .explicit, weekdays)
+        self =
+            switch rule {
+            case .none: .doesNotRepeat
+            case .hourly(interval: 1): .hourly
+            case .daily(interval: 1): .daily
+            case .weekly(
+                interval: 1,
+                weekdaySetKind: .weekday,
+                weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
+            ): .weekdays
+            case .weekly(
+                interval: 1,
+                weekdaySetKind: .weekend,
+                weekdays: [.saturday, .sunday]
+            ): .weekends
+            case .weekly(interval: 1, weekdaySetKind: .explicit, let weekdays)
             where weekdays.count == 1:
-            .weekly
-        case let .weekly(interval: 2, weekdaySetKind: .explicit, weekdays)
+                .weekly
+            case .weekly(interval: 2, weekdaySetKind: .explicit, let weekdays)
             where weekdays.count == 1:
-            .biweekly
-        case .monthly(interval: 1, selector: .anchorDay): .monthly
-        case .monthly(interval: 3, selector: .anchorDay): .every3Months
-        case .monthly(interval: 6, selector: .anchorDay): .every6Months
-        case .yearly(interval: 1, month: nil, selector: .anchorMonthDay): .yearly
-        default: .custom
-        }
+                .biweekly
+            case .monthly(interval: 1, selector: .anchorDay): .monthly
+            case .monthly(interval: 3, selector: .anchorDay): .every3Months
+            case .monthly(interval: 6, selector: .anchorDay): .every6Months
+            case .yearly(interval: 1, month: nil, selector: .anchorMonthDay): .yearly
+            default: .custom
+            }
     }
 
     var preset: NotificationManagerDomain.RepeatPreset? {

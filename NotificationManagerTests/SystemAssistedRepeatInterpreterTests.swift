@@ -3,9 +3,10 @@ import FoundationModels
 import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManager
 
-struct UnavailableAssistedRepeatInterpreterTests {
+struct UnavailableRepeatInterpreterTests {
     @Test func platformFallbackReportsUnavailableAndNeverProducesACandidate() async {
         let interpreter = UnavailableAssistedRepeatInterpreter()
 
@@ -65,10 +66,11 @@ struct SystemAssistedRepeatInterpreterTests {
             weekdaySetKind: .none,
             weekdays: [],
             month: .march,
-            selector: .ordinalWeekday(FoundationOrdinalWeekday(
-                ordinal: -2,
-                weekday: .monday
-            ))
+            selector: .ordinalWeekday(
+                FoundationOrdinalWeekday(
+                    ordinal: -2,
+                    weekday: .monday
+                ))
         )
         let runtime = FoundationModelsRuntimeSpy(
             status: .available,
@@ -79,12 +81,14 @@ struct SystemAssistedRepeatInterpreterTests {
 
         let candidate = try await interpreter.interpret("毎年3月の最後から2番目の月曜日")
 
-        #expect(candidate == RepeatCandidate(
-            frequency: .yearly,
-            interval: 2,
-            month: 3,
-            selector: .ordinalWeekday(ordinal: -2, weekday: .monday)
-        ))
+        #expect(
+            candidate
+                == RepeatCandidate(
+                    frequency: .yearly,
+                    interval: 2,
+                    month: 3,
+                    selector: .ordinalWeekday(ordinal: -2, weekday: .monday)
+                ))
         #expect(await runtime.events == [.generate("毎年3月の最後から2番目の月曜日")])
     }
 
@@ -103,12 +107,14 @@ struct SystemAssistedRepeatInterpreterTests {
         let decoded = try FoundationRepeatCandidate(generated.generatedContent)
 
         #expect(decoded == generated)
-        #expect(decoded.repeatCandidate == RepeatCandidate(
-            frequency: .weekly,
-            interval: 1,
-            weekdaySetKind: .explicit,
-            weekdays: [.monday, .wednesday, .friday]
-        ))
+        #expect(
+            decoded.repeatCandidate
+                == RepeatCandidate(
+                    frequency: .weekly,
+                    interval: 1,
+                    weekdaySetKind: .explicit,
+                    weekdays: [.monday, .wednesday, .friday]
+                ))
     }
 
     @Test func generationSchemaContainsEnumRangeOrdinalAndCollectionGuides() {
@@ -244,8 +250,8 @@ enum FoundationModelsRuntimeFailure: Sendable {
 private struct UnknownFoundationModelsRuntimeFailure: Error, Sendable {}
 
 @available(iOS 26.0, *)
-private extension FoundationRepeatCandidate {
-    static let daily = FoundationRepeatCandidate(
+extension FoundationRepeatCandidate {
+    fileprivate static let daily = FoundationRepeatCandidate(
         isSupported: true,
         frequency: .daily,
         interval: 1,

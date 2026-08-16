@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManagerApplication
 
 @Suite("SaveReminderUseCase")
@@ -33,7 +34,7 @@ struct SaveReminderUseCaseTests {
             draft: draft,
             capacityConsent: .notProvided
         )
-        guard case let .requiresCapacityConfirmation(warning) = warningOutcome else {
+        guard case .requiresCapacityConfirmation(let warning) = warningOutcome else {
             Issue.record("Expected capacity confirmation, got \(warningOutcome)")
             return
         }
@@ -51,7 +52,7 @@ struct SaveReminderUseCaseTests {
         #expect(await reconciler.reasons == [.reminderSaved(draftID)])
     }
 
-    @Test func hypotheticalPlanningReplacesTheExistingReminderInsteadOfDuplicatingIt() async throws {
+    @Test func hypotheticalPlanningReplacesExistingReminderWithoutDuplication() async throws {
         let draftID = UUID(uuidString: "FFFFFFFF-FFFF-FFFF-FFFF-FFFFFFFFFFFF")!
         let fillerSchedule = oneShotSchedule("2026-08-06T12:00:00Z")
         let oneRequestSchedule = oneShotSchedule("2026-08-06T12:10:00Z")
@@ -90,7 +91,7 @@ struct SaveReminderUseCaseTests {
 
         let outcome = try await useCase.execute(draft: draft)
 
-        guard case let .requiresCapacityConfirmation(warning) = outcome else {
+        guard case .requiresCapacityConfirmation(let warning) = outcome else {
             Issue.record("Expected replacement schedule to exceed capacity, got \(outcome)")
             return
         }
@@ -139,21 +140,26 @@ struct SaveReminderUseCaseTests {
             schedule: oneShotSchedule("2026-08-05T12:00:00Z")
         )
 
-        #expect(try await useCase.execute(draft: draft) ==
-            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
-                reminderID: draft.id,
-                evaluationNow: testDate("2026-08-06T12:00:00Z")
-            )))
+        #expect(
+            try await useCase.execute(draft: draft)
+                == .requiresExpiredScheduleConfirmation(
+                    ExpiredScheduleWarning(
+                        reminderID: draft.id,
+                        evaluationNow: testDate("2026-08-06T12:00:00Z")
+                    )))
         #expect(await repository.savedMutations.isEmpty)
 
-        #expect(try await useCase.execute(
-            draft: draft,
-            expiredScheduleConsent: .acknowledged
-        ) == .saved(draft.id))
+        #expect(
+            try await useCase.execute(
+                draft: draft,
+                expiredScheduleConsent: .acknowledged
+            ) == .saved(draft.id))
         #expect(await repository.savedMutations.count == 1)
     }
 
-    @Test func commitBoundaryRequestsExpiredConsentForANewReminderWhoseOnlyAlertJustPassed() async throws {
+    @Test func commitBoundaryRequestsExpiredConsentForANewReminderWhoseOnlyAlertJustPassed()
+        async throws
+    {
         let repository = InMemoryReminderRepository()
         let reconciler = RecordingReconcileRequester()
         let clock = SequenceDateSource([
@@ -174,11 +180,13 @@ struct SaveReminderUseCaseTests {
             schedule: oneShotSchedule("2026-08-06T12:00:00Z")
         )
 
-        #expect(try await useCase.execute(draft: draft, capacityConsent: .acknowledged) ==
-            .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
-                reminderID: draft.id,
-                evaluationNow: testDate("2026-08-06T12:00:00Z")
-            )))
+        #expect(
+            try await useCase.execute(draft: draft, capacityConsent: .acknowledged)
+                == .requiresExpiredScheduleConfirmation(
+                    ExpiredScheduleWarning(
+                        reminderID: draft.id,
+                        evaluationNow: testDate("2026-08-06T12:00:00Z")
+                    )))
         #expect(await repository.reminders.isEmpty)
         #expect(await reconciler.reasons.isEmpty)
     }
@@ -191,10 +199,11 @@ struct SaveReminderUseCaseTests {
             schedule: schedule,
             scheduleData: raw
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [existing],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [existing],
+                tags: []
+            ))
         let useCase = makeSaveUseCase(
             repository: repository,
             clock: SequenceDateSource([
@@ -211,7 +220,7 @@ struct SaveReminderUseCaseTests {
 
         let outcome = try await useCase.execute(draft: draft)
 
-        guard case let .requiresExpiredScheduleConfirmation(warning) = outcome else {
+        guard case .requiresExpiredScheduleConfirmation(let warning) = outcome else {
             Issue.record("Expected expired-schedule confirmation, got \(outcome)")
             return
         }
@@ -228,10 +237,11 @@ struct SaveReminderUseCaseTests {
             schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
             scheduleData: raw
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [existing],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [existing],
+                tags: []
+            ))
         let reconciler = RecordingReconcileRequester()
         let clock = SequenceDateSource([
             testDate("2026-08-06T12:00:00Z"),
@@ -251,12 +261,14 @@ struct SaveReminderUseCaseTests {
         )
 
         let confirmation = try await useCase.execute(draft: draft)
-        #expect(confirmation == .requiresExpiredScheduleConfirmation(
-            ExpiredScheduleWarning(
-                reminderID: draft.id,
-                evaluationNow: testDate("2026-08-06T12:00:00Z")
-            )
-        ))
+        #expect(
+            confirmation
+                == .requiresExpiredScheduleConfirmation(
+                    ExpiredScheduleWarning(
+                        reminderID: draft.id,
+                        evaluationNow: testDate("2026-08-06T12:00:00Z")
+                    )
+                ))
         #expect(await repository.savedMutations.isEmpty)
 
         let saved = try await useCase.execute(
@@ -338,17 +350,20 @@ struct SaveReminderUseCaseTests {
         #expect(try await repository.reminder(id: draft.id)?.schedule.originalBytes == raw)
     }
 
-    @Test func metadataValidationDoesNotRejectStaleDraftBytesWhenDurableBytesAreCurrent() async throws {
+    @Test func metadataValidationDoesNotRejectStaleDraftBytesWhenDurableBytesAreCurrent()
+        async throws
+    {
         let current = Data("current-schedule".utf8)
         let snapshot = reminderSnapshot(
             id: TestApplicationValues.reminderID,
             schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
             scheduleData: current
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [snapshot],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [snapshot],
+                tags: []
+            ))
         let stale = Data(repeating: 0xFF, count: ReminderLimits.scheduleBytes + 1)
         let draft = ReminderDraft(
             id: snapshot.id,
@@ -530,17 +545,20 @@ struct SaveReminderUseCaseTests {
         #expect(await repository.saveAttempts == 0)
     }
 
-    @Test func deviceNotificationsOffStillUsesUpdateIntentAndCannotResurrectADeletedReminder() async throws {
+    @Test func deviceNotificationsOffStillUsesUpdateIntentAndCannotResurrectADeletedReminder()
+        async throws
+    {
         let raw = Data("current-schedule".utf8)
         let existing = reminderSnapshot(
             id: TestApplicationValues.reminderID,
             schedule: oneShotSchedule("2026-08-07T12:00:00Z"),
             scheduleData: raw
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [existing],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [existing],
+                tags: []
+            ))
         var draft = ReminderDraft(snapshot: existing)
         draft.title = "Stale edit"
         try await repository.delete(id: existing.id)
@@ -558,17 +576,20 @@ struct SaveReminderUseCaseTests {
         #expect(try await repository.fetchCompleteSnapshot().reminders.isEmpty)
     }
 
-    @Test func deniedAuthorizationStillUsesReplaceIntentAndCannotResurrectADeletedReminder() async throws {
+    @Test func deniedAuthorizationStillUsesReplaceIntentAndCannotResurrectADeletedReminder()
+        async throws
+    {
         let oldSchedule = oneShotSchedule("2026-08-07T12:00:00Z")
         let replacement = oneShotSchedule("2026-08-08T12:00:00Z")
         let existing = reminderSnapshot(
             id: TestApplicationValues.reminderID,
             schedule: oldSchedule
         )
-        let repository = InMemoryReminderRepository(snapshot: CompleteReminderSnapshot(
-            reminders: [existing],
-            tags: []
-        ))
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(
+                reminders: [existing],
+                tags: []
+            ))
         let draft = existingReplacementDraft(
             id: existing.id,
             schedule: replacement,
@@ -624,21 +645,36 @@ func testDate(_ value: String) -> Date {
     let fractional = ISO8601DateFormatter()
     fractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
     if let date = fractional.date(from: value) { return date }
-    return ISO8601DateFormatter().date(from: value)!
+    guard let date = ISO8601DateFormatter().date(from: value) else {
+        preconditionFailure("Invalid ISO-8601 test fixture: \(value)")
+    }
+    return date
 }
 
 func oneShotSchedule(_ value: String) -> ScheduleDefinition {
     let date = testDate(value)
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    guard let utc = TimeZone(secondsFromGMT: 0) else {
+        preconditionFailure("Foundation must provide the zero-offset time zone")
+    }
+    calendar.timeZone = utc
     let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: date)
+    guard
+        let year = components.year,
+        let month = components.month,
+        let day = components.day,
+        let hour = components.hour,
+        let minute = components.minute
+    else {
+        preconditionFailure("Gregorian date fixture must provide complete wall-clock components")
+    }
     return ScheduleDefinition(
         source: SourceWallClock(
-            year: components.year!,
-            month: components.month!,
-            day: components.day!,
-            hour: components.hour!,
-            minute: components.minute!,
+            year: year,
+            month: month,
+            day: day,
+            hour: hour,
+            minute: minute,
             timeZoneIdentifier: "Africa/Abidjan"
         ),
         rule: .none,
@@ -703,8 +739,11 @@ func reminderSnapshot(
 func capacityFillers(count: Int, schedule: ScheduleDefinition) -> [ReminderSnapshot] {
     (1...count).map { value in
         let suffix = String(format: "%012X", value)
+        guard let id = UUID(uuidString: "00000000-0000-0000-0000-\(suffix)") else {
+            preconditionFailure("Generated capacity filler UUID must be valid: \(suffix)")
+        }
         return reminderSnapshot(
-            id: UUID(uuidString: "00000000-0000-0000-0000-\(suffix)")!,
+            id: id,
             schedule: schedule,
             title: "Filler \(value)"
         )
@@ -848,7 +887,7 @@ actor InMemoryReminderRepository: ReminderRepository {
         if let saveError { throw saveError }
         let schedule: ScheduleReadState
         switch mutation.command {
-        case let .create(scheduleData):
+        case .create(let scheduleData):
             guard reminders[mutation.id] == nil else {
                 throw RepositoryTestError.duplicateReminderID(mutation.id)
             }
@@ -858,7 +897,7 @@ actor InMemoryReminderRepository: ReminderRepository {
                 throw RepositoryTestError.reminderNotFound(mutation.id)
             }
             schedule = current.schedule
-        case let .replaceSchedule(scheduleData):
+        case .replaceSchedule(let scheduleData):
             guard let current = reminders[mutation.id] else {
                 throw RepositoryTestError.reminderNotFound(mutation.id)
             }
@@ -1001,10 +1040,10 @@ final class LockedApplicationTrace: @unchecked Sendable {
 extension ScheduleReadState {
     var originalBytes: Data {
         switch self {
-        case let .valid(_, _, data),
-             let .unsupportedFuture(_, data),
-             let .corrupt(data),
-             let .domainInvalid(_, data, _):
+        case .valid(_, _, let data),
+            .unsupportedFuture(_, let data),
+            .corrupt(let data),
+            .domainInvalid(_, let data, _):
             data
         }
     }

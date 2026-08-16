@@ -33,25 +33,46 @@ enum RepeatGrammarFixtures {
         .init(input: "Every month on the 4th", canonical: "Every month on the 4th"),
         .init(input: "Every month on 31st", canonical: "Every month on the 31st"),
         .init(input: "Every month on the last day", canonical: "Every month on the last day"),
-        .init(input: "Every month on the first weekday", canonical: "Every month on the 1st weekday"),
-        .init(input: "Every month on the fifth weekday", canonical: "Every month on the 5th weekday"),
-        .init(input: "Every month on the second weekend day", canonical: "Every month on the 2nd weekend day"),
+        .init(
+            input: "Every month on the first weekday", canonical: "Every month on the 1st weekday"),
+        .init(
+            input: "Every month on the fifth weekday", canonical: "Every month on the 5th weekday"),
+        .init(
+            input: "Every month on the second weekend day",
+            canonical: "Every month on the 2nd weekend day"),
         .init(input: "Every month on the 3rd Tuesday", canonical: "Every month on the 3rd Tuesday"),
         .init(input: "Every month on the fifth Sun", canonical: "Every month on the 5th Sunday"),
         .init(input: "Every month on the last Monday", canonical: "Every month on the last Monday"),
-        .init(input: "Every month on the 2nd last Friday", canonical: "Every month on the 2nd last Friday"),
-        .init(input: "Every month on the 5th last Sunday", canonical: "Every month on the 5th last Sunday"),
+        .init(
+            input: "Every month on the 2nd last Friday",
+            canonical: "Every month on the 2nd last Friday"),
+        .init(
+            input: "Every month on the 5th last Sunday",
+            canonical: "Every month on the 5th last Sunday"),
         .init(input: "Every year", canonical: "Every year"),
         .init(input: "Every 1 year", canonical: "Every year"),
         .init(input: "Every 2 years", canonical: "Every 2 years"),
         .init(input: "Every 9999 years", canonical: "Every 9999 years"),
-        .init(input: "Every year on the 29th of Feb", canonical: "Every year on the 29th of February"),
-        .init(input: "Every year on the last day of January", canonical: "Every year on the last day of January"),
-        .init(input: "Every year on the first weekday of January", canonical: "Every year on the 1st weekday of January"),
-        .init(input: "Every year on the second weekend day of January", canonical: "Every year on the 2nd weekend day of January"),
-        .init(input: "Every year on the 3rd Tue of Mar", canonical: "Every year on the 3rd Tuesday of March"),
-        .init(input: "Every year on the last Monday of April", canonical: "Every year on the last Monday of April"),
-        .init(input: "Every year on the 5th last Sunday of December", canonical: "Every year on the 5th last Sunday of December"),
+        .init(
+            input: "Every year on the 29th of Feb", canonical: "Every year on the 29th of February"),
+        .init(
+            input: "Every year on the last day of January",
+            canonical: "Every year on the last day of January"),
+        .init(
+            input: "Every year on the first weekday of January",
+            canonical: "Every year on the 1st weekday of January"),
+        .init(
+            input: "Every year on the second weekend day of January",
+            canonical: "Every year on the 2nd weekend day of January"),
+        .init(
+            input: "Every year on the 3rd Tue of Mar",
+            canonical: "Every year on the 3rd Tuesday of March"),
+        .init(
+            input: "Every year on the last Monday of April",
+            canonical: "Every year on the last Monday of April"),
+        .init(
+            input: "Every year on the 5th last Sunday of December",
+            canonical: "Every year on the 5th last Sunday of December"),
         .init(input: "  eVeRy\tthu\r\nAnD\u{000B}Friday  ", canonical: "Every Thursday and Friday")
     ]
 

@@ -27,15 +27,16 @@ struct LocalizedTextProvider: Sendable {
     }
 
     private static func bundle(for locale: Locale) -> Bundle {
-        guard let localization = Bundle.preferredLocalizations(
-            from: Bundle.main.localizations,
-            forPreferences: [locale.identifier]
-        ).first,
-        let languageBundleURL = Bundle.main.url(
-                  forResource: localization,
-                  withExtension: "lproj"
-              ),
-        let languageBundle = Bundle(url: languageBundleURL)
+        guard
+            let localization = Bundle.preferredLocalizations(
+                from: Bundle.main.localizations,
+                forPreferences: [locale.identifier]
+            ).first,
+            let languageBundleURL = Bundle.main.url(
+                forResource: localization,
+                withExtension: "lproj"
+            ),
+            let languageBundle = Bundle(url: languageBundleURL)
         else {
             return .main
         }

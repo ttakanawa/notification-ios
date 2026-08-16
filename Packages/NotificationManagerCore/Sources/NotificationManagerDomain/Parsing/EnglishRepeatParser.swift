@@ -222,18 +222,20 @@ public struct EnglishRepeatParser: Sendable {
         var canonicalResults = Set<String>()
 
         for token in lexed.tokens {
-            guard case let .word(original) = token.kind else { continue }
+            guard case .word(let original) = token.kind else { continue }
             for replacement in Self.knownWords
             where replacement != original && Self.distance(original, replacement) == 1 {
-                let prefix = String(String.UnicodeScalarView(scalars[..<token.scalarRange.lowerBound]))
-                let suffix = String(String.UnicodeScalarView(scalars[token.scalarRange.upperBound...]))
+                let prefix = String(
+                    String.UnicodeScalarView(scalars[..<token.scalarRange.lowerBound]))
+                let suffix = String(
+                    String.UnicodeScalarView(scalars[token.scalarRange.upperBound...]))
                 let replaced = prefix + replacement + suffix
                 guard let candidate = try? parseExact(replaced),
-                      !candidate.requiresSourceResolution,
-                      let rule = try? RepeatRuleValidator().validate(
+                    !candidate.requiresSourceResolution,
+                    let rule = try? RepeatRuleValidator().validate(
                         candidate,
                         source: Self.validationSource
-                      )
+                    )
                 else {
                     continue
                 }
@@ -246,34 +248,38 @@ public struct EnglishRepeatParser: Sendable {
     }
 
     private static func distance(_ lhs: String, _ rhs: String) -> Int {
-        let a = Array(lhs)
-        let b = Array(rhs)
+        let lhsCharacters = Array(lhs)
+        let rhsCharacters = Array(rhs)
         var matrix = Array(
-            repeating: Array(repeating: 0, count: b.count + 1),
-            count: a.count + 1
+            repeating: Array(repeating: 0, count: rhsCharacters.count + 1),
+            count: lhsCharacters.count + 1
         )
-        for index in 0...a.count { matrix[index][0] = index }
-        for index in 0...b.count { matrix[0][index] = index }
-        guard !a.isEmpty, !b.isEmpty else { return max(a.count, b.count) }
+        for index in 0...lhsCharacters.count { matrix[index][0] = index }
+        for index in 0...rhsCharacters.count { matrix[0][index] = index }
+        guard !lhsCharacters.isEmpty, !rhsCharacters.isEmpty else {
+            return max(lhsCharacters.count, rhsCharacters.count)
+        }
 
-        for row in 1...a.count {
-            for column in 1...b.count {
-                let substitution = matrix[row - 1][column - 1]
-                    + (a[row - 1] == b[column - 1] ? 0 : 1)
+        for row in 1...lhsCharacters.count {
+            for column in 1...rhsCharacters.count {
+                let substitution =
+                    matrix[row - 1][column - 1]
+                    + (lhsCharacters[row - 1] == rhsCharacters[column - 1] ? 0 : 1)
                 var value = min(
                     matrix[row - 1][column] + 1,
                     matrix[row][column - 1] + 1,
                     substitution
                 )
                 if row > 1, column > 1,
-                   a[row - 1] == b[column - 2], a[row - 2] == b[column - 1]
+                    lhsCharacters[row - 1] == rhsCharacters[column - 2],
+                    lhsCharacters[row - 2] == rhsCharacters[column - 1]
                 {
                     value = min(value, matrix[row - 2][column - 2] + 1)
                 }
                 matrix[row][column] = value
             }
         }
-        return matrix[a.count][b.count]
+        return matrix[lhsCharacters.count][rhsCharacters.count]
     }
 
     private static let validationSource = SourceWallClock(
@@ -297,8 +303,8 @@ public struct EnglishRepeatParser: Sendable {
     ]
 }
 
-private extension RepeatCandidate {
-    var requiresSourceResolution: Bool {
+extension RepeatCandidate {
+    fileprivate var requiresSourceResolution: Bool {
         frequency == .weekly && weekdaySetKind == nil && weekdays.isEmpty
     }
 }
@@ -316,7 +322,7 @@ private struct Cursor {
     mutating func advance() { index += 1 }
 
     func peekWordValue() -> String? {
-        guard index < tokens.count, case let .word(word) = tokens[index].kind else { return nil }
+        guard index < tokens.count, case .word(let word) = tokens[index].kind else { return nil }
         return word
     }
 
@@ -339,13 +345,13 @@ private struct Cursor {
     }
 
     func peekInteger() -> String? {
-        guard index < tokens.count, case let .integer(raw) = tokens[index].kind else { return nil }
+        guard index < tokens.count, case .integer(let raw) = tokens[index].kind else { return nil }
         return raw
     }
 
     mutating func requireDecimalInteger() throws -> Int {
         guard let raw = peekInteger(), raw.first != "0", let value = Int(raw),
-              (1...9_999).contains(value)
+            (1...9_999).contains(value)
         else {
             throw SyntaxFailure.invalid
         }
@@ -384,9 +390,9 @@ private struct Cursor {
             return (value, false)
         }
         guard index < tokens.count,
-              case let .ordinal(numberRaw, suffix) = tokens[index].kind,
-              numberRaw.first != "0", let number = Int(numberRaw),
-              (1...9_999).contains(number), suffix == Self.ordinalSuffix(number)
+            case .ordinal(let numberRaw, let suffix) = tokens[index].kind,
+            numberRaw.first != "0", let number = Int(numberRaw),
+            (1...9_999).contains(number), suffix == Self.ordinalSuffix(number)
         else {
             throw SyntaxFailure.invalid
         }

@@ -41,7 +41,7 @@ public enum CustomRepeatResolution: Sendable, Equatable {
     }
 
     public var error: CustomRepeatResolutionError? {
-        if case let .failed(error) = self { error } else { nil }
+        if case .failed(let error) = self { error } else { nil }
     }
 }
 
@@ -69,9 +69,9 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
 
     public func resolve(_ input: String) async -> CustomRepeatResolution {
         switch EnglishRepeatParser().parse(input) {
-        case let .success(candidate):
+        case .success(let candidate):
             return validate(candidate, route: .deterministicEnglish)
-        case let .failure(failure):
+        case .failure(let failure):
             if let suggestion = failure.suggestion {
                 return .suggested(suggestion)
             }
@@ -80,7 +80,7 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
         switch await assistedInterpreter.availability() {
         case .available:
             break
-        case let .unavailable(reason):
+        case .unavailable(let reason):
             return .failed(.assistanceUnavailable(reason))
         }
 
@@ -109,11 +109,12 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
                 end: end,
                 early: early
             )
-            return .resolved(ResolvedCustomRepeat(
-                route: route,
-                candidate: candidate,
-                schedule: schedule
-            ))
+            return .resolved(
+                ResolvedCustomRepeat(
+                    route: route,
+                    candidate: candidate,
+                    schedule: schedule
+                ))
         } catch let error as RepeatCandidateValidationError {
             return .failed(.validation(error))
         } catch {

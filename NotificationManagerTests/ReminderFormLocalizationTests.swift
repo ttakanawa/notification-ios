@@ -2,6 +2,7 @@ import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManager
 
 struct ReminderFormLocalizationTests {

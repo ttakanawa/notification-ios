@@ -30,7 +30,7 @@ public struct ReminderDraftValidator: Sendable {
         _ draft: ReminderDraft
     ) throws -> ValidatedReminderAggregate {
         guard case .preserveOriginal = draft.scheduleChange,
-              draft.originalScheduleData != nil
+            draft.originalScheduleData != nil
         else {
             throw ReminderValidationIssue.missingScheduleData
         }

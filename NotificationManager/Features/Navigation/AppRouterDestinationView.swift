@@ -8,7 +8,7 @@ struct AppRouterDestinationView: View {
     var body: some View {
         Group {
             switch destination {
-            case let .reminderEdit(id), let .reminderCreate(id):
+            case .reminderEdit(let id), .reminderCreate(let id):
                 if let model = router.formModel(for: id) {
                     ReminderFormView(
                         model: model,
@@ -21,7 +21,7 @@ struct AppRouterDestinationView: View {
                 }
             case .settings:
                 if let settings = router.notificationSettingsModel,
-                   let tags = router.tagManagementModel
+                    let tags = router.tagManagementModel
                 {
                     SettingsView(model: settings, tagModel: tags)
                 } else {
@@ -36,10 +36,11 @@ struct AppRouterDestinationView: View {
                         table: "Reminder"
                     ),
                     systemImage: "bell.badge",
-                    description: Text(LocalizedStringResource(
-                        "reminder.navigation.select.message",
-                        table: "Reminder"
-                    ))
+                    description: Text(
+                        LocalizedStringResource(
+                            "reminder.navigation.select.message",
+                            table: "Reminder"
+                        ))
                 )
                 .accessibilityIdentifier("adaptive-root.empty-detail")
             }
@@ -53,10 +54,11 @@ struct AppRouterDestinationView: View {
                 table: "Reminder"
             ),
             systemImage: "exclamationmark.triangle",
-            description: Text(LocalizedStringResource(
-                "reminder.navigation.unavailable.message",
-                table: "Reminder"
-            ))
+            description: Text(
+                LocalizedStringResource(
+                    "reminder.navigation.unavailable.message",
+                    table: "Reminder"
+                ))
         )
         .accessibilityIdentifier("reminder.navigation.unavailable")
     }

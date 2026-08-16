@@ -11,35 +11,35 @@ struct PersistenceCompositionRoot {
     private let makeEnvironment: EnvironmentFactory
 
     #if DEBUG
-    private let debugSchemaBootstrapper: DebugCloudKitSchemaBootstrapper
+        private let debugSchemaBootstrapper: DebugCloudKitSchemaBootstrapper
 
-    init(
-        configuration: ModelConfiguration = ModelContainerFactory.productionConfiguration(),
-        debugSchemaBootstrapper: DebugCloudKitSchemaBootstrapper =
-            DebugCloudKitSchemaBootstrapper(),
-        makeContainer: @escaping ContainerFactory = ModelContainerFactory.makeContainer,
-        makeEnvironment: @escaping EnvironmentFactory
-    ) {
-        self.configuration = configuration
-        self.debugSchemaBootstrapper = debugSchemaBootstrapper
-        self.makeContainer = makeContainer
-        self.makeEnvironment = makeEnvironment
-    }
+        init(
+            configuration: ModelConfiguration = ModelContainerFactory.productionConfiguration(),
+            debugSchemaBootstrapper: DebugCloudKitSchemaBootstrapper =
+                DebugCloudKitSchemaBootstrapper(),
+            makeContainer: @escaping ContainerFactory = ModelContainerFactory.makeContainer,
+            makeEnvironment: @escaping EnvironmentFactory
+        ) {
+            self.configuration = configuration
+            self.debugSchemaBootstrapper = debugSchemaBootstrapper
+            self.makeContainer = makeContainer
+            self.makeEnvironment = makeEnvironment
+        }
     #else
-    init(
-        configuration: ModelConfiguration = ModelContainerFactory.productionConfiguration(),
-        makeContainer: @escaping ContainerFactory = ModelContainerFactory.makeContainer,
-        makeEnvironment: @escaping EnvironmentFactory
-    ) {
-        self.configuration = configuration
-        self.makeContainer = makeContainer
-        self.makeEnvironment = makeEnvironment
-    }
+        init(
+            configuration: ModelConfiguration = ModelContainerFactory.productionConfiguration(),
+            makeContainer: @escaping ContainerFactory = ModelContainerFactory.makeContainer,
+            makeEnvironment: @escaping EnvironmentFactory
+        ) {
+            self.configuration = configuration
+            self.makeContainer = makeContainer
+            self.makeEnvironment = makeEnvironment
+        }
     #endif
 
     func open() throws -> AppEnvironment {
         #if DEBUG
-        try debugSchemaBootstrapper.initializeIfRequested(configuration: configuration)
+            try debugSchemaBootstrapper.initializeIfRequested(configuration: configuration)
         #endif
         let container = try makeContainer(configuration)
         return makeEnvironment(container)

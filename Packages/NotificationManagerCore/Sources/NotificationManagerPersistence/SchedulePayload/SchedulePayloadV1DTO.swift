@@ -48,13 +48,13 @@ struct SchedulePayloadV1DTO: Encodable {
         init(_ rule: RepeatRule) {
             switch rule {
             case .none: self = .none
-            case let .hourly(interval): self = .hourly(interval)
-            case let .daily(interval): self = .daily(interval)
-            case let .weekly(interval, kind, weekdays):
+            case .hourly(let interval): self = .hourly(interval)
+            case .daily(let interval): self = .daily(interval)
+            case .weekly(let interval, let kind, let weekdays):
                 self = .weekly(interval, WeekdaySetKindDTO(kind), weekdays.map(WeekdayDTO.init))
-            case let .monthly(interval, selector):
+            case .monthly(let interval, let selector):
                 self = .monthly(interval, SelectorDTO(selector))
-            case let .yearly(interval, month, selector):
+            case .yearly(let interval, let month, let selector):
                 self = .yearly(interval, month, SelectorDTO(selector))
             }
         }
@@ -64,22 +64,22 @@ struct SchedulePayloadV1DTO: Encodable {
             switch self {
             case .none:
                 try container.encode("none", forKey: .type)
-            case let .hourly(interval):
+            case .hourly(let interval):
                 try container.encode("hourly", forKey: .type)
                 try container.encode(interval, forKey: .interval)
-            case let .daily(interval):
+            case .daily(let interval):
                 try container.encode("daily", forKey: .type)
                 try container.encode(interval, forKey: .interval)
-            case let .weekly(interval, kind, weekdays):
+            case .weekly(let interval, let kind, let weekdays):
                 try container.encode("weekly", forKey: .type)
                 try container.encode(interval, forKey: .interval)
                 try container.encode(kind, forKey: .weekdaySetKind)
                 try container.encode(weekdays, forKey: .weekdays)
-            case let .monthly(interval, selector):
+            case .monthly(let interval, let selector):
                 try container.encode("monthly", forKey: .type)
                 try container.encode(interval, forKey: .interval)
                 try container.encode(selector, forKey: .selector)
-            case let .yearly(interval, month, selector):
+            case .yearly(let interval, let month, let selector):
                 try container.encode("yearly", forKey: .type)
                 try container.encode(interval, forKey: .interval)
                 try container.encodeIfPresent(month, forKey: .month)
@@ -104,11 +104,11 @@ struct SchedulePayloadV1DTO: Encodable {
             switch selector {
             case .anchorDay: self = .anchorDay
             case .anchorMonthDay: self = .anchorMonthDay
-            case let .dayOfMonth(day): self = .dayOfMonth(day)
+            case .dayOfMonth(let day): self = .dayOfMonth(day)
             case .lastDay: self = .lastDay
-            case let .ordinalDaySet(ordinal, daySet):
+            case .ordinalDaySet(let ordinal, let daySet):
                 self = .ordinalDaySet(ordinal, DaySetDTO(daySet))
-            case let .ordinalWeekday(ordinal, weekday):
+            case .ordinalWeekday(let ordinal, let weekday):
                 self = .ordinalWeekday(ordinal, WeekdayDTO(weekday))
             }
         }
@@ -120,16 +120,16 @@ struct SchedulePayloadV1DTO: Encodable {
                 try container.encode("anchorDay", forKey: .type)
             case .anchorMonthDay:
                 try container.encode("anchorMonthDay", forKey: .type)
-            case let .dayOfMonth(day):
+            case .dayOfMonth(let day):
                 try container.encode("dayOfMonth", forKey: .type)
                 try container.encode(day, forKey: .day)
             case .lastDay:
                 try container.encode("lastDay", forKey: .type)
-            case let .ordinalDaySet(ordinal, daySet):
+            case .ordinalDaySet(let ordinal, let daySet):
                 try container.encode("ordinalDaySet", forKey: .type)
                 try container.encode(ordinal, forKey: .ordinal)
                 try container.encode(daySet, forKey: .daySet)
-            case let .ordinalWeekday(ordinal, weekday):
+            case .ordinalWeekday(let ordinal, let weekday):
                 try container.encode("ordinalWeekday", forKey: .type)
                 try container.encode(ordinal, forKey: .ordinal)
                 try container.encode(weekday, forKey: .weekday)
@@ -148,7 +148,7 @@ struct SchedulePayloadV1DTO: Encodable {
         init(_ end: RepeatEnd) {
             switch end {
             case .never: self = .never
-            case let .onDate(date): self = .onDate(date)
+            case .onDate(let date): self = .onDate(date)
             }
         }
 
@@ -157,7 +157,7 @@ struct SchedulePayloadV1DTO: Encodable {
             switch self {
             case .never:
                 try container.encode("never", forKey: .type)
-            case let .onDate(date):
+            case .onDate(let date):
                 try container.encode("onDate", forKey: .type)
                 try container.encode(date.year, forKey: .year)
                 try container.encode(date.month, forKey: .month)

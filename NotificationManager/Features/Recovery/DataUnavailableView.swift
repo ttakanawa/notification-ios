@@ -20,27 +20,32 @@ struct DataUnavailableView: View {
                         )
                     } description: {
                         VStack(spacing: 8) {
-                            Text(LocalizedStringResource(
-                                "data_unavailable.description",
-                                table: "Recovery"
-                            ))
-                            Text(LocalizedStringResource(
-                                "data_unavailable.notifications-may-continue",
-                                table: "Recovery"
-                            ))
-                                .fontWeight(.semibold)
-                                .accessibilityIdentifier(
-                                    "data-unavailable.notifications-may-continue"
+                            Text(
+                                LocalizedStringResource(
+                                    "data_unavailable.description",
+                                    table: "Recovery"
+                                ))
+                            Text(
+                                LocalizedStringResource(
+                                    "data_unavailable.notifications-may-continue",
+                                    table: "Recovery"
                                 )
+                            )
+                            .fontWeight(.semibold)
+                            .accessibilityIdentifier(
+                                "data-unavailable.notifications-may-continue"
+                            )
                         }
                         .fixedSize(horizontal: false, vertical: true)
                     }
                 }
 
-                Section(LocalizedStringResource(
-                    "settings.section.notifications",
-                    table: "Settings"
-                )) {
+                Section(
+                    LocalizedStringResource(
+                        "settings.section.notifications",
+                        table: "Settings"
+                    )
+                ) {
                     Toggle(
                         LocalizedStringResource(
                             "settings.notifications.this-device",
@@ -65,14 +70,20 @@ struct DataUnavailableView: View {
                         )
                     }
                     .disabled(actions.isWorking)
-                    .accessibilityLabel(Text(LocalizedStringResource(
-                        "data_unavailable.remove-pending",
-                        table: "Recovery"
-                    )))
-                    .accessibilityHint(Text(LocalizedStringResource(
-                        "data_unavailable.remove-pending.explanation",
-                        table: "Recovery"
-                    )))
+                    .accessibilityLabel(
+                        Text(
+                            LocalizedStringResource(
+                                "data_unavailable.remove-pending",
+                                table: "Recovery"
+                            ))
+                    )
+                    .accessibilityHint(
+                        Text(
+                            LocalizedStringResource(
+                                "data_unavailable.remove-pending.explanation",
+                                table: "Recovery"
+                            ))
+                    )
                     .accessibilityIdentifier("data-unavailable.remove-pending")
 
                     Button {
@@ -88,41 +99,46 @@ struct DataUnavailableView: View {
                     }
                     .accessibilityIdentifier("data-unavailable.open-os-settings")
 
-                    Text(LocalizedStringResource(
-                        "data_unavailable.remove-pending.explanation",
-                        table: "Recovery"
-                    ))
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityHidden(true)
+                    Text(
+                        LocalizedStringResource(
+                            "data_unavailable.remove-pending.explanation",
+                            table: "Recovery"
+                        )
+                    )
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityHidden(true)
 
                     if let error = actions.actionError {
                         Label(
                             error.localizedResource,
                             systemImage: "exclamationmark.triangle"
                         )
-                            .foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier("data-unavailable.action-error")
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("data-unavailable.action-error")
                     }
                 }
 
                 Section {
-                    Button(LocalizedStringResource(
-                        "common.retry",
-                        table: "Common"
-                    )) {
+                    Button(
+                        LocalizedStringResource(
+                            "common.retry",
+                            table: "Common"
+                        )
+                    ) {
                         Task { await actions.retry() }
                     }
                     .disabled(actions.isRetrying)
                     .accessibilityIdentifier("data-unavailable.retry")
                 }
             }
-            .navigationTitle(LocalizedStringResource(
-                "data_unavailable.title",
-                table: "Recovery"
-            ))
+            .navigationTitle(
+                LocalizedStringResource(
+                    "data_unavailable.title",
+                    table: "Recovery"
+                ))
         }
         .task { await actions.load() }
         .announcesAccessibilityErrors(accessibilityErrors)

@@ -14,13 +14,13 @@ struct LocalizedReasonFormatter: Sendable {
         locale: Locale
     ) -> String {
         switch payload {
-        case let .oneShot(_, reasons):
+        case .oneShot(_, let reasons):
             return oneShotReasons(
                 reasons,
                 sourceTimeZoneIdentifier: sourceTimeZoneIdentifier,
                 locale: locale
             )
-        case let .repeating(_, contributors):
+        case .repeating(_, let contributors):
             return repeatingReasons(contributors, locale: locale)
         }
     }
@@ -56,12 +56,13 @@ struct LocalizedReasonFormatter: Sendable {
         sourceTimeZoneIdentifier: String,
         locale: Locale
     ) -> String {
-        let key = switch (reason.kind, isPrimary) {
-        case (.main, true): "localization.reason.one-shot.main.primary"
-        case (.main, false): "localization.reason.one-shot.main.secondary"
-        case (.early, true): "localization.reason.one-shot.early.primary"
-        case (.early, false): "localization.reason.one-shot.early.secondary"
-        }
+        let key =
+            switch (reason.kind, isPrimary) {
+            case (.main, true): "localization.reason.one-shot.main.primary"
+            case (.main, false): "localization.reason.one-shot.main.secondary"
+            case (.early, true): "localization.reason.one-shot.early.primary"
+            case (.early, false): "localization.reason.one-shot.early.secondary"
+            }
         return format(
             key,
             locale: locale,
@@ -80,12 +81,13 @@ struct LocalizedReasonFormatter: Sendable {
         let hasMain = contributors.contains { $0.kind == .main }
         let hasEarly = contributors.contains { $0.kind == .early }
         guard hasMain || hasEarly else { return "" }
-        let key = switch (hasMain, hasEarly) {
-        case (true, true): "localization.reason.repeating.main-and-early"
-        case (true, false): "localization.reason.repeating.main"
-        case (false, true): "localization.reason.repeating.early"
-        case (false, false): preconditionFailure("Handled by the empty contributor guard")
-        }
+        let key =
+            switch (hasMain, hasEarly) {
+            case (true, true): "localization.reason.repeating.main-and-early"
+            case (true, false): "localization.reason.repeating.main"
+            case (false, true): "localization.reason.repeating.early"
+            case (false, false): preconditionFailure("Handled by the empty contributor guard")
+            }
         return localizer.value(for: key, locale: locale)
     }
 

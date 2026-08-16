@@ -124,7 +124,7 @@ extension DeviceSchedulingStatus {
         switch self {
         case .notApplicable: "minus.circle"
         case .notScheduledThisDeviceOff, .notScheduledPermissionDenied,
-             .notScheduledAuthorizationUnknown, .unscheduledCapacity:
+            .notScheduledAuthorizationUnknown, .unscheduledCapacity:
             "bell.slash"
         case .permissionNotDetermined, .scheduling:
             "clock.arrow.circlepath"

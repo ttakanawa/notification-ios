@@ -65,9 +65,8 @@ public actor DeviceSchedulingStateStore {
         nextTriggerDates: [:],
         pendingOrAddedIdentifiers: []
     )
-    private var updateContinuations: [
-        UUID: AsyncStream<DeviceSchedulingStateSnapshot>.Continuation
-    ] = [:]
+    private var updateContinuations:
+        [UUID: AsyncStream<DeviceSchedulingStateSnapshot>.Continuation] = [:]
     private var reconcileStateRevision: UInt64 = 0
 
     public init() {}

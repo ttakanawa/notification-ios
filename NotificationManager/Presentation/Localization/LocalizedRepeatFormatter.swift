@@ -12,7 +12,7 @@ struct LocalizedRepeatFormatter: Sendable {
         switch schedule.rule {
         case .none:
             return text("localization.repeat.one-time", locale: locale)
-        case let .hourly(interval):
+        case .hourly(let interval):
             return interval == 1
                 ? text("localization.repeat.hourly.one", locale: locale)
                 : format(
@@ -20,7 +20,7 @@ struct LocalizedRepeatFormatter: Sendable {
                     locale: locale,
                     Int64(interval)
                 )
-        case let .daily(interval):
+        case .daily(let interval):
             return interval == 1
                 ? text("localization.repeat.daily.one", locale: locale)
                 : format(
@@ -28,7 +28,7 @@ struct LocalizedRepeatFormatter: Sendable {
                     locale: locale,
                     Int64(interval)
                 )
-        case let .weekly(interval, kind, weekdays):
+        case .weekly(let interval, let kind, let weekdays):
             if interval == 1, kind == .weekday {
                 return text("localization.repeat.weekdays", locale: locale)
             }
@@ -44,7 +44,7 @@ struct LocalizedRepeatFormatter: Sendable {
                     Int64(interval),
                     names
                 )
-        case let .monthly(interval, selector):
+        case .monthly(let interval, let selector):
             let selectorText = monthlySelectorSummary(
                 selector,
                 sourceDay: schedule.source.day,
@@ -58,7 +58,7 @@ struct LocalizedRepeatFormatter: Sendable {
                     Int64(interval),
                     selectorText
                 )
-        case let .yearly(interval, month, selector):
+        case .yearly(let interval, let month, let selector):
             let selectorText = yearlySelectorSummary(
                 selector,
                 month: month,
@@ -81,15 +81,17 @@ struct LocalizedRepeatFormatter: Sendable {
         let nominalTimeZone = TimeZone.gmt
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = nominalTimeZone
-        let date = calendar.date(from: DateComponents(
-            calendar: calendar,
-            timeZone: nominalTimeZone,
-            year: source.year,
-            month: source.month,
-            day: source.day,
-            hour: source.hour,
-            minute: source.minute
-        )) ?? .distantPast
+        let date =
+            calendar.date(
+                from: DateComponents(
+                    calendar: calendar,
+                    timeZone: nominalTimeZone,
+                    year: source.year,
+                    month: source.month,
+                    day: source.day,
+                    hour: source.hour,
+                    minute: source.minute
+                )) ?? .distantPast
         let timeFormatter = DateFormatter()
         timeFormatter.locale = locale
         timeFormatter.calendar = calendar
@@ -117,15 +119,16 @@ struct LocalizedRepeatFormatter: Sendable {
         let formatter = DateFormatter()
         formatter.locale = locale
         let symbols = formatter.weekdaySymbols ?? []
-        let index = switch weekday {
-        case .sunday: 0
-        case .monday: 1
-        case .tuesday: 2
-        case .wednesday: 3
-        case .thursday: 4
-        case .friday: 5
-        case .saturday: 6
-        }
+        let index =
+            switch weekday {
+            case .sunday: 0
+            case .monday: 1
+            case .tuesday: 2
+            case .wednesday: 3
+            case .thursday: 4
+            case .friday: 5
+            case .saturday: 6
+            }
         return symbols.indices.contains(index) ? symbols[index] : String(weekday.rawValue)
     }
 
@@ -156,7 +159,7 @@ struct LocalizedRepeatFormatter: Sendable {
                 locale: locale,
                 Int64(sourceDay)
             )
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             return format(
                 "localization.selector.day-of-month",
                 locale: locale,
@@ -164,14 +167,14 @@ struct LocalizedRepeatFormatter: Sendable {
             )
         case .lastDay:
             return text("localization.selector.last-day", locale: locale)
-        case let .ordinalDaySet(ordinalValue, daySet):
+        case .ordinalDaySet(let ordinalValue, let daySet):
             return format(
                 "localization.selector.ordinal-day-set",
                 locale: locale,
                 ordinal(ordinalValue, locale: locale),
                 daySetName(daySet, locale: locale)
             )
-        case let .ordinalWeekday(ordinalValue, weekday):
+        case .ordinalWeekday(let ordinalValue, let weekday):
             return ordinalWeekdaySummary(
                 ordinalValue,
                 weekday: weekday,
@@ -199,7 +202,7 @@ struct LocalizedRepeatFormatter: Sendable {
         }
         let monthText = monthName(month, locale: locale)
         switch selector {
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             return format(
                 "localization.selector.month-day",
                 locale: locale,
@@ -212,7 +215,7 @@ struct LocalizedRepeatFormatter: Sendable {
                 locale: locale,
                 monthText
             )
-        case let .ordinalDaySet(ordinalValue, daySet):
+        case .ordinalDaySet(let ordinalValue, let daySet):
             return format(
                 "localization.selector.month-ordinal-day-set",
                 locale: locale,
@@ -220,7 +223,7 @@ struct LocalizedRepeatFormatter: Sendable {
                 ordinal(ordinalValue, locale: locale),
                 daySetName(daySet, locale: locale)
             )
-        case let .ordinalWeekday(ordinalValue, weekday):
+        case .ordinalWeekday(let ordinalValue, let weekday):
             return format(
                 "localization.selector.month-ordinal-weekday",
                 locale: locale,

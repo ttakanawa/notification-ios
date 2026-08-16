@@ -24,22 +24,26 @@ struct CapacityConfirmationView: View {
     var body: some View {
         NavigationStack {
             VStack(alignment: .leading, spacing: 20) {
-                Label(LocalizedStringResource(
-                    "reminder.form.capacity-confirmation.title",
-                    table: "ReminderForm"
-                ), systemImage: "tray.full")
-                    .font(.title2.weight(.semibold))
-                    .fixedSize(horizontal: false, vertical: true)
+                Label(
+                    LocalizedStringResource(
+                        "reminder.form.capacity-confirmation.title",
+                        table: "ReminderForm"
+                    ), systemImage: "tray.full"
+                )
+                .font(.title2.weight(.semibold))
+                .fixedSize(horizontal: false, vertical: true)
 
                 Text(verbatim: capacityMessage)
                     .fixedSize(horizontal: false, vertical: true)
 
                 Spacer(minLength: 0)
 
-                Button(LocalizedStringResource(
-                    "reminder.form.capacity-confirmation.confirm",
-                    table: "ReminderForm"
-                )) {
+                Button(
+                    LocalizedStringResource(
+                        "reminder.form.capacity-confirmation.confirm",
+                        table: "ReminderForm"
+                    )
+                ) {
                     onConfirm()
                 }
                 .buttonStyle(.borderedProminent)
@@ -47,10 +51,12 @@ struct CapacityConfirmationView: View {
                 .disabled(isPersistenceOperationInFlight)
                 .accessibilityIdentifier("reminder-form.capacity-confirm")
 
-                Button(LocalizedStringResource(
-                    "reminder.action.cancel",
-                    table: "Reminder"
-                ), role: .cancel) {
+                Button(
+                    LocalizedStringResource(
+                        "reminder.action.cancel",
+                        table: "Reminder"
+                    ), role: .cancel
+                ) {
                     onCancel()
                 }
                 .frame(maxWidth: .infinity)

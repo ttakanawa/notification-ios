@@ -94,10 +94,11 @@ public struct SaveReminderUseCase: Sendable {
                 schedule: replacementSchedule,
                 evaluationNow: evaluationNow
             ), expiredScheduleConsent == .notProvided {
-                return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
-                    reminderID: draft.id,
-                    evaluationNow: evaluationNow
-                ))
+                return .requiresExpiredScheduleConfirmation(
+                    ExpiredScheduleWarning(
+                        reminderID: draft.id,
+                        evaluationNow: evaluationNow
+                    ))
             }
         } else {
             saveEvaluationNow = nil
@@ -115,14 +116,15 @@ public struct SaveReminderUseCase: Sendable {
                     replacementSchedule: replacementSchedule
                 )
                 let evaluationNow = saveEvaluationNow ?? now()
-                let plan = try LogicalNotificationPlanner().plan(PlannerInput(
-                    snapshot: hypothetical,
-                    evaluationNow: evaluationNow,
-                    deviceNotificationsEnabled: true,
-                    authorizationAllowsScheduling: true,
-                    capacity: Self.planningCapacity,
-                    recurrenceEnvironment: recurrenceEnvironment
-                ))
+                let plan = try LogicalNotificationPlanner().plan(
+                    PlannerInput(
+                        snapshot: hypothetical,
+                        evaluationNow: evaluationNow,
+                        deviceNotificationsEnabled: true,
+                        authorizationAllowsScheduling: true,
+                        capacity: Self.planningCapacity,
+                        recurrenceEnvironment: recurrenceEnvironment
+                    ))
                 if let warning = capacityWarning(
                     for: draft.id,
                     in: plan
@@ -134,17 +136,18 @@ public struct SaveReminderUseCase: Sendable {
 
         let commitNow = now()
         if let replacementSchedule,
-           try !hasFutureNotification(
-               reminderID: draft.id,
-               schedule: replacementSchedule,
-               evaluationNow: commitNow
-           ),
-           expiredScheduleConsent == .notProvided
-        {
-            return .requiresExpiredScheduleConfirmation(ExpiredScheduleWarning(
+            try !hasFutureNotification(
                 reminderID: draft.id,
+                schedule: replacementSchedule,
                 evaluationNow: commitNow
-            ))
+            ),
+            expiredScheduleConsent == .notProvided
+        {
+            return .requiresExpiredScheduleConfirmation(
+                ExpiredScheduleWarning(
+                    reminderID: draft.id,
+                    evaluationNow: commitNow
+                ))
         }
 
         var committingDraft = draft
@@ -153,19 +156,20 @@ public struct SaveReminderUseCase: Sendable {
             committingDraft,
             replacementScheduleData: replacementData
         )
-        let saved = try await repository.save(EncodedReminderMutation(
-            committingAggregate,
-            command: mutationCommand(
-                for: committingDraft,
-                validatedScheduleData: committingAggregate.scheduleData
-            )
-        ))
+        let saved = try await repository.save(
+            EncodedReminderMutation(
+                committingAggregate,
+                command: mutationCommand(
+                    for: committingDraft,
+                    validatedScheduleData: committingAggregate.scheduleData
+                )
+            ))
         await reconcileRequester.requestReconcile(.reminderSaved(saved.id))
         return .saved(saved.id)
     }
 
     private func replacementSchedule(in draft: ReminderDraft) -> ScheduleDefinition? {
-        guard case let .replace(schedule) = draft.scheduleChange else { return nil }
+        guard case .replace(let schedule) = draft.scheduleChange else { return nil }
         return schedule
     }
 
@@ -256,7 +260,7 @@ public struct SaveReminderUseCase: Sendable {
             .filter { $0.reminderID == reminderID }
             .sorted { $0.baseOccurrenceInstant < $1.baseOccurrenceInstant }
         guard let earliest = candidateGroups.first,
-              plan.outcomes[earliest] == .unscheduledCapacity
+            plan.outcomes[earliest] == .unscheduledCapacity
         else {
             return nil
         }

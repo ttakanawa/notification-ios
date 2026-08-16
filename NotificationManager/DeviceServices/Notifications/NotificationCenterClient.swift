@@ -41,16 +41,16 @@ public final class SystemNotificationCenterClient:
     public func deliveredNotificationInventory() async -> [NotificationInventoryItem] {
         await withCheckedContinuation { continuation in
             center.getDeliveredNotifications { notifications in
-                continuation.resume(returning: notifications.map {
-                    Self.inventoryItem($0.request)
-                })
+                continuation.resume(
+                    returning: notifications.map {
+                        Self.inventoryItem($0.request)
+                    })
             }
         }
     }
 
     public func add(_ request: UNNotificationRequest) async throws {
-        try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Void, any Error>) in
+        let _: Void = try await withCheckedThrowingContinuation { continuation in
             center.add(request) { error in
                 if let error {
                     continuation.resume(throwing: error)

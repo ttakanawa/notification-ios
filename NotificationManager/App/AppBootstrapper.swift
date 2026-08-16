@@ -1,6 +1,7 @@
 import Observation
+
 #if canImport(UIKit)
-import NotificationManagerPersistence
+    import NotificationManagerPersistence
 #endif
 
 enum AppBootstrapState {
@@ -13,9 +14,10 @@ enum AppBootstrapState {
 @Observable
 final class AppBootstrapper {
     typealias EnvironmentOpener = @MainActor @Sendable () async throws -> AppEnvironment
-    typealias FailureActionsFactory = @MainActor @Sendable (
-        @escaping @MainActor @Sendable () async -> Void
-    ) -> DataUnavailableActions
+    typealias FailureActionsFactory =
+        @MainActor @Sendable (
+            @escaping @MainActor @Sendable () async -> Void
+        ) -> DataUnavailableActions
 
     private(set) var state: AppBootstrapState = .loading
 
@@ -37,43 +39,43 @@ final class AppBootstrapper {
     }
 
     #if canImport(UIKit)
-    static func production(
-        notificationDelegate: NotificationApplicationDelegate
-    ) -> AppBootstrapper {
-        let preferenceStore = UserDefaultsDeviceNotificationPreferenceStore()
-        let authorizationService = NotificationAuthorizationService()
-        let notificationCenter = SystemNotificationCenterClient()
-        let cleanupService = NotificationCleanupService(
-            notificationCenter: notificationCenter
-        )
-        let compositionRoot = PersistenceCompositionRoot(
-            makeEnvironment: { container in
-                AppEnvironment.production(
-                    container: container,
-                    notificationDelegate: notificationDelegate,
-                    preferenceStore: preferenceStore,
-                    authorizationService: authorizationService,
-                    notificationCenter: notificationCenter,
-                    cleanupService: cleanupService
-                )
-            }
-        )
-        return AppBootstrapper(
-            notificationDelegate: notificationDelegate,
-            openEnvironment: {
-                try compositionRoot.open()
-            },
-            makeDataUnavailableActions: { retry in
-                DataUnavailableActions(
-                    preferenceStore: preferenceStore,
-                    authorizationProvider: authorizationService,
-                    authorizationRequester: authorizationService,
-                    pendingCleaner: cleanupService,
-                    retry: retry
-                )
-            }
-        )
-    }
+        static func production(
+            notificationDelegate: NotificationApplicationDelegate
+        ) -> AppBootstrapper {
+            let preferenceStore = UserDefaultsNotificationPreferenceStore()
+            let authorizationService = NotificationAuthorizationService()
+            let notificationCenter = SystemNotificationCenterClient()
+            let cleanupService = NotificationCleanupService(
+                notificationCenter: notificationCenter
+            )
+            let compositionRoot = PersistenceCompositionRoot(
+                makeEnvironment: { container in
+                    AppEnvironment.production(
+                        container: container,
+                        notificationDelegate: notificationDelegate,
+                        preferenceStore: preferenceStore,
+                        authorizationService: authorizationService,
+                        notificationCenter: notificationCenter,
+                        cleanupService: cleanupService
+                    )
+                }
+            )
+            return AppBootstrapper(
+                notificationDelegate: notificationDelegate,
+                openEnvironment: {
+                    try compositionRoot.open()
+                },
+                makeDataUnavailableActions: { retry in
+                    DataUnavailableActions(
+                        preferenceStore: preferenceStore,
+                        authorizationProvider: authorizationService,
+                        authorizationRequester: authorizationService,
+                        pendingCleaner: cleanupService,
+                        retry: retry
+                    )
+                }
+            )
+        }
     #endif
 
     func start() async {
@@ -110,13 +112,14 @@ final class AppBootstrapper {
         attemptTask = nil
 
         switch result {
-        case let .success(environment):
+        case .success(let environment):
             environment.activateNotificationHandling()
             state = .ready(environment)
         case .failure:
-            state = .dataUnavailable(makeDataUnavailableActions { [weak self] in
-                await self?.retry()
-            })
+            state = .dataUnavailable(
+                makeDataUnavailableActions { [weak self] in
+                    await self?.retry()
+                })
         }
     }
 }

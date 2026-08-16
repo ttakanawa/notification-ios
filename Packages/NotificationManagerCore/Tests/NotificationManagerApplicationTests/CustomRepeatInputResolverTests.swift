@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManagerApplication
 
 @Suite("CustomRepeatInputResolver")
@@ -12,16 +13,18 @@ struct CustomRepeatInputResolverTests {
         )
         let resolution = await makeResolver(assisted: assisted).resolve("Every 2 weeks")
 
-        guard case let .resolved(value) = resolution else {
+        guard case .resolved(let value) = resolution else {
             Issue.record("Expected deterministic English resolution, got \(resolution)")
             return
         }
         #expect(value.route == .deterministicEnglish)
-        #expect(value.rule == .weekly(
-            interval: 2,
-            weekdaySetKind: .explicit,
-            weekdays: [.friday]
-        ))
+        #expect(
+            value.rule
+                == .weekly(
+                    interval: 2,
+                    weekdaySetKind: .explicit,
+                    weekdays: [.friday]
+                ))
         #expect(await assisted.events.isEmpty)
     }
 
@@ -57,16 +60,18 @@ struct CustomRepeatInputResolverTests {
         )
         let resolution = await makeResolver(assisted: assisted).resolve("毎週月曜日")
 
-        guard case let .resolved(value) = resolution else {
+        guard case .resolved(let value) = resolution else {
             Issue.record("Expected assisted resolution, got \(resolution)")
             return
         }
         #expect(value.route == .japaneseAssisted)
-        #expect(value.rule == .weekly(
-            interval: 1,
-            weekdaySetKind: .explicit,
-            weekdays: [.monday]
-        ))
+        #expect(
+            value.rule
+                == .weekly(
+                    interval: 1,
+                    weekdaySetKind: .explicit,
+                    weekdays: [.monday]
+                ))
         #expect(await assisted.events == [.availability, .interpret("毎週月曜日")])
     }
 
@@ -145,10 +150,11 @@ struct CustomRepeatInputResolverTests {
 
         let resolution = await makeResolver(assisted: assisted).resolve("毎日")
 
-        let expected: CustomRepeatResolutionError = switch interpretationError {
-        case .safetyGuard: .safetyGuard
-        case .generation: .generation
-        }
+        let expected: CustomRepeatResolutionError =
+            switch interpretationError {
+            case .safetyGuard: .safetyGuard
+            case .generation: .generation
+            }
         #expect(resolution.error == expected)
     }
 
@@ -178,7 +184,7 @@ struct CustomRepeatInputResolverTests {
 
         let outcome = try await session.submit("毎日")
 
-        guard case let .applied(.awaitingConfirmation(preview)) = outcome else {
+        guard case .applied(.awaitingConfirmation(let preview)) = outcome else {
             Issue.record("Expected a pending confirmation, got \(outcome)")
             return
         }
@@ -188,12 +194,14 @@ struct CustomRepeatInputResolverTests {
         #expect(preview.nextNotifications.notifications.count == 3)
 
         let confirmed = await session.confirm()
-        #expect(confirmed == ScheduleDefinition(
-            source: Self.source,
-            rule: .daily(interval: 1),
-            end: .never,
-            early: nil
-        ))
+        #expect(
+            confirmed
+                == ScheduleDefinition(
+                    source: Self.source,
+                    rule: .daily(interval: 1),
+                    end: .never,
+                    early: nil
+                ))
     }
 
     @Test func failedSubmissionCannotExposeAScheduleForPersistence() async throws {
@@ -261,7 +269,7 @@ struct CustomRepeatInputResolverTests {
         await resolver.waitUntilRequested("A")
 
         let currentOutcome = try await session.submit("B")
-        guard case let .applied(.awaitingConfirmation(preview)) = currentOutcome else {
+        guard case .applied(.awaitingConfirmation(let preview)) = currentOutcome else {
             Issue.record("Expected B to become the current preview, got \(currentOutcome)")
             return
         }
@@ -324,9 +332,13 @@ struct CustomRepeatInputResolverTests {
         timeZoneIdentifier: "America/New_York"
     )
 
-    private static let previewNow = ISO8601DateFormatter().date(
-        from: "2040-08-30T00:00:00Z"
-    )!
+    private static let previewNow: Date = {
+        let value = "2040-08-30T00:00:00Z"
+        guard let date = ISO8601DateFormatter().date(from: value) else {
+            preconditionFailure("Invalid ISO-8601 test fixture: \(value)")
+        }
+        return date
+    }()
 
     private static let dailySchedule = ScheduleDefinition(
         source: source,
@@ -366,9 +378,8 @@ struct CustomRepeatInputResolverTests {
 private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
     private var requestedInputs: Set<String> = []
     private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
-    private var resolutionContinuations: [
-        String: CheckedContinuation<CustomRepeatResolution, Never>
-    ] = [:]
+    private var resolutionContinuations:
+        [String: CheckedContinuation<CustomRepeatResolution, Never>] = [:]
     private let immediate: [String: CustomRepeatResolution]
 
     init(immediate: [String: CustomRepeatResolution] = [:]) {
@@ -377,7 +388,9 @@ private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
 
     func resolve(_ input: String) async -> CustomRepeatResolution {
         requestedInputs.insert(input)
-        requestWaiters.removeValue(forKey: input)?.forEach { $0.resume() }
+        for waiter in requestWaiters.removeValue(forKey: input) ?? [] {
+            waiter.resume()
+        }
         if let resolution = immediate[input] {
             return resolution
         }
@@ -433,10 +446,10 @@ private actor AssistedRepeatInterpreterSpy: AssistedRepeatInterpreting {
 
 private struct UnknownInterpreterFailure: Error, Sendable {}
 
-private extension RepeatCandidate {
-    static let daily = RepeatCandidate(frequency: .daily, interval: 1)
+extension RepeatCandidate {
+    fileprivate static let daily = RepeatCandidate(frequency: .daily, interval: 1)
 
-    static let weeklyMonday = RepeatCandidate(
+    fileprivate static let weeklyMonday = RepeatCandidate(
         frequency: .weekly,
         interval: 1,
         weekdaySetKind: .explicit,

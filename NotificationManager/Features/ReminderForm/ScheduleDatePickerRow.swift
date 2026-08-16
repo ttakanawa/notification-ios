@@ -61,10 +61,11 @@ struct ScheduleDatePickerRow: View {
                         draftSelection = fallbackSelection
                         isPickerPresented = true
                     } label: {
-                        Text(LocalizedStringResource(
-                            "reminder.form.value.select",
-                            table: "ReminderForm"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.form.value.select",
+                                table: "ReminderForm"
+                            ))
                     }
                     .accessibilityIdentifier(accessibilityIdentifier)
                 } label: {
@@ -89,10 +90,11 @@ struct ScheduleDatePickerRow: View {
                         Button(role: .cancel) {
                             isPickerPresented = false
                         } label: {
-                            Text(LocalizedStringResource(
-                                "reminder.action.cancel",
-                                table: "Reminder"
-                            ))
+                            Text(
+                                LocalizedStringResource(
+                                    "reminder.action.cancel",
+                                    table: "Reminder"
+                                ))
                         }
                     }
                     ToolbarItem(placement: .confirmationAction) {
@@ -101,10 +103,11 @@ struct ScheduleDatePickerRow: View {
                             isPickerPresented = false
                             onSelect(selectedValue)
                         } label: {
-                            Text(LocalizedStringResource(
-                                "reminder.action.done",
-                                table: "Reminder"
-                            ))
+                            Text(
+                                LocalizedStringResource(
+                                    "reminder.action.done",
+                                    table: "Reminder"
+                                ))
                         }
                     }
                 }

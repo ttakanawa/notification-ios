@@ -37,7 +37,7 @@ public struct ReminderStatusCalculator: Sendable {
         case .corrupt, .domainInvalid:
             statuses.append(.invalidSchedule)
             hasFutureAlert = false
-        case let .valid(definition, _, _):
+        case .valid(let definition, _, _):
             do {
                 let result = try NextNotificationProvider().nextPhysicalNotifications(
                     for: UUID(uuid: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)),

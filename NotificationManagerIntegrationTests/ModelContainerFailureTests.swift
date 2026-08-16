@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerPersistence
 import SwiftData
 import Testing
+
 @testable import NotificationManager
 
 @Suite("Model container failure recovery")
@@ -58,7 +59,7 @@ struct ModelContainerFailureTests {
 
         await bootstrapper.start()
 
-        guard case let .dataUnavailable(actions) = bootstrapper.state else {
+        guard case .dataUnavailable(let actions) = bootstrapper.state else {
             Issue.record("Container failure should expose store-independent actions")
             return
         }
@@ -68,96 +69,98 @@ struct ModelContainerFailureTests {
     }
 
     #if DEBUG
-    @MainActor
-    @Test func explicitDebugSchemaBootstrapReleasesCoreDataBeforeSwiftDataOpen() {
-        let trace = DebugSchemaTrace()
-        let configuration = ModelContainerFactory.productionConfiguration(
-            url: URL(fileURLWithPath: "/private/tmp/debug-schema-order.store")
-        )
-        let bootstrapper = DebugCloudKitSchemaBootstrapper(
-            arguments: [DebugCloudKitSchemaBootstrapper.launchArgument],
-            makeSession: { received in
-                trace.record(.sessionCreated)
-                #expect(received.url == configuration.url)
-                #expect(received.name == configuration.name)
-                #expect(
-                    received.cloudKitContainerIdentifier
-                        == configuration.cloudKitContainerIdentifier
-                )
-                return DebugSchemaSessionSpy(trace: trace)
-            }
-        )
-        let root = PersistenceCompositionRoot(
-            configuration: configuration,
-            debugSchemaBootstrapper: bootstrapper,
-            makeContainer: { _ in
-                trace.record(.swiftDataOpenStarted)
-                throw ContainerFailureTestError.stopAfterTrace
-            },
-            makeEnvironment: { _ in AppEnvironment() }
-        )
-
-        #expect(throws: ContainerFailureTestError.stopAfterTrace) {
-            _ = try root.open()
-        }
-        #expect(trace.events == [
-            .sessionCreated,
-            .storeLoadedSynchronously,
-            .schemaInitialized,
-            .storeRemoved,
-            .sessionReleased,
-            .swiftDataOpenStarted
-        ])
-    }
-
-    @MainActor
-    @Test func debugSchemaBootstrapRequiresTheExplicitLaunchArgument() throws {
-        let trace = DebugSchemaTrace()
-        let bootstrapper = DebugCloudKitSchemaBootstrapper(
-            arguments: ["-ordinary-debug-launch"],
-            makeSession: { _ in
-                trace.record(.sessionCreated)
-                return DebugSchemaSessionSpy(trace: trace)
-            }
-        )
-
-        try bootstrapper.initializeIfRequested(
-            configuration: ModelContainerFactory.productionConfiguration(
-                url: URL(fileURLWithPath: "/private/tmp/debug-schema-not-requested.store")
+        @MainActor
+        @Test func explicitDebugSchemaBootstrapReleasesCoreDataBeforeSwiftDataOpen() {
+            let trace = DebugSchemaTrace()
+            let configuration = ModelContainerFactory.productionConfiguration(
+                url: URL(fileURLWithPath: "/private/tmp/debug-schema-order.store")
             )
-        )
+            let bootstrapper = DebugCloudKitSchemaBootstrapper(
+                arguments: [DebugCloudKitSchemaBootstrapper.launchArgument],
+                makeSession: { received in
+                    trace.record(.sessionCreated)
+                    #expect(received.url == configuration.url)
+                    #expect(received.name == configuration.name)
+                    #expect(
+                        received.cloudKitContainerIdentifier
+                            == configuration.cloudKitContainerIdentifier
+                    )
+                    return DebugSchemaSessionSpy(trace: trace)
+                }
+            )
+            let root = PersistenceCompositionRoot(
+                configuration: configuration,
+                debugSchemaBootstrapper: bootstrapper,
+                makeContainer: { _ in
+                    trace.record(.swiftDataOpenStarted)
+                    throw ContainerFailureTestError.stopAfterTrace
+                },
+                makeEnvironment: { _ in AppEnvironment() }
+            )
 
-        #expect(trace.events.isEmpty)
-    }
-
-    @MainActor
-    @Test func schemaFailureStillUnloadsStoreAndPreservesThePrimaryError() {
-        let trace = DebugSchemaTrace()
-        let bootstrapper = DebugCloudKitSchemaBootstrapper(
-            arguments: [DebugCloudKitSchemaBootstrapper.launchArgument],
-            makeSession: { _ in
-                DebugSchemaSessionSpy(
-                    trace: trace,
-                    initializeError: .schemaInitializationFailed,
-                    removeError: .storeRemovalFailed
-                )
+            #expect(throws: ContainerFailureTestError.stopAfterTrace) {
+                _ = try root.open()
             }
-        )
+            #expect(
+                trace.events == [
+                    .sessionCreated,
+                    .storeLoadedSynchronously,
+                    .schemaInitialized,
+                    .storeRemoved,
+                    .sessionReleased,
+                    .swiftDataOpenStarted
+                ])
+        }
 
-        #expect(throws: ContainerFailureTestError.schemaInitializationFailed) {
+        @MainActor
+        @Test func debugSchemaBootstrapRequiresTheExplicitLaunchArgument() throws {
+            let trace = DebugSchemaTrace()
+            let bootstrapper = DebugCloudKitSchemaBootstrapper(
+                arguments: ["-ordinary-debug-launch"],
+                makeSession: { _ in
+                    trace.record(.sessionCreated)
+                    return DebugSchemaSessionSpy(trace: trace)
+                }
+            )
+
             try bootstrapper.initializeIfRequested(
                 configuration: ModelContainerFactory.productionConfiguration(
-                    url: URL(fileURLWithPath: "/private/tmp/debug-schema-failure.store")
+                    url: URL(fileURLWithPath: "/private/tmp/debug-schema-not-requested.store")
                 )
             )
+
+            #expect(trace.events.isEmpty)
         }
-        #expect(trace.events == [
-            .storeLoadedSynchronously,
-            .schemaInitialized,
-            .storeRemoved,
-            .sessionReleased
-        ])
-    }
+
+        @MainActor
+        @Test func schemaFailureStillUnloadsStoreAndPreservesThePrimaryError() {
+            let trace = DebugSchemaTrace()
+            let bootstrapper = DebugCloudKitSchemaBootstrapper(
+                arguments: [DebugCloudKitSchemaBootstrapper.launchArgument],
+                makeSession: { _ in
+                    DebugSchemaSessionSpy(
+                        trace: trace,
+                        initializeError: .schemaInitializationFailed,
+                        removeError: .storeRemovalFailed
+                    )
+                }
+            )
+
+            #expect(throws: ContainerFailureTestError.schemaInitializationFailed) {
+                try bootstrapper.initializeIfRequested(
+                    configuration: ModelContainerFactory.productionConfiguration(
+                        url: URL(fileURLWithPath: "/private/tmp/debug-schema-failure.store")
+                    )
+                )
+            }
+            #expect(
+                trace.events == [
+                    .storeLoadedSynchronously,
+                    .schemaInitialized,
+                    .storeRemoved,
+                    .sessionReleased
+                ])
+        }
     #endif
 }
 
@@ -199,58 +202,58 @@ private actor FailurePendingCleaner: PendingAppNotificationCleaning {
 }
 
 #if DEBUG
-@MainActor
-private final class DebugSchemaTrace {
-    private(set) var events: [DebugSchemaTraceEvent] = []
+    @MainActor
+    private final class DebugSchemaTrace {
+        private(set) var events: [DebugSchemaTraceEvent] = []
 
-    func record(_ event: DebugSchemaTraceEvent) {
-        events.append(event)
-    }
-}
-
-private enum DebugSchemaTraceEvent: Equatable {
-    case sessionCreated
-    case storeLoadedSynchronously
-    case schemaInitialized
-    case storeRemoved
-    case sessionReleased
-    case swiftDataOpenStarted
-}
-
-@MainActor
-private final class DebugSchemaSessionSpy: DebugCloudKitSchemaSession {
-    private let trace: DebugSchemaTrace
-    private let initializeError: ContainerFailureTestError?
-    private let removeError: ContainerFailureTestError?
-
-    init(
-        trace: DebugSchemaTrace,
-        initializeError: ContainerFailureTestError? = nil,
-        removeError: ContainerFailureTestError? = nil
-    ) {
-        self.trace = trace
-        self.initializeError = initializeError
-        self.removeError = removeError
-    }
-
-    func loadPersistentStoreSynchronously() throws {
-        trace.record(.storeLoadedSynchronously)
-    }
-
-    func initializeCloudKitSchema() throws {
-        trace.record(.schemaInitialized)
-        if let initializeError { throw initializeError }
-    }
-
-    func removePersistentStore() throws {
-        trace.record(.storeRemoved)
-        if let removeError { throw removeError }
-    }
-
-    deinit {
-        MainActor.assumeIsolated {
-            trace.record(.sessionReleased)
+        func record(_ event: DebugSchemaTraceEvent) {
+            events.append(event)
         }
     }
-}
+
+    private enum DebugSchemaTraceEvent: Equatable {
+        case sessionCreated
+        case storeLoadedSynchronously
+        case schemaInitialized
+        case storeRemoved
+        case sessionReleased
+        case swiftDataOpenStarted
+    }
+
+    @MainActor
+    private final class DebugSchemaSessionSpy: DebugCloudKitSchemaSession {
+        private let trace: DebugSchemaTrace
+        private let initializeError: ContainerFailureTestError?
+        private let removeError: ContainerFailureTestError?
+
+        init(
+            trace: DebugSchemaTrace,
+            initializeError: ContainerFailureTestError? = nil,
+            removeError: ContainerFailureTestError? = nil
+        ) {
+            self.trace = trace
+            self.initializeError = initializeError
+            self.removeError = removeError
+        }
+
+        func loadPersistentStoreSynchronously() throws {
+            trace.record(.storeLoadedSynchronously)
+        }
+
+        func initializeCloudKitSchema() throws {
+            trace.record(.schemaInitialized)
+            if let initializeError { throw initializeError }
+        }
+
+        func removePersistentStore() throws {
+            trace.record(.storeRemoved)
+            if let removeError { throw removeError }
+        }
+
+        deinit {
+            MainActor.assumeIsolated {
+                trace.record(.sessionReleased)
+            }
+        }
+    }
 #endif

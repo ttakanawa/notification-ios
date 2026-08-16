@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Notification application delegate")
@@ -19,7 +20,7 @@ struct NotificationApplicationDelegateTests {
             }
         )
         let request = notificationRequest(reminderID: Self.reminderID)
-        let completion = NotificationPresentationCompletionRecorder(sequence: sequence)
+        let completion = PresentationCompletionRecorder(sequence: sequence)
 
         delegate.presentationOptions(for: request) { options in
             completion.record(options)
@@ -40,7 +41,7 @@ struct NotificationApplicationDelegateTests {
             eligibilityIndexStore: index,
             reconcileAfterNotification: { _ in }
         )
-        let completion = NotificationPresentationCompletionRecorder(
+        let completion = PresentationCompletionRecorder(
             sequence: NotificationDelegateSequence()
         )
 
@@ -495,10 +496,11 @@ struct NotificationApplicationDelegateTests {
 
         #expect(missing == .notificationUnavailable)
         #expect(uppercase == .notificationUnavailable)
-        #expect(routes.destinations == [
-            .notificationUnavailable,
-            .notificationUnavailable
-        ])
+        #expect(
+            routes.destinations == [
+                .notificationUnavailable,
+                .notificationUnavailable
+            ])
         #expect(routes.openedURLs.isEmpty)
     }
 
@@ -531,11 +533,12 @@ struct NotificationApplicationDelegateTests {
         #expect(routes.destinations.isEmpty)
         #expect(routes.openedURLs.isEmpty)
         #expect(await lookup.requestedIDs.isEmpty)
-        #expect(await reconciles.triggers == [
-            .notificationResponseCompleted,
-            .notificationResponseCompleted,
-            .notificationResponseCompleted
-        ])
+        #expect(
+            await reconciles.triggers == [
+                .notificationResponseCompleted,
+                .notificationResponseCompleted,
+                .notificationResponseCompleted
+            ])
     }
 
     @MainActor
@@ -619,16 +622,17 @@ struct NotificationApplicationDelegateTests {
         )
         await events.waitForCount(8)
 
-        #expect(events.values == [
-            "completion:\(Self.reminderID)",
-            "lookup:\(Self.reminderID)",
-            "route:\(Self.reminderID)",
-            "reconcile",
-            "lookup:\(secondReminderID)",
-            "route:\(secondReminderID)",
-            "completion:\(secondReminderID)",
-            "reconcile"
-        ])
+        #expect(
+            events.values == [
+                "completion:\(Self.reminderID)",
+                "lookup:\(Self.reminderID)",
+                "route:\(Self.reminderID)",
+                "reconcile",
+                "lookup:\(secondReminderID)",
+                "route:\(secondReminderID)",
+                "completion:\(secondReminderID)",
+                "reconcile"
+            ])
     }
 
     @MainActor
@@ -679,16 +683,17 @@ struct NotificationApplicationDelegateTests {
         await lookup.releaseBlockedLookup()
         await events.waitForCount(8)
 
-        #expect(events.values == [
-            "lookup:\(Self.reminderID)",
-            "route:\(Self.reminderID)",
-            "completion:\(Self.reminderID)",
-            "reconcile",
-            "lookup:\(secondReminderID)",
-            "route:\(secondReminderID)",
-            "completion:\(secondReminderID)",
-            "reconcile"
-        ])
+        #expect(
+            events.values == [
+                "lookup:\(Self.reminderID)",
+                "route:\(Self.reminderID)",
+                "completion:\(Self.reminderID)",
+                "reconcile",
+                "lookup:\(secondReminderID)",
+                "route:\(secondReminderID)",
+                "completion:\(secondReminderID)",
+                "reconcile"
+            ])
     }
 
     @MainActor
@@ -725,7 +730,7 @@ struct NotificationApplicationDelegateTests {
         await lookup.waitUntilBlockedLookupStarts()
         await lifecycle.handle(.background)
         await lookup.releaseBlockedLookup()
-        while completion.count == 0 {
+        while !completion.hasRecordedResponse {
             await Task.yield()
         }
 
@@ -733,7 +738,7 @@ struct NotificationApplicationDelegateTests {
     }
 
     @MainActor
-    @Test func coldLaunchResponseQueueIsBoundedAndReplaysInFIFOOrder() async {
+    @Test func coldLaunchResponseQueueIsBoundedAndReplaysInFIFOOrder() async throws {
         let lookup = NotificationLookupRecorder(reminder: nil)
         let routes = NotificationRouteRecorder()
         let completion = NotificationResponseCompletionRecorder()
@@ -741,11 +746,13 @@ struct NotificationApplicationDelegateTests {
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             responseHandlingInitiallyBound: false
         )
-        let identifiers = (0...NotificationApplicationDelegate.pendingResponseLimit).map {
-            UUID(uuidString: String(
-                format: "00000000-0000-0000-0000-%012x",
-                $0
-            ))!
+        let identifiers = try (0...NotificationApplicationDelegate.pendingResponseLimit).map {
+            try #require(
+                UUID(
+                    uuidString: String(
+                        format: "00000000-0000-0000-0000-%012x",
+                        $0
+                    )))
         }
 
         for identifier in identifiers {
@@ -809,29 +816,32 @@ struct NotificationApplicationDelegateTests {
         #expect(routes.destinations == [.notificationUnavailable])
         #expect(routes.openedURLs.isEmpty)
         #expect(await lookup.requestedIDs.isEmpty)
-        #expect(await reconciles.triggers == [
-            .notificationResponseCompleted,
-            .notificationResponseCompleted,
-            .notificationResponseCompleted
-        ])
+        #expect(
+            await reconciles.triggers == [
+                .notificationResponseCompleted,
+                .notificationResponseCompleted,
+                .notificationResponseCompleted
+            ])
     }
 
     @MainActor
     @Test func neutralAndSettingsRoutesClearSelectionAcrossAdaptiveTransitions() {
-        let actions = ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { command in .saved(command.reminderID) },
-            delete: { _ in }
-        ))
-        let router = AppRouter(actions: actions)
-        router.register(form: ReminderFormModel(
-            snapshot: reminder(title: "Selected reminder", urlString: nil),
-            savedRepeatPresentation: nil,
-            now: Date(timeIntervalSince1970: 1),
-            actions: ReminderFormActions(
-                save: { draft, _, _ in .saved(draft.id) },
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
                 delete: { _ in }
-            )
-        ))
+            ))
+        let router = AppRouter(actions: actions)
+        router.register(
+            form: ReminderFormModel(
+                snapshot: reminder(title: "Selected reminder", urlString: nil),
+                savedRepeatPresentation: nil,
+                now: Date(timeIntervalSince1970: 1),
+                actions: ReminderFormActions(
+                    save: { draft, _, _ in .saved(draft.id) },
+                    delete: { _ in }
+                )
+            ))
 
         router.showReminder(Self.reminderID)
         #expect(router.selectedReminderID == Self.reminderID)
@@ -963,10 +973,11 @@ struct NotificationApplicationDelegateTests {
 
     @MainActor
     private func routerActions() -> ReminderActionCoordinator {
-        ReminderActionCoordinator(handlers: ReminderActionHandlers(
-            setEnabled: { command in .saved(command.reminderID) },
-            delete: { _ in }
-        ))
+        ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            ))
     }
 
     @MainActor
@@ -989,9 +1000,10 @@ private func requireStrictNonisolatedNotificationDelegateWitnesses(
     center: UNUserNotificationCenter,
     notification: UNNotification,
     response: UNNotificationResponse,
-    presentationCompletion: @escaping @Sendable (
-        UNNotificationPresentationOptions
-    ) -> Void,
+    presentationCompletion:
+        @escaping @Sendable (
+            UNNotificationPresentationOptions
+        ) -> Void,
     responseCompletion: @escaping @Sendable () -> Void
 ) {
     delegate.userNotificationCenter(
@@ -1084,9 +1096,7 @@ private final class ResponseSnapshotPublicationRecorder {
 
 private actor ResponsePresentationSnapshotGate {
     private var nextAttempt = 0
-    private var pending: [
-        Int: CheckedContinuation<CompleteReminderSnapshot?, Never>
-    ] = [:]
+    private var pending: [Int: CheckedContinuation<CompleteReminderSnapshot?, Never>] = [:]
 
     func load() async -> CompleteReminderSnapshot? {
         let attempt = nextAttempt
@@ -1115,7 +1125,9 @@ private actor ResponseCoalescingRecorder {
         didStart = true
         let currentWaiters = waiters
         waiters.removeAll()
-        currentWaiters.forEach { $0.resume() }
+        for waiter in currentWaiters {
+            waiter.resume()
+        }
     }
 
     func waitUntilStarted() async {
@@ -1133,26 +1145,28 @@ private final class RoutingSnapshotProjectionRecorder {
     private(set) var publishedStates: [Int] = []
 
     init() {
-        router = AppRouter(actions: ReminderActionCoordinator(
-            handlers: ReminderActionHandlers(
-                setEnabled: { command in .saved(command.reminderID) },
-                delete: { _ in }
-            )
-        ))
+        router = AppRouter(
+            actions: ReminderActionCoordinator(
+                handlers: ReminderActionHandlers(
+                    setEnabled: { command in .saved(command.reminderID) },
+                    delete: { _ in }
+                )
+            ))
     }
 
     func publish(snapshot: CompleteReminderSnapshot, state: Int) {
         router.prunePersistedReminders(keeping: Set(snapshot.reminders.map(\.id)))
         for reminder in snapshot.reminders {
-            router.registerFormIfAbsent(ReminderFormModel(
-                snapshot: reminder,
-                savedRepeatPresentation: nil,
-                now: reminder.updatedAt,
-                actions: ReminderFormActions(
-                    save: { draft, _, _ in .saved(draft.id) },
-                    delete: { _ in }
-                )
-            ))
+            router.registerFormIfAbsent(
+                ReminderFormModel(
+                    snapshot: reminder,
+                    savedRepeatPresentation: nil,
+                    now: reminder.updatedAt,
+                    actions: ReminderFormActions(
+                        save: { draft, _, _ in .saved(draft.id) },
+                        delete: { _ in }
+                    )
+                ))
         }
         publishedTitles.append(snapshot.reminders.map(\.title))
         publishedStates.append(state)
@@ -1184,7 +1198,9 @@ private actor BlockingFirstNotificationLookup {
             blockedLookupStarted = true
             let waiters = startWaiters
             startWaiters.removeAll()
-            waiters.forEach { $0.resume() }
+            for waiter in waiters {
+                waiter.resume()
+            }
             await withCheckedContinuation { continuation in
                 releaseContinuation = continuation
             }
@@ -1232,10 +1248,10 @@ private final class OrderedNotificationResponseEvents: @unchecked Sendable {
     }
 }
 
-private extension NotificationResponseDestination {
-    var eventReminderID: UUID {
+extension NotificationResponseDestination {
+    fileprivate var eventReminderID: UUID {
         switch self {
-        case let .reminderEdit(reminderID):
+        case .reminderEdit(let reminderID):
             reminderID
         case .notificationUnavailable:
             UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
@@ -1289,9 +1305,9 @@ private actor LifecycleReconcileReasonRecorder {
     }
 }
 
-private extension Array {
+extension Array {
     @MainActor
-    func asyncMap<T: Sendable>(
+    fileprivate func asyncMap<T: Sendable>(
         _ transform: @MainActor (Element) async -> T
     ) async -> [T] {
         var result: [T] = []
@@ -1302,7 +1318,7 @@ private extension Array {
     }
 }
 
-private final class NotificationPresentationCompletionRecorder: @unchecked Sendable {
+private final class PresentationCompletionRecorder: @unchecked Sendable {
     private let lock = NSLock()
     private let sequenceCounter: NotificationDelegateSequence
     private var storedOptions: UNNotificationPresentationOptions = []
@@ -1333,6 +1349,7 @@ private final class NotificationResponseCompletionRecorder: @unchecked Sendable 
     private var storedCount = 0
 
     var count: Int { lock.withLock { storedCount } }
+    var hasRecordedResponse: Bool { lock.withLock { storedCount > 0 } }
 
     func record() {
         lock.withLock { storedCount += 1 }

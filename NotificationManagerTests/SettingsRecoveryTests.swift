@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Settings and recovery")
@@ -52,13 +53,14 @@ struct SettingsRecoveryTests {
         #expect(model.authorization.rawStatus == .denied)
         #expect(await authorization.requestCount == 1)
         #expect(await reconciler.reasons == [.deviceSettingsChanged])
-        #expect(await trace.events == [
-            .preferenceSet(true),
-            .authorizationRead(0),
-            .authorizationRequested,
-            .authorizationRead(1),
-            .reconcileRequested
-        ])
+        #expect(
+            await trace.events == [
+                .preferenceSet(true),
+                .authorizationRead(0),
+                .authorizationRequested,
+                .authorizationRead(1),
+                .reconcileRequested
+            ])
     }
 
     @MainActor
@@ -127,11 +129,12 @@ struct SettingsRecoveryTests {
 
         #expect(!model.isEnabled)
         #expect(await cleaner.callCount == 1)
-        #expect(await trace.events == [
-            .preferenceSet(false),
-            .pendingCleanup,
-            .reconcileRequested
-        ])
+        #expect(
+            await trace.events == [
+                .preferenceSet(false),
+                .pendingCleanup,
+                .reconcileRequested
+            ])
     }
 
     @MainActor
@@ -280,20 +283,21 @@ struct RecoveryPrivacyBoundaryTests {
     }
 
     @Test func aboutPrivacyDisclosuresKeepEachNormativeLimitationExplicit() {
-        #expect(Set(AboutPrivacyDisclosure.allCases) == [
-            .automaticICloudSync,
-            .syncCompletionNotGuaranteed,
-            .accountBehaviorNotGuaranteed,
-            .notificationStorageManagedByOS,
-            .notificationPreviewsControlledByOS,
-            .staleSyncedContentMayAppear,
-            .notificationRemovalIsNonAtomic,
-            .deliveredNotificationRetention,
-            .delayedOperationsAfterTermination,
-            .staleRepeatingRequestsUntilReconcile,
-            .noServerAnalyticsOrAdvertising,
-            .foundationModelsRunOnDevice
-        ])
+        #expect(
+            Set(AboutPrivacyDisclosure.allCases) == [
+                .automaticICloudSync,
+                .syncCompletionNotGuaranteed,
+                .accountBehaviorNotGuaranteed,
+                .notificationStorageManagedByOS,
+                .notificationPreviewsControlledByOS,
+                .staleSyncedContentMayAppear,
+                .notificationRemovalIsNonAtomic,
+                .deliveredNotificationRetention,
+                .delayedOperationsAfterTermination,
+                .staleRepeatingRequestsUntilReconcile,
+                .noServerAnalyticsOrAdvertising,
+                .foundationModelsRunOnDevice
+            ])
     }
 
 }
@@ -301,7 +305,9 @@ struct RecoveryPrivacyBoundaryTests {
 @Suite("Tag management and picker")
 struct TagManagementPresentationTests {
     @MainActor
-    @Test func createUsesTask11NormalizationAndSurfacesRepositoryDuplicateWithoutLosingTags() async throws {
+    @Test func createUsesTask11NormalizationAndSurfacesRepositoryDuplicateWithoutLosingTags()
+        async throws
+    {
         let (model, _) = makeTagModel()
         await model.load()
 
@@ -465,8 +471,11 @@ struct TagManagementPresentationTests {
 
     private func tagFixture(id: String, name: String) -> TagSnapshot {
         let timestamp = Date(timeIntervalSince1970: 1_786_003_200)
+        guard let tagID = UUID(uuidString: id) else {
+            preconditionFailure("Invalid tag UUID fixture: \(id)")
+        }
         return TagSnapshot(
-            id: UUID(uuidString: id)!,
+            id: tagID,
             name: name,
             normalizedName: name.lowercased(),
             createdAt: timestamp,
@@ -532,10 +541,11 @@ struct SourceTimePresentationTests {
     @Test func dstGapWallClockKeepsNominalCivilComponentsAcrossLocales() throws {
         let formatter = SourceDateTimePresentationFormatter(
             localizer: LocalizedTextProvider { key, _ in
-                #expect([
-                    "reminder.source-wall-clock.presentation",
-                    "reminder.source-instant.presentation"
-                ].contains(key))
+                #expect(
+                    [
+                        "reminder.source-wall-clock.presentation",
+                        "reminder.source-instant.presentation"
+                    ].contains(key))
                 return "%1$@ · %2$@"
             }
         )
@@ -572,7 +582,7 @@ struct SourceTimePresentationTests {
 }
 
 @Suite("Localized notification reason presentation")
-struct LocalizedNotificationReasonPresentationTests {
+struct NotificationReasonPresentationTests {
     @Test func emptyRepeatingContributorsProduceNoReasonWithoutLocalizationLookup() {
         let formatter = LocalizedReasonFormatter(
             localizer: LocalizedTextProvider { key, _ in
@@ -700,39 +710,38 @@ struct LocalizedNotificationReasonPresentationTests {
 @Suite("Accessibility error announcement identity")
 struct AccessibilityErrorAnnouncementTests {
     @Test func identitiesKeepRawIdentityWhileExposingOwnedLocalizationTable() {
-        let fixtures: [
-            (
+        let fixtures:
+            [(
                 identity: AccessibilityErrorIdentity,
                 rawValue: String,
                 table: LocalizationTable
-            )
-        ] = [
-            (
-                .reminderTitleRequired,
-                "reminder.form.error.title-required",
-                .reminderForm
-            ),
-            (
-                .reminderEnabledChangeFailed,
-                "reminder.action.enabled-change-failed",
-                .reminder
-            ),
-            (
-                .settingsPendingCleanup,
-                "settings.error.pending-cleanup",
-                .settings
-            ),
-            (
-                .tagDuplicateName,
-                "tags.error.duplicate-name",
-                .tags
-            ),
-            (
-                .dataUnavailable,
-                "recovery.error.data-unavailable",
-                .recovery
-            )
-        ]
+            )] = [
+                (
+                    .reminderTitleRequired,
+                    "reminder.form.error.title-required",
+                    .reminderForm
+                ),
+                (
+                    .reminderEnabledChangeFailed,
+                    "reminder.action.enabled-change-failed",
+                    .reminder
+                ),
+                (
+                    .settingsPendingCleanup,
+                    "settings.error.pending-cleanup",
+                    .settings
+                ),
+                (
+                    .tagDuplicateName,
+                    "tags.error.duplicate-name",
+                    .tags
+                ),
+                (
+                    .dataUnavailable,
+                    "recovery.error.data-unavailable",
+                    .recovery
+                )
+            ]
 
         for fixture in fixtures {
             #expect(fixture.identity.rawValue == fixture.rawValue)
@@ -804,7 +813,9 @@ private actor BlockingRetryAction {
         started = true
         let waiters = startWaiters
         startWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             releaseContinuation = continuation
         }
@@ -868,9 +879,11 @@ private actor TagPresentationRepository: ReminderRepository {
                 throw TagRepositoryError.notFound(mutation.id)
             }
         }
-        guard !tags.values.contains(where: {
-            $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
-        }) else {
+        guard
+            !tags.values.contains(where: {
+                $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+            })
+        else {
             throw TagRepositoryError.duplicateNormalizedName(mutation.normalizedName)
         }
         let tag = TagSnapshot(
@@ -922,7 +935,9 @@ private actor ControlledTagSnapshotRepository: ReminderRepository {
             firstFetchStarted = true
             let waiters = firstFetchStartWaiters
             firstFetchStartWaiters.removeAll()
-            waiters.forEach { $0.resume() }
+            for waiter in waiters {
+                waiter.resume()
+            }
             await withCheckedContinuation { continuation in
                 firstFetchRelease = continuation
             }
@@ -1082,8 +1097,8 @@ private actor RecoveryNotificationCenterSpy: NotificationCenterClient {
     }
 }
 
-private extension NotificationAuthorizationSnapshot {
-    static func fixture(rawValue: Int) -> NotificationAuthorizationSnapshot {
+extension NotificationAuthorizationSnapshot {
+    fileprivate static func fixture(rawValue: Int) -> NotificationAuthorizationSnapshot {
         NotificationAuthorizationService.map(rawValue: rawValue)
     }
 }

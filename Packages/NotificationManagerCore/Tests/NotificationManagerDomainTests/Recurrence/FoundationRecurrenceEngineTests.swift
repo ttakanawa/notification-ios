@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Recurrence.FoundationRecurrenceEngine")
@@ -26,11 +27,12 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2026-08-01T09:30:00Z")..<isoDate("2026-08-07T09:30:00Z")
         )
 
-        #expect(values == [
-            isoDate("2026-08-01T09:30:00Z"),
-            isoDate("2026-08-03T09:30:00Z"),
-            isoDate("2026-08-05T09:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2026-08-01T09:30:00Z"),
+                isoDate("2026-08-03T09:30:00Z"),
+                isoDate("2026-08-05T09:30:00Z")
+            ])
     }
 
     @Test func weeklyIntervalMapsWeekdayResidue() throws {
@@ -42,12 +44,13 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2026-08-03T00:00:00Z")..<isoDate("2026-09-15T00:00:00Z")
         )
 
-        #expect(values == [
-            isoDate("2026-08-03T09:30:00Z"),
-            isoDate("2026-08-17T09:30:00Z"),
-            isoDate("2026-08-31T09:30:00Z"),
-            isoDate("2026-09-14T09:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2026-08-03T09:30:00Z"),
+                isoDate("2026-08-17T09:30:00Z"),
+                isoDate("2026-08-31T09:30:00Z"),
+                isoDate("2026-09-14T09:30:00Z")
+            ])
     }
 
     @Test func weekdaysAndWeekendsUseSourceZoneWeekdays() throws {
@@ -75,12 +78,13 @@ struct FoundationRecurrenceEngineTests {
         )
 
         #expect(weekdays == [3, 4, 5, 6, 7].map { isoDate("2026-08-0\($0)T09:30:00Z") })
-        #expect(weekends == [
-            isoDate("2026-08-01T09:30:00Z"),
-            isoDate("2026-08-02T09:30:00Z"),
-            isoDate("2026-08-08T09:30:00Z"),
-            isoDate("2026-08-09T09:30:00Z")
-        ])
+        #expect(
+            weekends == [
+                isoDate("2026-08-01T09:30:00Z"),
+                isoDate("2026-08-02T09:30:00Z"),
+                isoDate("2026-08-08T09:30:00Z"),
+                isoDate("2026-08-09T09:30:00Z")
+            ])
     }
 
     @Test func monthlyDayOfMonthSkipsMonthsWithoutThatDay() throws {
@@ -92,11 +96,12 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2027-01-01T00:00:00Z")..<isoDate("2027-06-01T00:00:00Z")
         )
 
-        #expect(values == [
-            isoDate("2027-01-31T09:30:00Z"),
-            isoDate("2027-03-31T09:30:00Z"),
-            isoDate("2027-05-31T09:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2027-01-31T09:30:00Z"),
+                isoDate("2027-03-31T09:30:00Z"),
+                isoDate("2027-05-31T09:30:00Z")
+            ])
     }
 
     @Test func monthlyAnchorDayAndLastDayMapDirectly() throws {
@@ -115,17 +120,19 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2027-01-01T00:00:00Z")..<isoDate("2027-04-01T00:00:00Z")
         )
 
-        #expect(anchorDay == [
-            isoDate("2027-01-30T09:30:00Z"),
-            isoDate("2027-03-30T09:30:00Z"),
-            isoDate("2027-05-30T09:30:00Z"),
-            isoDate("2027-07-30T09:30:00Z")
-        ])
-        #expect(lastDay == [
-            isoDate("2027-01-31T09:30:00Z"),
-            isoDate("2027-02-28T09:30:00Z"),
-            isoDate("2027-03-31T09:30:00Z")
-        ])
+        #expect(
+            anchorDay == [
+                isoDate("2027-01-30T09:30:00Z"),
+                isoDate("2027-03-30T09:30:00Z"),
+                isoDate("2027-05-30T09:30:00Z"),
+                isoDate("2027-07-30T09:30:00Z")
+            ])
+        #expect(
+            lastDay == [
+                isoDate("2027-01-31T09:30:00Z"),
+                isoDate("2027-02-28T09:30:00Z"),
+                isoDate("2027-03-31T09:30:00Z")
+            ])
     }
 
     @Test func monthlyFifthAndReverseWeekdaysSkipMissingOccurrences() throws {
@@ -150,16 +157,18 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2023-01-01T00:00:00Z")..<isoDate("2023-04-01T00:00:00Z")
         )
 
-        #expect(fifthMonday == [
-            isoDate("2023-01-30T09:30:00Z"),
-            isoDate("2023-05-29T09:30:00Z"),
-            isoDate("2023-07-31T09:30:00Z")
-        ])
-        #expect(lastFriday == [
-            isoDate("2023-01-27T09:30:00Z"),
-            isoDate("2023-02-24T09:30:00Z"),
-            isoDate("2023-03-31T09:30:00Z")
-        ])
+        #expect(
+            fifthMonday == [
+                isoDate("2023-01-30T09:30:00Z"),
+                isoDate("2023-05-29T09:30:00Z"),
+                isoDate("2023-07-31T09:30:00Z")
+            ])
+        #expect(
+            lastFriday == [
+                isoDate("2023-01-27T09:30:00Z"),
+                isoDate("2023-02-24T09:30:00Z"),
+                isoDate("2023-03-31T09:30:00Z")
+            ])
     }
 
     @Test func monthlyOrdinalWeekdayAndWeekendSelectorsUseSetPositions() throws {
@@ -184,16 +193,18 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2023-01-01T00:00:00Z")..<isoDate("2023-04-01T00:00:00Z")
         )
 
-        #expect(firstWeekday == [
-            isoDate("2023-02-01T09:30:00Z"),
-            isoDate("2023-03-01T09:30:00Z"),
-            isoDate("2023-04-03T09:30:00Z")
-        ])
-        #expect(secondWeekendDay == [
-            isoDate("2023-01-07T09:30:00Z"),
-            isoDate("2023-02-05T09:30:00Z"),
-            isoDate("2023-03-05T09:30:00Z")
-        ])
+        #expect(
+            firstWeekday == [
+                isoDate("2023-02-01T09:30:00Z"),
+                isoDate("2023-03-01T09:30:00Z"),
+                isoDate("2023-04-03T09:30:00Z")
+            ])
+        #expect(
+            secondWeekendDay == [
+                isoDate("2023-01-07T09:30:00Z"),
+                isoDate("2023-02-05T09:30:00Z"),
+                isoDate("2023-03-05T09:30:00Z")
+            ])
     }
 
     @Test func yearlyIntervalAndAnchorMonthDayMapDirectly() throws {
@@ -212,16 +223,18 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2024-01-01T00:00:00Z")..<isoDate("2027-01-01T00:00:00Z")
         )
 
-        #expect(fixed == [
-            isoDate("2024-05-10T09:30:00Z"),
-            isoDate("2026-05-10T09:30:00Z"),
-            isoDate("2028-05-10T09:30:00Z")
-        ])
-        #expect(anchorMonthDay == [
-            isoDate("2024-06-12T09:30:00Z"),
-            isoDate("2025-06-12T09:30:00Z"),
-            isoDate("2026-06-12T09:30:00Z")
-        ])
+        #expect(
+            fixed == [
+                isoDate("2024-05-10T09:30:00Z"),
+                isoDate("2026-05-10T09:30:00Z"),
+                isoDate("2028-05-10T09:30:00Z")
+            ])
+        #expect(
+            anchorMonthDay == [
+                isoDate("2024-06-12T09:30:00Z"),
+                isoDate("2025-06-12T09:30:00Z"),
+                isoDate("2026-06-12T09:30:00Z")
+            ])
     }
 
     @Test func fixedYearlyFebruary29DoesNotSpillToMarch() throws {
@@ -273,11 +286,12 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2024-01-01T00:00:00Z")..<isoDate("2027-01-01T00:00:00Z")
         )
 
-        #expect(values == [
-            isoDate("2024-05-27T09:30:00Z"),
-            isoDate("2025-05-26T09:30:00Z"),
-            isoDate("2026-05-25T09:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2024-05-27T09:30:00Z"),
+                isoDate("2025-05-26T09:30:00Z"),
+                isoDate("2026-05-25T09:30:00Z")
+            ])
     }
 
     @Test func existingFixedYearlyDateKeepsFoundationDSTResolution() throws {
@@ -336,20 +350,22 @@ struct FoundationRecurrenceEngineTests {
             environment: FoundationRecurrenceEnvironment()
         ).map { ($0.instant, $0.sourceComponents.hour) }
 
-        #expect(gap.map(\.0) == [
-            isoDate("2026-03-08T07:30:00Z"),
-            isoDate("2026-03-08T08:30:00Z"),
-            isoDate("2026-03-08T09:30:00Z"),
-            isoDate("2026-03-08T10:30:00Z")
-        ])
+        #expect(
+            gap.map(\.0) == [
+                isoDate("2026-03-08T07:30:00Z"),
+                isoDate("2026-03-08T08:30:00Z"),
+                isoDate("2026-03-08T09:30:00Z"),
+                isoDate("2026-03-08T10:30:00Z")
+            ])
         #expect(gap.map(\.1) == [3, 4, 5, 6])
-        #expect(overlap.map(\.0) == [
-            isoDate("2026-11-01T05:30:00Z"),
-            isoDate("2026-11-01T06:30:00Z"),
-            isoDate("2026-11-01T07:30:00Z"),
-            isoDate("2026-11-01T08:30:00Z"),
-            isoDate("2026-11-01T09:30:00Z")
-        ])
+        #expect(
+            overlap.map(\.0) == [
+                isoDate("2026-11-01T05:30:00Z"),
+                isoDate("2026-11-01T06:30:00Z"),
+                isoDate("2026-11-01T07:30:00Z"),
+                isoDate("2026-11-01T08:30:00Z"),
+                isoDate("2026-11-01T09:30:00Z")
+            ])
         #expect(overlap.map(\.1) == [1, 1, 2, 3, 4])
     }
 
@@ -360,10 +376,11 @@ struct FoundationRecurrenceEngineTests {
             in: anchor.addingTimeInterval(0.5)..<anchor.addingTimeInterval(3 * 3_600)
         )
 
-        #expect(values == [
-            isoDate("2026-08-04T10:30:00Z"),
-            isoDate("2026-08-04T11:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2026-08-04T10:30:00Z"),
+                isoDate("2026-08-04T11:30:00Z")
+            ])
     }
 
     @Test func scheduleEndDateIsInclusiveInSourceZone() throws {
@@ -376,11 +393,12 @@ struct FoundationRecurrenceEngineTests {
             in: isoDate("2026-08-01T00:00:00Z")..<isoDate("2026-08-06T00:00:00Z")
         )
 
-        #expect(values == [
-            isoDate("2026-08-01T09:30:00Z"),
-            isoDate("2026-08-02T09:30:00Z"),
-            isoDate("2026-08-03T09:30:00Z")
-        ])
+        #expect(
+            values == [
+                isoDate("2026-08-01T09:30:00Z"),
+                isoDate("2026-08-02T09:30:00Z"),
+                isoDate("2026-08-03T09:30:00Z")
+            ])
     }
 
     @Test func inclusiveEndUsesFollowingCivilDayStartAfterMidnightGap() throws {
@@ -410,7 +428,7 @@ struct FoundationRecurrenceEngineTests {
         #expect(values.map(\.2) == [30, 30])
     }
 
-    @Test func farPastHourlyQueryJumpsToLargeInitialIndexAndObservesOnlyConsumedCandidates() throws {
+    @Test func farPastHourlyQueryUsesLargeInitialIndexAndOnlyConsumedCandidates() throws {
         let recorder = RecurrenceObservationRecorder()
         let instrumentedEngine = FoundationRecurrenceEngine(observe: recorder.record)
         let schedule = schedule(
@@ -432,16 +450,19 @@ struct FoundationRecurrenceEngineTests {
         #expect(plan.stepSeconds == 3_600)
         #expect(plan.firstIndex > 1_000_000)
         #expect(plan.firstInstant == lowerBound)
-        #expect(values == [
-            lowerBound,
-            lowerBound.addingTimeInterval(3_600),
-            lowerBound.addingTimeInterval(2 * 3_600)
-        ])
+        #expect(
+            values == [
+                lowerBound,
+                lowerBound.addingTimeInterval(3_600),
+                lowerBound.addingTimeInterval(2 * 3_600)
+            ])
         #expect(recorder.candidates == values)
         #expect(recorder.candidates.count <= 1_024)
     }
 
-    @Test func farPastCalendarQueryStartsAtRequestedLowerBoundAndObservesOnlyConsumedCandidates() throws {
+    @Test func farPastCalendarQueryStartsAtRequestedLowerBoundAndObservesOnlyConsumedCandidates()
+        throws
+    {
         let recorder = RecurrenceObservationRecorder()
         let instrumentedEngine = FoundationRecurrenceEngine(observe: recorder.record)
         let schedule = schedule(
@@ -459,13 +480,15 @@ struct FoundationRecurrenceEngineTests {
 
         let plan = try #require(recorder.calendarQueryPlans.first)
         #expect(recorder.calendarQueryPlans.count == 1)
-        #expect(plan.anchor == utcDate(year: 1_900, month: 1, day: 1).addingTimeInterval(9.5 * 3_600))
+        #expect(
+            plan.anchor == utcDate(year: 1_900, month: 1, day: 1).addingTimeInterval(9.5 * 3_600))
         #expect(plan.range == range)
-        #expect(values == [
-            lowerBound.addingTimeInterval(9.5 * 3_600),
-            lowerBound.addingTimeInterval((24 + 9.5) * 3_600),
-            lowerBound.addingTimeInterval((48 + 9.5) * 3_600)
-        ])
+        #expect(
+            values == [
+                lowerBound.addingTimeInterval(9.5 * 3_600),
+                lowerBound.addingTimeInterval((24 + 9.5) * 3_600),
+                lowerBound.addingTimeInterval((48 + 9.5) * 3_600)
+            ])
         #expect(recorder.candidates == values)
         #expect(recorder.candidates.count <= 1_024)
     }
@@ -506,7 +529,8 @@ struct FoundationRecurrenceEngineTests {
             in: range
         )
 
-        #expect(hourly == [utcDate(year: 9_999, month: 12, day: 31).addingTimeInterval(23.5 * 3_600)])
+        #expect(
+            hourly == [utcDate(year: 9_999, month: 12, day: 31).addingTimeInterval(23.5 * 3_600)])
         #expect(daily == [utcDate(year: 9_999, month: 12, day: 31).addingTimeInterval(9.5 * 3_600)])
     }
 
@@ -588,11 +612,11 @@ private final class RecurrenceObservationRecorder: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         switch observation {
-        case let .calendarQuery(plan):
+        case .calendarQuery(let plan):
             recordedCalendarQueryPlans.append(plan)
-        case let .hourlyQuery(plan):
+        case .hourlyQuery(let plan):
             recordedHourlyQueryPlans.append(plan)
-        case let .candidate(date):
+        case .candidate(let date):
             recordedCandidates.append(date)
         }
     }
@@ -607,7 +631,10 @@ private func isoDate(_ value: String) -> Date {
 
 private func utcDate(year: Int, month: Int, day: Int) -> Date {
     var calendar = Calendar(identifier: .gregorian)
-    calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+    guard let utc = TimeZone(secondsFromGMT: 0) else {
+        preconditionFailure("Foundation must provide the zero-offset time zone")
+    }
+    calendar.timeZone = utc
     guard let date = calendar.date(from: DateComponents(year: year, month: month, day: day)) else {
         preconditionFailure("Invalid UTC test fixture")
     }

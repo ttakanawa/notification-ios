@@ -34,7 +34,7 @@ public enum DeviceSchedulingStatus: Sendable, Equatable {
         if input.earliestGroupOutcome == .unscheduledError { return .unscheduledError }
         if input.reconcileInProgressOrQueued { return .scheduling }
         if input.earliestGroupOutcome == .unscheduledCapacity { return .unscheduledCapacity }
-        if input.earliestRequestPresentOrLatestAddSucceeded { return .scheduled }
+        if input.earliestRequestPresentOrAddSucceeded { return .scheduled }
         return .scheduling
     }
 }
@@ -46,7 +46,7 @@ public struct DeviceSchedulingStatusInput: Sendable, Equatable {
     public let earliestGroupOutcome: AlertGroupSchedulingOutcome?
     public let laterGroupOutcomes: [AlertGroupSchedulingOutcome]
     public let reconcileInProgressOrQueued: Bool
-    public let earliestRequestPresentOrLatestAddSucceeded: Bool
+    public let earliestRequestPresentOrAddSucceeded: Bool
 
     public init(
         lifecycleStatus: LifecycleStatus,
@@ -55,7 +55,7 @@ public struct DeviceSchedulingStatusInput: Sendable, Equatable {
         earliestGroupOutcome: AlertGroupSchedulingOutcome?,
         laterGroupOutcomes: [AlertGroupSchedulingOutcome],
         reconcileInProgressOrQueued: Bool,
-        earliestRequestPresentOrLatestAddSucceeded: Bool
+        earliestRequestPresentOrAddSucceeded: Bool
     ) {
         self.lifecycleStatus = lifecycleStatus
         self.deviceNotificationsEnabled = deviceNotificationsEnabled
@@ -63,6 +63,6 @@ public struct DeviceSchedulingStatusInput: Sendable, Equatable {
         self.earliestGroupOutcome = earliestGroupOutcome
         self.laterGroupOutcomes = laterGroupOutcomes
         self.reconcileInProgressOrQueued = reconcileInProgressOrQueued
-        self.earliestRequestPresentOrLatestAddSucceeded = earliestRequestPresentOrLatestAddSucceeded
+        self.earliestRequestPresentOrAddSucceeded = earliestRequestPresentOrAddSucceeded
     }
 }

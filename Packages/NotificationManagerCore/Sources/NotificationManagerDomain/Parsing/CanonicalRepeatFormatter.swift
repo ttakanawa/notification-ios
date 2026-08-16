@@ -5,16 +5,16 @@ public struct CanonicalRepeatFormatter: Sendable {
         switch rule {
         case .none:
             return "Does Not Repeat"
-        case let .hourly(interval):
+        case .hourly(let interval):
             return frequency(interval: interval, singular: "hour", plural: "hours")
-        case let .daily(interval):
+        case .daily(let interval):
             return frequency(interval: interval, singular: "day", plural: "days")
-        case let .weekly(interval, kind, weekdays):
+        case .weekly(let interval, let kind, let weekdays):
             return weekly(interval: interval, kind: kind, weekdays: weekdays)
-        case let .monthly(interval, selector):
+        case .monthly(let interval, let selector):
             return frequency(interval: interval, singular: "month", plural: "months")
                 + selectorText(selector)
-        case let .yearly(interval, month, selector):
+        case .yearly(let interval, let month, let selector):
             let prefix = frequency(interval: interval, singular: "year", plural: "years")
             guard let month, (1...12).contains(month) else { return prefix }
             return prefix + selectorText(selector) + " of " + Self.monthNames[month - 1]
@@ -39,7 +39,8 @@ public struct CanonicalRepeatFormatter: Sendable {
         case .weekend:
             return "Every weekend"
         case .explicit:
-            let names = weekdays
+            let names =
+                weekdays
                 .sorted { $0.rawValue < $1.rawValue }
                 .map(weekdayName)
             switch names.count {
@@ -50,7 +51,8 @@ public struct CanonicalRepeatFormatter: Sendable {
             case 2:
                 return "Every \(names[0]) and \(names[1])"
             default:
-                return "Every " + names.dropLast().joined(separator: ", ") + ", and " + names.last!
+                guard let last = names.last else { return "Every week" }
+                return "Every " + names.dropLast().joined(separator: ", ") + ", and " + last
             }
         }
     }
@@ -59,13 +61,13 @@ public struct CanonicalRepeatFormatter: Sendable {
         switch selector {
         case .anchorDay, .anchorMonthDay:
             return ""
-        case let .dayOfMonth(day):
+        case .dayOfMonth(let day):
             return " on the \(ordinal(day))"
         case .lastDay:
             return " on the last day"
-        case let .ordinalDaySet(value, daySet):
+        case .ordinalDaySet(let value, let daySet):
             return " on the \(ordinal(value)) \(daySet == .weekday ? "weekday" : "weekend day")"
-        case let .ordinalWeekday(value, weekday):
+        case .ordinalWeekday(let value, let weekday):
             if value == -1 {
                 return " on the last \(weekdayName(weekday))"
             }
@@ -82,12 +84,13 @@ public struct CanonicalRepeatFormatter: Sendable {
         if (11...13).contains(tens) {
             suffix = "th"
         } else {
-            suffix = switch value % 10 {
-            case 1: "st"
-            case 2: "nd"
-            case 3: "rd"
-            default: "th"
-            }
+            suffix =
+                switch value % 10 {
+                case 1: "st"
+                case 2: "nd"
+                case 3: "rd"
+                default: "th"
+                }
         }
         return "\(value)\(suffix)"
     }

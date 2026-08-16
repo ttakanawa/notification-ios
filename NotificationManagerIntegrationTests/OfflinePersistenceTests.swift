@@ -4,6 +4,7 @@ import NotificationManagerDomain
 import NotificationManagerPersistence
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Offline local persistence acceptance")
@@ -17,11 +18,12 @@ struct OfflinePersistenceTests {
         #expect(result.editedTitle == "Offline itinerary updated")
         #expect(result.deletedReminderIsAbsent)
         #expect(result.cleanedReminderIDs == [result.draftID])
-        #expect(result.reconcileReasons == [
-            .reminderSaved(result.draftID),
-            .reminderSaved(result.draftID),
-            .reminderDeleted(result.draftID)
-        ])
+        #expect(
+            result.reconcileReasons == [
+                .reminderSaved(result.draftID),
+                .reminderSaved(result.draftID),
+                .reminderDeleted(result.draftID)
+            ])
     }
 }
 
@@ -84,14 +86,15 @@ private struct OfflineAcceptanceHarness {
         guard let stored = snapshot.reminders.first else {
             throw OfflineAcceptanceError.missingSnapshot
         }
-        let plan = try LogicalNotificationPlanner().plan(PlannerInput(
-            snapshot: snapshot,
-            evaluationNow: evaluationNow,
-            deviceNotificationsEnabled: true,
-            authorizationAllowsScheduling: true,
-            capacity: 60,
-            recurrenceEnvironment: FoundationRecurrenceEnvironment()
-        ))
+        let plan = try LogicalNotificationPlanner().plan(
+            PlannerInput(
+                snapshot: snapshot,
+                evaluationNow: evaluationNow,
+                deviceNotificationsEnabled: true,
+                authorizationAllowsScheduling: true,
+                capacity: 60,
+                recurrenceEnvironment: FoundationRecurrenceEnvironment()
+            ))
         guard let logicalRequest = plan.requests.first else {
             throw OfflineAcceptanceError.missingLogicalRequest
         }
@@ -137,7 +140,7 @@ private struct OfflineAcceptanceHarness {
     }
 
     private func savedID(_ outcome: SaveReminderOutcome) throws -> UUID {
-        guard case let .saved(id) = outcome else {
+        guard case .saved(let id) = outcome else {
             throw OfflineAcceptanceError.unexpectedSaveOutcome
         }
         return id

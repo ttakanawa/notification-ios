@@ -26,25 +26,20 @@ enum StrictJSONValue: Sendable, Equatable {
     }
 
     var objectValue: [String: StrictJSONValue]? {
-        guard case let .object(value) = self else { return nil }
+        guard case .object(let value) = self else { return nil }
         return value
     }
 
     var stringValue: String? {
-        guard case let .string(value) = self else { return nil }
-        return value
-    }
-
-    var boolValue: Bool? {
-        guard case let .bool(value) = self else { return nil }
+        guard case .string(let value) = self else { return nil }
         return value
     }
 
     func integer<T: FixedWidthInteger>(as type: T.Type = T.self) -> T? {
-        guard case let .number(lexeme) = self,
-              !lexeme.contains("."),
-              !lexeme.contains("e"),
-              !lexeme.contains("E")
+        guard case .number(let lexeme) = self,
+            !lexeme.contains("."),
+            !lexeme.contains("e"),
+            !lexeme.contains("E")
         else {
             return nil
         }
@@ -106,7 +101,7 @@ private struct StrictJSONParser {
                     foundVersion = true
                     let lexeme = try parseNumber()
                     guard lexeme.allSatisfy({ $0.isASCII && $0.isNumber }),
-                          let parsedVersion = UInt32(lexeme)
+                        let parsedVersion = UInt32(lexeme)
                     else {
                         throw StrictJSONError.invalidDocument
                     }
@@ -151,7 +146,7 @@ private struct StrictJSONParser {
                     try consumeLiteral([0x66, 0x61, 0x6C, 0x73, 0x65])
                 case 0x6E:
                     try consumeLiteral([0x6E, 0x75, 0x6C, 0x6C])
-                case 0x2D, 0x30 ... 0x39:
+                case 0x2D, 0x30...0x39:
                     _ = try parseNumber()
                 default:
                     throw StrictJSONError.invalidDocument
@@ -208,7 +203,7 @@ private struct StrictJSONParser {
         case 0x6E:
             try consumeLiteral([0x6E, 0x75, 0x6C, 0x6C])
             return .null
-        case 0x2D, 0x30 ... 0x39:
+        case 0x2D, 0x30...0x39:
             return .number(try parseNumber())
         default:
             throw StrictJSONError.invalidDocument
@@ -284,16 +279,16 @@ private struct StrictJSONParser {
             case 0x75:
                 let first = try parseHexQuad()
                 let scalar: UInt32
-                if (0xD800 ... 0xDBFF).contains(first) {
+                if (0xD800...0xDBFF).contains(first) {
                     try consume(0x5C)
                     try consume(0x75)
                     let second = try parseHexQuad()
-                    guard (0xDC00 ... 0xDFFF).contains(second) else {
+                    guard (0xDC00...0xDFFF).contains(second) else {
                         throw StrictJSONError.invalidDocument
                     }
                     scalar = 0x10000 + ((first - 0xD800) << 10) + (second - 0xDC00)
                 } else {
-                    guard !(0xDC00 ... 0xDFFF).contains(first) else {
+                    guard !(0xDC00...0xDFFF).contains(first) else {
                         throw StrictJSONError.invalidDocument
                     }
                     scalar = first
@@ -317,9 +312,9 @@ private struct StrictJSONParser {
             index += 1
             let digit: UInt32
             switch byte {
-            case 0x30 ... 0x39: digit = UInt32(byte - 0x30)
-            case 0x41 ... 0x46: digit = UInt32(byte - 0x41 + 10)
-            case 0x61 ... 0x66: digit = UInt32(byte - 0x61 + 10)
+            case 0x30...0x39: digit = UInt32(byte - 0x30)
+            case 0x41...0x46: digit = UInt32(byte - 0x41 + 10)
+            case 0x61...0x66: digit = UInt32(byte - 0x61 + 10)
             default: throw StrictJSONError.invalidDocument
             }
             value = value * 16 + digit
@@ -333,30 +328,32 @@ private struct StrictJSONParser {
         guard let byte = current else { throw StrictJSONError.invalidDocument }
         if byte == 0x30 {
             index += 1
-            if let next = current, (0x30 ... 0x39).contains(next) {
+            if let next = current, (0x30...0x39).contains(next) {
                 throw StrictJSONError.invalidDocument
             }
-        } else if (0x31 ... 0x39).contains(byte) {
-            repeat { index += 1 } while current.map { (0x30 ... 0x39).contains($0) } == true
+        } else if (0x31...0x39).contains(byte) {
+            repeat { index += 1 } while current.map { (0x30...0x39).contains($0) } == true
         } else {
             throw StrictJSONError.invalidDocument
         }
 
         if consumeIfPresent(0x2E) {
-            guard current.map({ (0x30 ... 0x39).contains($0) }) == true else {
+            guard current.map({ (0x30...0x39).contains($0) }) == true else {
                 throw StrictJSONError.invalidDocument
             }
-            repeat { index += 1 } while current.map { (0x30 ... 0x39).contains($0) } == true
+            repeat { index += 1 } while current.map { (0x30...0x39).contains($0) } == true
         }
         if current == 0x65 || current == 0x45 {
             index += 1
             if current == 0x2B || current == 0x2D { index += 1 }
-            guard current.map({ (0x30 ... 0x39).contains($0) }) == true else {
+            guard current.map({ (0x30...0x39).contains($0) }) == true else {
                 throw StrictJSONError.invalidDocument
             }
-            repeat { index += 1 } while current.map { (0x30 ... 0x39).contains($0) } == true
+            repeat { index += 1 } while current.map { (0x30...0x39).contains($0) } == true
         }
 
+        // The parser has already accepted only ASCII JSON-number bytes in this range.
+        // swiftlint:disable:next optional_data_string_conversion
         return String(decoding: bytes[start..<index], as: UTF8.self)
     }
 

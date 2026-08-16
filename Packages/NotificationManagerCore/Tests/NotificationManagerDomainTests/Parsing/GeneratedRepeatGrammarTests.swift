@@ -1,4 +1,5 @@
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Parsing.GeneratedRepeatGrammar")

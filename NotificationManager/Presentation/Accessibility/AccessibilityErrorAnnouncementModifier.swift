@@ -43,10 +43,12 @@ struct AccessibilityErrorAnnouncementModifier: ViewModifier {
 
     private func announceNewIdentity(in current: [AccessibilityErrorIdentity]) {
         defer { previousIdentities = current }
-        guard let identity = resolver.newIdentity(
-            previous: previousIdentities,
-            current: current
-        ) else {
+        guard
+            let identity = resolver.newIdentity(
+                previous: previousIdentities,
+                current: current
+            )
+        else {
             return
         }
         let message = String(

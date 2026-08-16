@@ -8,7 +8,7 @@ struct DateTimeSection: View {
 
     var body: some View {
         Section {
-            if case let .readOnly(reason) = model.scheduleAccess {
+            if case .readOnly(let reason) = model.scheduleAccess {
                 Label(reason.localizedResource, systemImage: "lock")
                     .fixedSize(horizontal: false, vertical: true)
                     .background {
@@ -82,17 +82,19 @@ struct DateTimeSection: View {
                         if let identifier = model.timeZoneIdentifier {
                             Text(verbatim: identifier)
                         } else {
-                            Text(LocalizedStringResource(
-                                "reminder.form.value.select",
-                                table: "ReminderForm"
-                            ))
+                            Text(
+                                LocalizedStringResource(
+                                    "reminder.form.value.select",
+                                    table: "ReminderForm"
+                                ))
                         }
                     }
                 } label: {
-                    Text(LocalizedStringResource(
-                        "reminder.field.time-zone",
-                        table: "ReminderForm"
-                    ))
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.time-zone",
+                            table: "ReminderForm"
+                        ))
                 }
                 .accessibilityIdentifier("reminder-form.time-zone")
                 .sheet(isPresented: $isTimeZonePickerPresented) {
@@ -112,24 +114,28 @@ struct DateTimeSection: View {
                     .accessibilityIdentifier("reminder-form.time-zone-error")
             }
 
-            if case let .repair(issues) = model.scheduleAccess, !issues.isEmpty {
-                Label(LocalizedStringResource(
-                    "reminder.form.schedule-repair-required",
-                    table: "ReminderForm"
-                ), systemImage: "wrench.and.screwdriver")
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.schedule-repair")
+            if case .repair(let issues) = model.scheduleAccess, !issues.isEmpty {
+                Label(
+                    LocalizedStringResource(
+                        "reminder.form.schedule-repair-required",
+                        table: "ReminderForm"
+                    ), systemImage: "wrench.and.screwdriver"
+                )
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("reminder-form.schedule-repair")
             }
         } header: {
-            Text(LocalizedStringResource(
-                "reminder.form.section.date-time",
-                table: "ReminderForm"
-            ))
-                .background {
-                    AccessibilityIdentifierContainer(
-                        identifier: "reminder-form.section.date-time"
-                    )
-                }
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.section.date-time",
+                    table: "ReminderForm"
+                )
+            )
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.section.date-time"
+                )
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -139,11 +145,13 @@ struct DateTimeSection: View {
         accessibilityIdentifier: String
     ) -> some View {
         LabeledContent {
-            Text(LocalizedStringResource(
-                "reminder.form.value.unavailable",
-                table: "ReminderForm"
-            ))
-                .foregroundStyle(.secondary)
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.value.unavailable",
+                    table: "ReminderForm"
+                )
+            )
+            .foregroundStyle(.secondary)
         } label: {
             Text(title)
         }

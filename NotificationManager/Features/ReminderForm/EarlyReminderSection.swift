@@ -6,30 +6,33 @@ struct EarlyReminderSection: View {
 
     var body: some View {
         Section {
-            Picker(LocalizedStringResource(
-                "reminder.field.early-reminder",
-                table: "ReminderForm"
-            ), selection: earlyChoiceBinding) {
+            Picker(
+                LocalizedStringResource(
+                    "reminder.field.early-reminder",
+                    table: "ReminderForm"
+                ), selection: earlyChoiceBinding
+            ) {
                 ForEach(EarlyReminderChoice.allCases) { choice in
                     Text(choice.localizedResource)
                         .accessibilityIdentifier(choice.accessibilityIdentifier)
                         .tag(choice)
                 }
             }
-                .disabled(!model.scheduleFieldsAreEditable)
-                .accessibilityIdentifier("reminder-form.early-choice")
+            .disabled(!model.scheduleFieldsAreEditable)
+            .accessibilityIdentifier("reminder-form.early-choice")
 
             if let early = model.earlyReminder {
                 if model.earlyReminderChoice == .custom {
                     TextField(text: earlyValueBinding) {
-                        Text(LocalizedStringResource(
-                            "reminder.field.early-value",
-                            table: "ReminderForm"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.field.early-value",
+                                table: "ReminderForm"
+                            ))
                     }
-                        .keyboardType(.numberPad)
-                        .disabled(!model.scheduleFieldsAreEditable)
-                        .accessibilityIdentifier("reminder-form.early-value")
+                    .keyboardType(.numberPad)
+                    .disabled(!model.scheduleFieldsAreEditable)
+                    .accessibilityIdentifier("reminder-form.early-value")
 
                     if !model.earlyReminderValueTextIsValid {
                         Label(
@@ -44,10 +47,12 @@ struct EarlyReminderSection: View {
                         .accessibilityIdentifier("reminder-form.early-value-error")
                     }
 
-                    Picker(LocalizedStringResource(
-                        "reminder.field.early-unit",
-                        table: "ReminderForm"
-                    ), selection: earlyUnitBinding) {
+                    Picker(
+                        LocalizedStringResource(
+                            "reminder.field.early-unit",
+                            table: "ReminderForm"
+                        ), selection: earlyUnitBinding
+                    ) {
                         ForEach(EarlyReminderUnitChoice.allCases) { choice in
                             Text(choice.localizedResource).tag(choice)
                         }
@@ -56,23 +61,27 @@ struct EarlyReminderSection: View {
                     .accessibilityIdentifier("reminder-form.early-unit")
                 }
 
-                Toggle(LocalizedStringResource(
-                    "reminder.field.main-notification",
-                    table: "ReminderForm"
-                ), isOn: mainEnabledBinding(early))
-                    .disabled(!model.scheduleFieldsAreEditable)
-                    .accessibilityIdentifier("reminder-form.main-enabled")
+                Toggle(
+                    LocalizedStringResource(
+                        "reminder.field.main-notification",
+                        table: "ReminderForm"
+                    ), isOn: mainEnabledBinding(early)
+                )
+                .disabled(!model.scheduleFieldsAreEditable)
+                .accessibilityIdentifier("reminder-form.main-enabled")
             }
         } header: {
-            Text(LocalizedStringResource(
-                "reminder.form.section.early-reminder",
-                table: "ReminderForm"
-            ))
-                .background {
-                    AccessibilityIdentifierContainer(
-                        identifier: "reminder-form.section.early-reminder"
-                    )
-                }
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.section.early-reminder",
+                    table: "ReminderForm"
+                )
+            )
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.section.early-reminder"
+                )
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -114,8 +123,8 @@ struct EarlyReminderSection: View {
     }
 }
 
-private extension EarlyReminderChoice {
-    var accessibilityIdentifier: String {
+extension EarlyReminderChoice {
+    fileprivate var accessibilityIdentifier: String {
         switch self {
         case .none: "reminder.early.none"
         case .oneMinute: "reminder.early.one-minute-before"
@@ -155,12 +164,13 @@ private enum EarlyReminderUnitChoice: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 
     init(_ value: EarlyReminderUnit) {
-        self = switch value {
-        case .minutes: .minutes
-        case .hours: .hours
-        case .days: .days
-        case .weeks: .weeks
-        }
+        self =
+            switch value {
+            case .minutes: .minutes
+            case .hours: .hours
+            case .days: .days
+            case .weeks: .weeks
+            }
     }
 
     var value: EarlyReminderUnit {

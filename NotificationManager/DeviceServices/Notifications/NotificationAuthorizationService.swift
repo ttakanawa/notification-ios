@@ -35,7 +35,7 @@ public enum NotificationAuthorizationDiagnostic: Sendable, Equatable {
 
     fileprivate var rawValue: Int {
         switch self {
-        case let .unknownStatus(rawValue): rawValue
+        case .unknownStatus(let rawValue): rawValue
         }
     }
 }
@@ -122,8 +122,8 @@ public final class NotificationAuthorizationService:
     }
 }
 
-private extension DeviceAuthorizationSchedulingState {
-    var canonicalRawValue: Int {
+extension DeviceAuthorizationSchedulingState {
+    fileprivate var canonicalRawValue: Int {
         switch self {
         case .notDetermined: 0
         case .denied: 1

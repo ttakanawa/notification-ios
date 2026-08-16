@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManagerApplication
 
 @Suite struct TagNameNormalizerTests {
@@ -46,7 +47,7 @@ import Testing
         ]
 
         for value in whiteSpace {
-            let scalar = UnicodeScalar(value)!
+            let scalar = try #require(UnicodeScalar(value))
             #expect(try normalizer.normalize("\(scalar)X\(scalar)") == "x")
         }
     }

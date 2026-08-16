@@ -68,8 +68,8 @@ enum ReminderNextPresentation: Sendable, Equatable {
 
     var authoritativeAlertInstant: Date {
         switch self {
-        case let .directOSFire(authoritative, _): authoritative
-        case let .rolling(notification): notification.alertInstant
+        case .directOSFire(let authoritative, _): authoritative
+        case .rolling(let notification): notification.alertInstant
         }
     }
 }
@@ -172,7 +172,7 @@ enum ReminderListProjection {
         _ rhs: ReminderListItemPresentation
     ) -> Bool {
         switch (lhs.nextPresentation, rhs.nextPresentation) {
-        case let (.some(lhsNext), .some(rhsNext)):
+        case (.some(let lhsNext), .some(let rhsNext)):
             if lhsNext.authoritativeAlertInstant != rhsNext.authoritativeAlertInstant {
                 return lhsNext.authoritativeAlertInstant < rhsNext.authoritativeAlertInstant
             }

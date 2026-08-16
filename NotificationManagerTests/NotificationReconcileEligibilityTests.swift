@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("Notification reconcile eligibility invalidation")
@@ -48,7 +49,9 @@ private actor EligibilityBlockingSnapshotLoader: CompleteSchedulingSnapshotLoadi
         started = true
         let waiters = startWaiters
         startWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             releaseContinuation = continuation
         }

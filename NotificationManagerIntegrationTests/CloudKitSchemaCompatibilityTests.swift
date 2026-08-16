@@ -6,20 +6,24 @@ import XCTest
 final class CloudKitSchemaCompatibilityTests: XCTestCase {
     func testProductionConfigurationOpensVersionedCloudKitCompatibleSchema() throws {
         let directory = FileManager.default.temporaryDirectory
-            .appending(path: "CloudKitSchemaCompatibilityTests-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(
+                path: "CloudKitSchemaCompatibilityTests-\(UUID().uuidString)",
+                directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let storeURL = directory.appending(path: "NotificationManager.store")
         let configuration = ModelContainerFactory.productionConfiguration(url: storeURL)
 
         XCTAssertFalse(configuration.isStoredInMemoryOnly)
-        XCTAssertTrue(String(reflecting: configuration.cloudKitDatabase).contains("_automatic: true"))
+        XCTAssertTrue(
+            String(reflecting: configuration.cloudKitDatabase).contains("_automatic: true"))
         XCTAssertNoThrow(try configuration.validate())
 
         let container = try ModelContainerFactory.makeContainer(configuration: configuration)
         XCTAssertEqual(container.schema.version, Schema.Version(1, 0, 0))
         XCTAssertTrue(container.migrationPlan == NotificationManagerMigrationPlan.self)
-        XCTAssertEqual(Set(container.schema.entities.map(\.name)), ["ReminderRecordV1", "TagRecordV1"])
+        XCTAssertEqual(
+            Set(container.schema.entities.map(\.name)), ["ReminderRecordV1", "TagRecordV1"])
     }
 
     func testCloudKitSchemaMetadataHasNoUniqueConstraintsAndOnlyApprovedEncryption() throws {
@@ -49,7 +53,8 @@ final class CloudKitSchemaCompatibilityTests: XCTestCase {
     func testProductionConfigurationAcceptsMaximumBoundaryRecordShapeLocally() throws {
         let fixture = try maximumBoundaryAggregateFixture()
         let directory = FileManager.default.temporaryDirectory
-            .appending(path: "CloudKitMaximumBoundary-\(UUID().uuidString)", directoryHint: .isDirectory)
+            .appending(
+                path: "CloudKitMaximumBoundary-\(UUID().uuidString)", directoryHint: .isDirectory)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItem(at: directory) }
         let configuration = ModelContainerFactory.productionConfiguration(
@@ -72,10 +77,11 @@ final class CloudKitSchemaCompatibilityTests: XCTestCase {
         XCTAssertEqual(fetched.urlString?.utf8.count, ReminderLimits.urlBytes)
         XCTAssertEqual(fetched.scheduleData.count, ReminderLimits.scheduleBytes)
         XCTAssertEqual(fetched.tags?.count, ReminderLimits.tagCount)
-        XCTAssertTrue((fetched.tags ?? []).allSatisfy {
-            $0.name.utf8.count == TagLimits.nameBytes
-                && $0.normalizedName.utf8.count == TagLimits.normalizedNameBytes
-        })
+        XCTAssertTrue(
+            (fetched.tags ?? []).allSatisfy {
+                $0.name.utf8.count == TagLimits.nameBytes
+                    && $0.normalizedName.utf8.count == TagLimits.normalizedNameBytes
+            })
     }
 
     private func isCloudEncrypted(_ attribute: Schema.Attribute) -> Bool {
@@ -90,11 +96,13 @@ private struct MaximumBoundaryAggregateFixture {
 
 private func maximumBoundaryAggregateFixture() throws -> MaximumBoundaryAggregateFixture {
     let timestamp = Date(timeIntervalSince1970: 2_229_984_000)
-    let tags = (0..<ReminderLimits.tagCount).map { index in
+    let tags = try (0..<ReminderLimits.tagCount).map { index in
         let prefix = String(format: "tag-%03d-", index)
         let name = prefix + String(repeating: "x", count: TagLimits.nameBytes - prefix.utf8.count)
         return TagRecordV1(
-            id: UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1))!,
+            id: try XCTUnwrap(
+                UUID(uuidString: String(format: "00000000-0000-0000-0000-%012d", index + 1))
+            ),
             name: name,
             normalizedName: name,
             normalizationVersion: TagLimits.normalizationVersion,
@@ -105,10 +113,12 @@ private func maximumBoundaryAggregateFixture() throws -> MaximumBoundaryAggregat
     let title = String(repeating: "T", count: ReminderLimits.titleBytes)
     let notes = String(repeating: "N", count: ReminderLimits.notesBytes)
     let urlPrefix = "https://example.com/"
-    let urlString = urlPrefix + String(
-        repeating: "u",
-        count: ReminderLimits.urlBytes - urlPrefix.utf8.count
-    )
+    let urlString =
+        urlPrefix
+        + String(
+            repeating: "u",
+            count: ReminderLimits.urlBytes - urlPrefix.utf8.count
+        )
     let scheduleData = Data(repeating: 0x7B, count: ReminderLimits.scheduleBytes)
     let draft = ReminderDraft(
         id: UUID(uuidString: "123e4567-e89b-12d3-a456-426614174000")!,

@@ -1,4 +1,5 @@
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Parsing.EnglishRepeatParser")
@@ -77,12 +78,18 @@ struct ParsingEnglishRepeatParserTests {
     }
 
     @Test func acceptsEveryCorrectNumericOrdinalSuffixAndRejectsIncorrectSuffixes() throws {
-        let accepted = [1: "st", 2: "nd", 3: "rd", 4: "th", 11: "th", 12: "th", 13: "th", 21: "st", 22: "nd", 23: "rd", 31: "st"]
+        let accepted = [
+            1: "st", 2: "nd", 3: "rd", 4: "th", 11: "th", 12: "th", 13: "th", 21: "st", 22: "nd",
+            23: "rd", 31: "st"
+        ]
         for (number, suffix) in accepted {
             _ = try validated("Every month on the \(number)\(suffix)")
         }
 
-        for input in ["Every month on the 1th", "Every month on the 2ndd", "Every month on the 11st", "Every month on the 12nd", "Every month on the 13rd", "Every month on the 21th"] {
+        for input in [
+            "Every month on the 1th", "Every month on the 2ndd", "Every month on the 11st",
+            "Every month on the 12nd", "Every month on the 13rd", "Every month on the 21th"
+        ] {
             #expect(throws: RepeatParseFailure.self) { _ = try parser.parse(input).get() }
         }
     }
@@ -102,16 +109,27 @@ struct ParsingEnglishRepeatParserTests {
     }
 
     @Test func generatesCoverageForEveryForwardAndReverseSelectorProduction() throws {
-        let wordOrdinals = [("first", "1st"), ("second", "2nd"), ("third", "3rd"), ("fourth", "4th"), ("fifth", "5th")]
+        let wordOrdinals = [
+            ("first", "1st"), ("second", "2nd"), ("third", "3rd"), ("fourth", "4th"),
+            ("fifth", "5th")
+        ]
         for (word, numeric) in wordOrdinals {
-            #expect(formatter.string(for: try validated("Every month on the \(word) weekday")) == "Every month on the \(numeric) weekday")
-            #expect(formatter.string(for: try validated("Every month on the \(word) weekend day")) == "Every month on the \(numeric) weekend day")
-            #expect(formatter.string(for: try validated("Every month on the \(word) Monday")) == "Every month on the \(numeric) Monday")
+            #expect(
+                formatter.string(for: try validated("Every month on the \(word) weekday"))
+                    == "Every month on the \(numeric) weekday")
+            #expect(
+                formatter.string(for: try validated("Every month on the \(word) weekend day"))
+                    == "Every month on the \(numeric) weekend day")
+            #expect(
+                formatter.string(for: try validated("Every month on the \(word) Monday"))
+                    == "Every month on the \(numeric) Monday")
         }
         for ordinal in 2...5 {
             let suffix = ordinal == 2 ? "nd" : ordinal == 3 ? "rd" : "th"
             let text = "\(ordinal)\(suffix)"
-            #expect(formatter.string(for: try validated("Every month on the \(text) last Sunday")) == "Every month on the \(text) last Sunday")
+            #expect(
+                formatter.string(for: try validated("Every month on the \(text) last Sunday"))
+                    == "Every month on the \(text) last Sunday")
         }
     }
 
@@ -119,11 +137,19 @@ struct ParsingEnglishRepeatParserTests {
         let names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
         for count in 3...7 {
             let prefix = names.prefix(count)
+            let finalInputName = try #require(prefix.last)
             let commaOnly = "Every " + prefix.joined(separator: ",")
-            let noOxford = "Every " + prefix.dropLast().joined(separator: ", ") + " and " + prefix.last!
-            let oxford = "Every " + prefix.dropLast().joined(separator: ", ") + ", and " + prefix.last!
-            let expectedNames = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].prefix(count)
-            let canonical = "Every " + expectedNames.dropLast().joined(separator: ", ") + ", and " + expectedNames.last!
+            let noOxford =
+                "Every " + prefix.dropLast().joined(separator: ", ") + " and " + finalInputName
+            let oxford =
+                "Every " + prefix.dropLast().joined(separator: ", ") + ", and " + finalInputName
+            let expectedNames = [
+                "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"
+            ].prefix(count)
+            let finalExpectedName = try #require(expectedNames.last)
+            let canonical =
+                "Every " + expectedNames.dropLast().joined(separator: ", ") + ", and "
+                + finalExpectedName
             #expect(formatter.string(for: try validated(commaOnly)) == canonical)
             #expect(formatter.string(for: try validated(noOxford)) == canonical)
             #expect(formatter.string(for: try validated(oxford)) == canonical)
@@ -146,7 +172,9 @@ struct ParsingEnglishRepeatParserTests {
     @Test func offersAUniqueSingleAlphabeticTokenDamerauLevenshteinSuggestion() {
         #expect(failure(for: "Evrey day").suggestion == "Every day")
         #expect(failure(for: "Every Tuseday").suggestion == "Every Tuesday")
-        #expect(failure(for: "Every yer on the 1st of January").suggestion == "Every year on the 1st of January")
+        #expect(
+            failure(for: "Every yer on the 1st of January").suggestion
+                == "Every year on the 1st of January")
     }
 
     @Test func doesNotSuggestWhenCorrectionIsAmbiguousRequiresTwoTokensOrFailsValidation() {
@@ -169,7 +197,9 @@ struct ParsingEnglishRepeatParserTests {
         let actualSourceRule = correctedCandidate.flatMap {
             try? validator.validate($0, source: .repeatFixture)
         }
-        #expect(actualSourceRule == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.tuesday]))
+        #expect(
+            actualSourceRule
+                == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.tuesday]))
     }
 
     @Test func suggestionNeverAutoAppliesTheCorrection() {
@@ -190,7 +220,7 @@ struct ParsingEnglishRepeatParserTests {
         case .success:
             Issue.record("Expected parsing to fail: \(input)")
             return RepeatParseFailure(suggestion: nil)
-        case let .failure(failure):
+        case .failure(let failure):
             return failure
         }
     }

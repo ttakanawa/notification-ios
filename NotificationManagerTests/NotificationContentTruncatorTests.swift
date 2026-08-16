@@ -1,4 +1,5 @@
 import Testing
+
 @testable import NotificationManager
 
 struct NotificationContentTruncatorTests {
@@ -29,18 +30,19 @@ struct NotificationContentTruncatorTests {
     @Test func valueWithinLimitIsReturnedUnchanged() {
         let original = "旅程 👨‍👩‍👧‍👦"
 
-        #expect(NotificationContentTruncator().truncate(
-            original,
-            maximumBytes: original.utf8.count,
-            ellipsis: "…"
-        ) == original)
+        #expect(
+            NotificationContentTruncator().truncate(
+                original,
+                maximumBytes: original.utf8.count,
+                ellipsis: "…"
+            ) == original)
     }
 
     @Test func nonPositiveLimitAndOversizedEllipsisReturnNoPartialGrapheme() {
         let truncator = NotificationContentTruncator()
 
-        #expect(truncator.truncate("value", maximumBytes: 0, ellipsis: "…") == "")
-        #expect(truncator.truncate("value", maximumBytes: -1, ellipsis: "…") == "")
-        #expect(truncator.truncate("value", maximumBytes: 2, ellipsis: "…") == "")
+        #expect(truncator.truncate("value", maximumBytes: 0, ellipsis: "…").isEmpty)
+        #expect(truncator.truncate("value", maximumBytes: -1, ellipsis: "…").isEmpty)
+        #expect(truncator.truncate("value", maximumBytes: 2, ellipsis: "…").isEmpty)
     }
 }

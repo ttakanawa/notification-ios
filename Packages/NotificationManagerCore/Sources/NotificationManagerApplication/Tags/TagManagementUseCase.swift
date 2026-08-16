@@ -19,15 +19,16 @@ public struct TagManagementUseCase: Sendable {
     public func create(name: String, id: UUID = UUID()) async throws -> TagSnapshot {
         let normalizedName = try normalizer.normalize(name)
         let timestamp = Self.integralSecond(now())
-        return try await repository.saveTag(EncodedTagMutation(
-            id: id,
-            name: name,
-            normalizedName: normalizedName,
-            normalizationVersion: TagLimits.normalizationVersion,
-            createdAt: timestamp,
-            updatedAt: timestamp,
-            command: .create
-        ))
+        return try await repository.saveTag(
+            EncodedTagMutation(
+                id: id,
+                name: name,
+                normalizedName: normalizedName,
+                normalizationVersion: TagLimits.normalizationVersion,
+                createdAt: timestamp,
+                updatedAt: timestamp,
+                command: .create
+            ))
     }
 
     public func rename(tagID: UUID, name: String) async throws -> TagSnapshot {
@@ -36,15 +37,16 @@ public struct TagManagementUseCase: Sendable {
         guard let current = snapshot.tags.first(where: { $0.id == tagID }) else {
             throw TagRepositoryError.notFound(tagID)
         }
-        return try await repository.saveTag(EncodedTagMutation(
-            id: current.id,
-            name: name,
-            normalizedName: normalizedName,
-            normalizationVersion: TagLimits.normalizationVersion,
-            createdAt: current.createdAt,
-            updatedAt: Self.integralSecond(now()),
-            command: .update
-        ))
+        return try await repository.saveTag(
+            EncodedTagMutation(
+                id: current.id,
+                name: name,
+                normalizedName: normalizedName,
+                normalizationVersion: TagLimits.normalizationVersion,
+                createdAt: current.createdAt,
+                updatedAt: Self.integralSecond(now()),
+                command: .update
+            ))
     }
 
     public func delete(tagID: UUID) async throws {

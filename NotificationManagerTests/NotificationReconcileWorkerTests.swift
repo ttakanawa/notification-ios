@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 import UserNotifications
+
 @testable import NotificationManager
 
 struct NotificationReconcileWorkerTests {
@@ -34,10 +35,11 @@ struct NotificationReconcileWorkerTests {
         let missingTagID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
         let danglingReminder = validReminder(tagIDs: [missingTagID])
         let relationshipLoader = CompleteSchedulingSnapshotLoader(
-            repository: SnapshotRepositoryStub(snapshot: CompleteReminderSnapshot(
-                reminders: [danglingReminder],
-                tags: []
-            ))
+            repository: SnapshotRepositoryStub(
+                snapshot: CompleteReminderSnapshot(
+                    reminders: [danglingReminder],
+                    tags: []
+                ))
         )
 
         await #expect(throws: CompleteSchedulingSnapshotLoadError.relationshipTraversal) {
@@ -46,10 +48,11 @@ struct NotificationReconcileWorkerTests {
 
         let duplicate = validReminder()
         let classificationLoader = CompleteSchedulingSnapshotLoader(
-            repository: SnapshotRepositoryStub(snapshot: CompleteReminderSnapshot(
-                reminders: [duplicate, duplicate],
-                tags: []
-            ))
+            repository: SnapshotRepositoryStub(
+                snapshot: CompleteReminderSnapshot(
+                    reminders: [duplicate, duplicate],
+                    tags: []
+                ))
         )
         await #expect(throws: CompleteSchedulingSnapshotLoadError.classification) {
             try await classificationLoader.loadCompleteSnapshot()
@@ -101,15 +104,17 @@ struct NotificationReconcileWorkerTests {
             )
         }
         let unrelated = "other-app.notification"
-        let center = NotificationCenterClientSpy(pending: identifiers.map {
-            NotificationInventoryItem(identifier: $0)
-        } + [NotificationInventoryItem(identifier: unrelated)])
+        let center = NotificationCenterClientSpy(
+            pending: identifiers.map {
+                NotificationInventoryItem(identifier: $0)
+            } + [NotificationInventoryItem(identifier: unrelated)])
         let worker = NotificationReconcileWorker(
             snapshotLoader: CompleteSchedulingSnapshotLoader(
-                repository: SnapshotRepositoryStub(snapshot: CompleteReminderSnapshot(
-                    reminders: reminders,
-                    tags: []
-                ))
+                repository: SnapshotRepositoryStub(
+                    snapshot: CompleteReminderSnapshot(
+                        reminders: reminders,
+                        tags: []
+                    ))
             ),
             preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: true),
             authorizationProvider: FixedNotificationAuthorizationProvider(.allowed),
@@ -130,19 +135,21 @@ struct NotificationReconcileWorkerTests {
 
         #expect(await center.addedIdentifiers().isEmpty)
         #expect(await center.pendingIdentifiers() == [unrelated])
-        #expect(await center.recordedCalls() == [
-            "pending",
-            "remove-pending:\(identifiers.sorted().joined(separator: ","))"
-        ])
+        #expect(
+            await center.recordedCalls() == [
+                "pending",
+                "remove-pending:\(identifiers.sorted().joined(separator: ","))"
+            ])
     }
 
     @Test func validEmptySnapshotCleansOnlyAppOwnedPendingWithoutReadingDelivered() async {
         let stale = "notification-manager.local.v2.future"
         let unrelated = "other-app.notification"
-        let center = NotificationCenterClientSpy(pending: [
-            NotificationInventoryItem(identifier: stale),
-            NotificationInventoryItem(identifier: unrelated)
-        ], delivered: [NotificationInventoryItem(identifier: stale)])
+        let center = NotificationCenterClientSpy(
+            pending: [
+                NotificationInventoryItem(identifier: stale),
+                NotificationInventoryItem(identifier: unrelated)
+            ], delivered: [NotificationInventoryItem(identifier: stale)])
         let worker = NotificationReconcileWorker(
             snapshotLoader: FixedSchedulingSnapshotLoader(
                 CompleteReminderSnapshot(reminders: [], tags: [])
@@ -157,10 +164,11 @@ struct NotificationReconcileWorkerTests {
         await worker.requestReconcile(.foreground)
         await worker.waitUntilIdle()
 
-        #expect(await center.recordedCalls() == [
-            "pending",
-            "remove-pending:\(stale)"
-        ])
+        #expect(
+            await center.recordedCalls() == [
+                "pending",
+                "remove-pending:\(stale)"
+            ])
         #expect(await center.pendingIdentifiers() == [unrelated])
     }
 
@@ -178,10 +186,11 @@ struct NotificationReconcileWorkerTests {
         )
         let stateStore = DeviceSchedulingStateStore()
         let worker = NotificationReconcileWorker(
-            snapshotLoader: FixedSchedulingSnapshotLoader(CompleteReminderSnapshot(
-                reminders: [validReminder()],
-                tags: []
-            )),
+            snapshotLoader: FixedSchedulingSnapshotLoader(
+                CompleteReminderSnapshot(
+                    reminders: [validReminder()],
+                    tags: []
+                )),
             preferenceStore: FixedDeviceNotificationPreferenceStore(enabled: gate.enabled),
             authorizationProvider: FixedNotificationAuthorizationProvider(gate.authorization),
             notificationCenter: center,
@@ -203,10 +212,11 @@ struct NotificationReconcileWorkerTests {
         await worker.requestReconcile(.foreground)
         await worker.waitUntilIdle()
 
-        #expect(await center.recordedCalls() == [
-            "pending",
-            "remove-pending:\(appOwned)"
-        ])
+        #expect(
+            await center.recordedCalls() == [
+                "pending",
+                "remove-pending:\(appOwned)"
+            ])
         #expect(await center.deliveredIdentifiers() == [appOwned])
         let state = await stateStore.snapshot()
         #expect(state.deviceNotificationsEnabled == gate.enabled)
@@ -227,12 +237,13 @@ struct NotificationReconcileWorkerTests {
             NotificationInventoryItem(identifier: stale),
             NotificationInventoryItem(identifier: unrelated)
         ])
-        let planner = FixedNotificationPlanner(plan: plan(
-            requests: [desired],
-            outcomes: desired.contributingGroupIDs.reduce(into: [:]) {
-                $0[$1] = .scheduled
-            }
-        ))
+        let planner = FixedNotificationPlanner(
+            plan: plan(
+                requests: [desired],
+                outcomes: desired.contributingGroupIDs.reduce(into: [:]) {
+                    $0[$1] = .scheduled
+                }
+            ))
         let materializer = RecordingNotificationMaterializer { logical, _ in
             notificationRequest(identifier: logical.identifier, title: "fresh content")
         }
@@ -257,19 +268,23 @@ struct NotificationReconcileWorkerTests {
         await worker.requestReconcile(.foreground)
         await worker.waitUntilIdle()
 
-        #expect(await center.recordedCalls() == [
-            "pending",
-            "remove-pending:\(stale)",
-            "add:\(desired.identifier)"
-        ])
+        #expect(
+            await center.recordedCalls() == [
+                "pending",
+                "remove-pending:\(stale)",
+                "add:\(desired.identifier)"
+            ])
         #expect(await center.addedTitles() == ["fresh content"])
-        #expect(await center.pendingIdentifiers() == [
-            desired.identifier,
-            unrelated
-        ])
+        #expect(
+            await center.pendingIdentifiers() == [
+                desired.identifier,
+                unrelated
+            ])
     }
 
-    @Test func materializationFailureMarksEverySharedContributorWithoutRollingBackSuccess() async throws {
+    @Test func materializationFailureMarksEverySharedContributorWithoutRollingBackSuccess()
+        async throws
+    {
         let reminder = validReminder()
         let groupA = AlertGroupID(
             reminderID: reminder.id,
@@ -307,10 +322,11 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [shared, success],
-                outcomes: [groupA: .scheduled, groupB: .scheduled, groupC: .scheduled]
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [shared, success],
+                    outcomes: [groupA: .scheduled, groupB: .scheduled, groupC: .scheduled]
+                )),
             materializer: materializer,
             stateStore: stateStore,
             clock: SequenceReconcileClock([
@@ -355,10 +371,11 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [first, second],
-                outcomes: [firstGroup: .scheduled, secondGroup: .scheduled]
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [first, second],
+                    outcomes: [firstGroup: .scheduled, secondGroup: .scheduled]
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -402,10 +419,11 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [request],
-                outcomes: [group: .scheduled]
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [request],
+                    outcomes: [group: .scheduled]
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -449,10 +467,11 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [oneShot, repeating],
-                outcomes: [oneShotGroup: .scheduled, repeatingGroup: .scheduled]
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [oneShot, repeating],
+                    outcomes: [oneShotGroup: .scheduled, repeatingGroup: .scheduled]
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -492,10 +511,11 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [],
-                outcomes: [group: .unscheduledError]
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [],
+                    outcomes: [group: .unscheduledError]
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -562,12 +582,13 @@ struct NotificationReconcileWorkerTests {
         let worker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: center,
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [logical],
-                outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
-                    $0[$1] = .scheduled
-                }
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [logical],
+                    outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                        $0[$1] = .scheduled
+                    }
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -655,19 +676,21 @@ struct NotificationReconcileWorkerTests {
         await worker.requestReconcile(.foreground)
         await worker.waitUntilIdle()
 
-        #expect(eventLog.values.prefix(4) == [
-            "plan",
-            "materialize:\(first.identifier)",
-            "materialize:\(second.identifier)",
-            "pending"
-        ])
+        #expect(
+            eventLog.values.prefix(4) == [
+                "plan",
+                "materialize:\(first.identifier)",
+                "materialize:\(second.identifier)",
+                "pending"
+            ])
         #expect(planner.evaluationNow == evaluationNow)
         #expect(planner.environmentIdentity == ObjectIdentifier(environment))
         #expect(materializer.evaluationNows == [evaluationNow, evaluationNow])
-        #expect(materializer.environmentIdentities == [
-            ObjectIdentifier(environment),
-            ObjectIdentifier(environment)
-        ])
+        #expect(
+            materializer.environmentIdentities == [
+                ObjectIdentifier(environment),
+                ObjectIdentifier(environment)
+            ])
         #expect(materializer.localeIdentifiers == ["ja_JP", "ja_JP"])
         #expect(await preferences.readCount == 1)
         #expect(await authorization.readCount == 1)
@@ -941,11 +964,13 @@ struct NotificationReconcileWorkerTests {
 
         #expect(await sleeper.delays == [1, 2])
         #expect(await loader.count == 3)
-        #expect(await worker.timerState() == NotificationReconcileTimerState(
-            retryScheduled: false,
-            foregroundReplenishmentScheduled: false,
-            retryAttempt: 2
-        ))
+        #expect(
+            await worker.timerState()
+                == NotificationReconcileTimerState(
+                    retryScheduled: false,
+                    foregroundReplenishmentScheduled: false,
+                    retryAttempt: 2
+                ))
     }
 
     @Test func supersededRetryCallbackCannotReplaceTheCurrentTimer() async {
@@ -978,11 +1003,13 @@ struct NotificationReconcileWorkerTests {
 
         #expect(await loader.count == 2)
         #expect(await sleeper.recordedDelays == [1, 1])
-        #expect(await worker.timerState() == NotificationReconcileTimerState(
-            retryScheduled: true,
-            foregroundReplenishmentScheduled: false,
-            retryAttempt: 1
-        ))
+        #expect(
+            await worker.timerState()
+                == NotificationReconcileTimerState(
+                    retryScheduled: true,
+                    foregroundReplenishmentScheduled: false,
+                    retryAttempt: 1
+                ))
         await worker.enterBackground()
         await sleeper.resumeAll()
         await drainScheduledTasks()
@@ -995,12 +1022,14 @@ struct NotificationReconcileWorkerTests {
             alertInstant: testDate("2040-08-31T13:30:00Z"),
             baseInstant: testDate("2040-08-31T13:30:00Z")
         )
-        let planner = SequenceNotificationPlanner([plan(
-            requests: [logical],
-            outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
-                $0[$1] = .scheduled
-            }
-        )])
+        let planner = SequenceNotificationPlanner([
+            plan(
+                requests: [logical],
+                outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                    $0[$1] = .scheduled
+                }
+            )
+        ])
         let center = NotificationCenterClientSpy()
         let sleeper = ManuallyResumedSleeper()
         let worker = NotificationReconcileWorker(
@@ -1023,10 +1052,12 @@ struct NotificationReconcileWorkerTests {
                 sleep: { delay in try await sleeper.sleep(delay) }
             ),
             retryDelays: [],
-            triggerInspector: { _ in NotificationTriggerInspection(
-                repeats: false,
-                nextTriggerDate: testDate("2040-08-31T13:30:00Z")
-            ) }
+            triggerInspector: { _ in
+                NotificationTriggerInspection(
+                    repeats: false,
+                    nextTriggerDate: testDate("2040-08-31T13:30:00Z")
+                )
+            }
         )
 
         await worker.requestReconcile(.foreground)
@@ -1113,12 +1144,14 @@ struct NotificationReconcileWorkerTests {
             alertInstant: testDate("2040-08-31T13:30:00Z"),
             baseInstant: testDate("2040-08-31T13:30:00Z")
         )
-        let planner = SequenceNotificationPlanner([plan(
-            requests: [logical],
-            outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
-                $0[$1] = .scheduled
-            }
-        )])
+        let planner = SequenceNotificationPlanner([
+            plan(
+                requests: [logical],
+                outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                    $0[$1] = .scheduled
+                }
+            )
+        ])
         let center = NotificationCenterClientSpy()
         let sleeper = ManuallyResumedSleeper()
         let worker = NotificationReconcileWorker(
@@ -1141,10 +1174,12 @@ struct NotificationReconcileWorkerTests {
                 sleep: { delay in try await sleeper.sleep(delay) }
             ),
             retryDelays: [],
-            triggerInspector: { _ in NotificationTriggerInspection(
-                repeats: false,
-                nextTriggerDate: testDate("2040-08-31T13:30:00Z")
-            ) }
+            triggerInspector: { _ in
+                NotificationTriggerInspection(
+                    repeats: false,
+                    nextTriggerDate: testDate("2040-08-31T13:30:00Z")
+                )
+            }
         )
 
         await worker.requestReconcile(.foreground)
@@ -1193,12 +1228,13 @@ struct NotificationReconcileWorkerTests {
         let successfulWorker = testWorker(
             snapshot: CompleteReminderSnapshot(reminders: [reminder], tags: []),
             center: NotificationCenterClientSpy(),
-            planner: FixedNotificationPlanner(plan: plan(
-                requests: [logical],
-                outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
-                    $0[$1] = .scheduled
-                }
-            )),
+            planner: FixedNotificationPlanner(
+                plan: plan(
+                    requests: [logical],
+                    outcomes: logical.contributingGroupIDs.reduce(into: [:]) {
+                        $0[$1] = .scheduled
+                    }
+                )),
             materializer: RecordingNotificationMaterializer { logical, _ in
                 notificationRequest(identifier: logical.identifier)
             },
@@ -1220,11 +1256,12 @@ struct NotificationReconcileWorkerTests {
         await successfulWorker.waitUntilIdle()
         #expect(await successfulWorker.timerState().foregroundReplenishmentScheduled)
         await waitUntil { await foregroundSleeper.delays.count == 1 }
-        #expect(await foregroundSleeper.delays == [
-            testDate("2040-08-31T13:30:01Z").timeIntervalSince(
-                testDate("2040-08-02T00:00:00Z")
-            )
-        ])
+        #expect(
+            await foregroundSleeper.delays == [
+                testDate("2040-08-31T13:30:01Z").timeIntervalSince(
+                    testDate("2040-08-02T00:00:00Z")
+                )
+            ])
         await successfulWorker.enterBackground()
         let cancelledForegroundState = await successfulWorker.timerState()
         #expect(!cancelledForegroundState.foregroundReplenishmentScheduled)
@@ -1277,10 +1314,11 @@ struct NotificationReconcileWorkerTests {
 
         await cleanup.removeAllPendingAppNotifications()
 
-        #expect(await center.recordedCalls() == [
-            "pending",
-            "remove-pending:\(appOwned)"
-        ])
+        #expect(
+            await center.recordedCalls() == [
+                "pending",
+                "remove-pending:\(appOwned)"
+            ])
         #expect(await center.pendingIdentifiers() == [unrelated])
     }
 }
@@ -1397,11 +1435,12 @@ private actor NotificationCenterClientSpy: @preconcurrency NotificationCenterCli
         }
         addedRequests.append(request)
         pending.removeAll { $0.identifier == request.identifier }
-        pending.append(NotificationInventoryItem(
-            identifier: request.identifier,
-            reminderRoutingValue: request.content.userInfo["notification-manager.reminder-id"]
-                as? String
-        ))
+        pending.append(
+            NotificationInventoryItem(
+                identifier: request.identifier,
+                reminderRoutingValue: request.content.userInfo["notification-manager.reminder-id"]
+                    as? String
+            ))
     }
 
     func removePendingNotificationRequests(withIdentifiers identifiers: [String]) async {
@@ -1438,7 +1477,9 @@ private actor BlockingSecondPendingNotificationCenter: @preconcurrency Notificat
         secondPendingStarted = true
         let waiters = secondPendingStartWaiters
         secondPendingStartWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             secondPendingRelease = continuation
         }
@@ -1546,16 +1587,18 @@ private final class RecordingNotificationMaterializer:
     NotificationRequestMaterializing,
     @unchecked Sendable
 {
-    private let body: @Sendable (
-        LogicalNotificationRequest,
-        MaterializationInput
-    ) throws -> UNNotificationRequest
-
-    init(
-        _ body: @escaping @Sendable (
+    private let body:
+        @Sendable (
             LogicalNotificationRequest,
             MaterializationInput
         ) throws -> UNNotificationRequest
+
+    init(
+        _ body:
+            @escaping @Sendable (
+                LogicalNotificationRequest,
+                MaterializationInput
+            ) throws -> UNNotificationRequest
     ) {
         self.body = body
     }
@@ -1683,14 +1726,16 @@ private func testWorker(
 }
 
 private final class SequenceReconcileClock: @unchecked Sendable {
+    typealias Sleep = @Sendable (TimeInterval) async throws -> Void
+
     private let lock = NSLock()
     private var values: [Date]
-    private let sleepBody: @Sendable (TimeInterval) async throws -> Void
+    private let sleepBody: Sleep
 
     init(
         _ values: [Date],
-        sleep: @escaping @Sendable (TimeInterval) async throws -> Void = {
-            _ in try await Task.sleep(for: .seconds(3_600))
+        sleep: @escaping Sleep = { _ in
+            try await Task.sleep(for: .seconds(3_600))
         }
     ) {
         precondition(!values.isEmpty)
@@ -1730,7 +1775,9 @@ private actor BlockingSequenceSnapshotLoader: CompleteSchedulingSnapshotLoading 
         firstStarted = true
         let waiters = firstStartWaiters
         firstStartWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             firstRelease = continuation
         }
@@ -1770,7 +1817,9 @@ private actor BlockingFailingSnapshotLoader: CompleteSchedulingSnapshotLoading {
         didStart = true
         let waiters = startWaiters
         startWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { releaseContinuation = $0 }
         throw CompleteSchedulingSnapshotLoadError.fetch
     }
@@ -1829,7 +1878,9 @@ private actor ManuallyResumedSleeper {
     func resumeAll() {
         let pending = continuations.values
         continuations.removeAll()
-        pending.forEach { $0.resume() }
+        for continuation in pending {
+            continuation.resume()
+        }
     }
 
     func hasReturned(id: Int) -> Bool { returnedIDs.contains(id) }
@@ -1875,10 +1926,12 @@ private func oneShotRequest(
         ),
         reminderID: reminderID,
         payload: .oneShot(alertInstant: alertInstant, reasons: [reason]),
-        contributingGroupIDs: contributors ?? [AlertGroupID(
-            reminderID: reminderID,
-            baseOccurrenceInstant: baseInstant
-        )]
+        contributingGroupIDs: contributors ?? [
+            AlertGroupID(
+                reminderID: reminderID,
+                baseOccurrenceInstant: baseInstant
+            )
+        ]
     )
 }
 
@@ -1892,24 +1945,32 @@ private func repeatingRequest(
         minute: 30,
         second: 0
     )
-    let identifier = try! NotificationIdentifierCodec().repeatingIdentifier(
-        reminderID: reminderID,
-        components: components
-    )
+    guard
+        let identifier = try? NotificationIdentifierCodec().repeatingIdentifier(
+            reminderID: reminderID,
+            components: components
+        )
+    else {
+        preconditionFailure("Valid repeating request fixture must produce an identifier")
+    }
     return LogicalNotificationRequest(
         identifier: identifier,
         reminderID: reminderID,
         payload: .repeating(
             components: components,
-            contributors: [RepeatingTriggerContributor(
-                kind: .main,
-                sourceComponents: components
-            )]
+            contributors: [
+                RepeatingTriggerContributor(
+                    kind: .main,
+                    sourceComponents: components
+                )
+            ]
         ),
-        contributingGroupIDs: [AlertGroupID(
-            reminderID: reminderID,
-            baseOccurrenceInstant: baseInstant
-        )]
+        contributingGroupIDs: [
+            AlertGroupID(
+                reminderID: reminderID,
+                baseOccurrenceInstant: baseInstant
+            )
+        ]
     )
 }
 
@@ -1920,29 +1981,33 @@ private func validReminder(
     tagIDs: Set<UUID> = []
 ) -> ReminderSnapshot {
     let date = testDate("2040-08-01T00:00:00Z")
+    guard let reminderID = UUID(uuidString: id) else {
+        preconditionFailure("Invalid reminder UUID fixture: \(id)")
+    }
     return ReminderSnapshot(
-        id: UUID(uuidString: id)!,
+        id: reminderID,
         title: title,
         notes: nil,
         urlString: nil,
         enabled: true,
-        schedule: schedule ?? .valid(
-            ScheduleDefinition(
-                source: SourceWallClock(
-                    year: 2040,
-                    month: 8,
-                    day: 31,
-                    hour: 9,
-                    minute: 30,
-                    timeZoneIdentifier: "America/New_York"
+        schedule: schedule
+            ?? .valid(
+                ScheduleDefinition(
+                    source: SourceWallClock(
+                        year: 2040,
+                        month: 8,
+                        day: 31,
+                        hour: 9,
+                        minute: 30,
+                        timeZoneIdentifier: "America/New_York"
+                    ),
+                    rule: .daily(interval: 1),
+                    end: .never,
+                    early: nil
                 ),
-                rule: .daily(interval: 1),
-                end: .never,
-                early: nil
+                sourceVersion: 1,
+                originalData: Data([1])
             ),
-            sourceVersion: 1,
-            originalData: Data([1])
-        ),
         tagIDs: tagIDs,
         createdAt: date,
         updatedAt: date

@@ -79,12 +79,12 @@ public struct LogicalNotificationRequest: Sendable, Equatable {
     }
 
     public var oneShotAlertInstant: Date? {
-        guard case let .oneShot(alertInstant, _) = payload else { return nil }
+        guard case .oneShot(let alertInstant, _) = payload else { return nil }
         return alertInstant
     }
 
     public var oneShotReasons: [EffectiveAlert] {
-        guard case let .oneShot(_, reasons) = payload else { return [] }
+        guard case .oneShot(_, let reasons) = payload else { return [] }
         return reasons
     }
 }
@@ -131,6 +131,81 @@ public struct LogicalNotificationPlanner: Sendable {
         }
 
         // Stage 1: classify the complete snapshot and exclude every non-active reminder.
+        let classification = try classifyReminders(input)
+
+        guard input.deviceNotificationsEnabled,
+            input.authorizationAllowsScheduling
+        else {
+            return LogicalPlan(
+                requests: [],
+                outcomes: [:],
+                selectedGroupIDs: [],
+                scheduledThrough: [:],
+                reminderStatuses: classification.statuses
+            )
+        }
+
+        // Stage 2: obtain one earliest future group per active reminder.
+        var states = try initialPlanningStates(
+            classification.active,
+            evaluationNow: input.evaluationNow,
+            environment: input.recurrenceEnvironment
+        )
+
+        let baselineOrder = states.indices.sorted {
+            groupPrecedes(states[$0].earliest, states[$1].earliest)
+        }
+
+        // Stage 3: allocate every baseline group atomically before any continuation.
+        var allocation = allocateBaselines(
+            states: states,
+            order: baselineOrder,
+            capacity: input.capacity
+        )
+
+        // Stage 4: replace a baseline with its complete repeating collection only
+        // when the prospective collection fits as one atomic unit.
+        let repeatingSelection = selectRepeatingReplacements(
+            states: states,
+            order: baselineOrder,
+            allocation: allocation,
+            input: input
+        )
+
+        // Stage 5: merge-sort rolling heads. Overflow retires only that reminder.
+        let heads = initialContinuationHeads(
+            states: &states,
+            allocation: allocation,
+            repeatingSelection: repeatingSelection
+        )
+        allocateContinuations(
+            states: &states,
+            initialHeads: heads,
+            capacity: input.capacity,
+            repeatingByReminder: repeatingSelection.byReminder,
+            allocation: &allocation
+        )
+
+        // Stage 6: merge selected groups into the final locale-independent requests.
+        let requests = try logicalRequests(
+            selectedGroups: allocation.selectedGroups,
+            repeatingByReminder: repeatingSelection.byReminder
+        )
+        let scheduledThrough = scheduledThrough(
+            allocation.selectedGroups,
+            repeatingByReminder: repeatingSelection.byReminder
+        )
+
+        return LogicalPlan(
+            requests: requests,
+            outcomes: allocation.outcomes,
+            selectedGroupIDs: allocation.selectedGroupIDs,
+            scheduledThrough: scheduledThrough,
+            reminderStatuses: classification.statuses
+        )
+    }
+
+    private func classifyReminders(_ input: PlannerInput) throws -> ReminderClassification {
         let reminders = try uniqueReminders(input.snapshot.reminders)
         var statuses: [UUID: ReminderStatus] = [:]
         var active: [(ReminderSnapshot, ScheduleDefinition)] = []
@@ -143,76 +218,77 @@ public struct LogicalNotificationPlanner: Sendable {
             )
             statuses[reminder.id] = status
             guard status.primary == .active,
-                  case let .valid(schedule, _, _) = reminder.schedule
+                case .valid(let schedule, _, _) = reminder.schedule
             else {
                 continue
             }
             active.append((reminder, schedule))
         }
+        return ReminderClassification(statuses: statuses, active: active)
+    }
 
-        guard input.deviceNotificationsEnabled,
-              input.authorizationAllowsScheduling
-        else {
-            return LogicalPlan(
-                requests: [],
-                outcomes: [:],
-                selectedGroupIDs: [],
-                scheduledThrough: [:],
-                reminderStatuses: statuses
-            )
-        }
-
-        // Stage 2: obtain one earliest future group per active reminder.
+    private func initialPlanningStates(
+        _ active: [(ReminderSnapshot, ScheduleDefinition)],
+        evaluationNow: Date,
+        environment: any RecurrenceEnvironment
+    ) throws -> [ReminderPlanningState] {
         var states: [ReminderPlanningState] = []
         for (reminder, schedule) in active {
             var cursor = try FutureAlertGroupCursor(
                 reminderID: reminder.id,
                 schedule: schedule,
-                evaluationNow: input.evaluationNow,
-                environment: input.recurrenceEnvironment
+                evaluationNow: evaluationNow,
+                environment: environment
             )
             guard let earliest = try cursor.next() else { continue }
-            states.append(ReminderPlanningState(
-                reminder: reminder,
-                schedule: schedule,
-                cursor: cursor,
-                earliest: earliest
-            ))
+            states.append(
+                ReminderPlanningState(
+                    reminder: reminder,
+                    schedule: schedule,
+                    cursor: cursor,
+                    earliest: earliest
+                ))
         }
+        return states
+    }
 
-        let baselineOrder = states.indices.sorted {
-            groupPrecedes(states[$0].earliest, states[$1].earliest)
-        }
-        var selectedGroups: [PlanningGroup] = []
-        var outcomes: [AlertGroupID: AlertGroupSchedulingOutcome] = [:]
-        var selectedGroupIDs: [AlertGroupID] = []
-        var baselineSelected: Set<UUID> = []
-
-        // Stage 3: allocate every baseline group atomically before any continuation.
-        for index in baselineOrder {
+    private func allocateBaselines(
+        states: [ReminderPlanningState],
+        order: [Int],
+        capacity: Int
+    ) -> PlanningAllocation {
+        var allocation = PlanningAllocation()
+        for index in order {
             let group = states[index].earliest
             do {
-                if try identifierCount(for: selectedGroups + [group]) <= input.capacity {
-                    selectedGroups.append(group)
-                    selectedGroupIDs.append(group.id)
-                    outcomes[group.id] = .scheduled
-                    baselineSelected.insert(group.id.reminderID)
+                if try identifierCount(
+                    for: allocation.selectedGroups + [group]
+                ) <= capacity {
+                    allocation.selectedGroups.append(group)
+                    allocation.selectedGroupIDs.append(group.id)
+                    allocation.outcomes[group.id] = .scheduled
+                    allocation.baselineSelected.insert(group.id.reminderID)
                 } else {
-                    outcomes[group.id] = .unscheduledCapacity
+                    allocation.outcomes[group.id] = .unscheduledCapacity
                 }
             } catch {
-                outcomes[group.id] = .unscheduledError
+                allocation.outcomes[group.id] = .unscheduledError
             }
         }
+        return allocation
+    }
 
-        // Stage 4: replace a baseline with its complete repeating collection only
-        // when the prospective collection fits as one atomic unit.
-        var repeatingByReminder: [UUID: [RepeatingTriggerCandidate]] = [:]
-        var continuationRetired: Set<UUID> = []
-        for index in baselineOrder {
+    private func selectRepeatingReplacements(
+        states: [ReminderPlanningState],
+        order: [Int],
+        allocation: PlanningAllocation,
+        input: PlannerInput
+    ) -> RepeatingSelection {
+        var selection = RepeatingSelection()
+        for index in order {
             let state = states[index]
             let reminderID = state.reminder.id
-            guard baselineSelected.contains(reminderID) else { continue }
+            guard allocation.baselineSelected.contains(reminderID) else { continue }
 
             do {
                 try dependencies.failureCheck(.repeatingReplacement, reminderID)
@@ -223,41 +299,47 @@ public struct LogicalNotificationPlanner: Sendable {
                     limit: 3,
                     environment: input.recurrenceEnvironment
                 ).notifications
-                guard let candidates = RepeatingTriggerPlanner().plan(
-                    RepeatingTriggerPlanningInput(
-                        schedule: state.schedule,
-                        evaluationNow: input.evaluationNow,
-                        physicalNotifications: preview,
-                        environment: input.recurrenceEnvironment
-                    )
-                ), !candidates.isEmpty
+                guard
+                    let candidates = RepeatingTriggerPlanner().plan(
+                        RepeatingTriggerPlanningInput(
+                            schedule: state.schedule,
+                            evaluationNow: input.evaluationNow,
+                            physicalNotifications: preview,
+                            environment: input.recurrenceEnvironment
+                        )
+                    ), !candidates.isEmpty
                 else {
                     continue
                 }
 
-                var prospective = repeatingByReminder
+                var prospective = selection.byReminder
                 prospective[reminderID] = candidates
                 if try identifierCount(
-                    for: selectedGroups,
+                    for: allocation.selectedGroups,
                     repeatingByReminder: prospective
                 ) <= input.capacity {
-                    repeatingByReminder = prospective
+                    selection.byReminder = prospective
                 }
             } catch {
                 // The accepted baseline remains safe. Without a future group identity,
                 // this pass can only retire this reminder's later work.
-                continuationRetired.insert(reminderID)
-                continue
+                selection.continuationRetired.insert(reminderID)
             }
         }
+        return selection
+    }
 
-        // Stage 5: merge-sort rolling heads. Overflow retires only that reminder.
+    private func initialContinuationHeads(
+        states: inout [ReminderPlanningState],
+        allocation: PlanningAllocation,
+        repeatingSelection: RepeatingSelection
+    ) -> [RollingHead] {
         var heads: [RollingHead] = []
         for index in states.indices {
             let reminderID = states[index].reminder.id
-            guard baselineSelected.contains(reminderID),
-                  repeatingByReminder[reminderID] == nil,
-                  !continuationRetired.contains(reminderID)
+            guard allocation.baselineSelected.contains(reminderID),
+                repeatingSelection.byReminder[reminderID] == nil,
+                !repeatingSelection.continuationRetired.contains(reminderID)
             else {
                 continue
             }
@@ -272,24 +354,36 @@ public struct LogicalNotificationPlanner: Sendable {
                 continue
             }
         }
+        return heads
+    }
 
+    private func allocateContinuations(
+        states: inout [ReminderPlanningState],
+        initialHeads: [RollingHead],
+        capacity: Int,
+        repeatingByReminder: [UUID: [RepeatingTriggerCandidate]],
+        allocation: inout PlanningAllocation
+    ) {
+        var heads = initialHeads
         while let headIndex = heads.indices.min(by: {
             groupPrecedes(heads[$0].group, heads[$1].group)
         }) {
             let head = heads.remove(at: headIndex)
             do {
-                guard try identifierCount(
-                    for: selectedGroups + [head.group],
-                    repeatingByReminder: repeatingByReminder
-                ) <= input.capacity else {
-                    outcomes[head.group.id] = .unscheduledCapacity
+                guard
+                    try identifierCount(
+                        for: allocation.selectedGroups + [head.group],
+                        repeatingByReminder: repeatingByReminder
+                    ) <= capacity
+                else {
+                    allocation.outcomes[head.group.id] = .unscheduledCapacity
                     continue
                 }
-                selectedGroups.append(head.group)
-                selectedGroupIDs.append(head.group.id)
-                outcomes[head.group.id] = .scheduled
+                allocation.selectedGroups.append(head.group)
+                allocation.selectedGroupIDs.append(head.group.id)
+                allocation.outcomes[head.group.id] = .scheduled
             } catch {
-                outcomes[head.group.id] = .unscheduledError
+                allocation.outcomes[head.group.id] = .unscheduledError
                 continue
             }
 
@@ -307,28 +401,21 @@ public struct LogicalNotificationPlanner: Sendable {
                 continue
             }
         }
+    }
 
-        // Stage 6: merge selected groups into the final locale-independent requests.
-        let requests = try logicalRequests(
-            selectedGroups: selectedGroups,
-            repeatingByReminder: repeatingByReminder
-        )
-        var scheduledThrough: [UUID: Date] = [:]
+    private func scheduledThrough(
+        _ selectedGroups: [PlanningGroup],
+        repeatingByReminder: [UUID: [RepeatingTriggerCandidate]]
+    ) -> [UUID: Date] {
+        var result: [UUID: Date] = [:]
         for group in selectedGroups where repeatingByReminder[group.id.reminderID] == nil {
             guard let lastAlert = group.alerts.map(\.alertInstant).max() else { continue }
-            scheduledThrough[group.id.reminderID] = max(
-                scheduledThrough[group.id.reminderID] ?? lastAlert,
+            result[group.id.reminderID] = max(
+                result[group.id.reminderID] ?? lastAlert,
                 lastAlert
             )
         }
-
-        return LogicalPlan(
-            requests: requests,
-            outcomes: outcomes,
-            selectedGroupIDs: selectedGroupIDs,
-            scheduledThrough: scheduledThrough,
-            reminderStatuses: statuses
-        )
+        return result
     }
 
     private func uniqueReminders(_ reminders: [ReminderSnapshot]) throws -> [ReminderSnapshot] {
@@ -355,15 +442,33 @@ struct LogicalNotificationPlannerDependencies: Sendable {
     let failureCheck: @Sendable (LogicalNotificationPlannerFailurePoint, UUID) throws -> Void
 
     init(
-        failureCheck: @escaping @Sendable (
-            LogicalNotificationPlannerFailurePoint,
-            UUID
-        ) throws -> Void
+        failureCheck:
+            @escaping @Sendable (
+                LogicalNotificationPlannerFailurePoint,
+                UUID
+            ) throws -> Void
     ) {
         self.failureCheck = failureCheck
     }
 
     static let production = LogicalNotificationPlannerDependencies { _, _ in }
+}
+
+private struct ReminderClassification {
+    let statuses: [UUID: ReminderStatus]
+    let active: [(ReminderSnapshot, ScheduleDefinition)]
+}
+
+private struct PlanningAllocation {
+    var selectedGroups: [PlanningGroup] = []
+    var outcomes: [AlertGroupID: AlertGroupSchedulingOutcome] = [:]
+    var selectedGroupIDs: [AlertGroupID] = []
+    var baselineSelected: Set<UUID> = []
+}
+
+private struct RepeatingSelection {
+    var byReminder: [UUID: [RepeatingTriggerCandidate]] = [:]
+    var continuationRetired: Set<UUID> = []
 }
 
 private struct ReminderPlanningState {
@@ -383,7 +488,10 @@ private struct PlanningGroup {
     let alerts: [EffectiveAlert]
 
     var firstAlertInstant: Date {
-        alerts.map(\.alertInstant).min()!
+        guard let first = alerts.map(\.alertInstant).min() else {
+            preconditionFailure("Planning groups must contain at least one alert")
+        }
+        return first
     }
 }
 
@@ -405,18 +513,20 @@ private func identifierCount(
     var identifiers: Set<String> = []
     for group in groups where repeatingByReminder[group.id.reminderID] == nil {
         for alert in group.alerts {
-            identifiers.insert(try codec.oneShotIdentifier(
-                reminderID: group.id.reminderID,
-                alertInstant: alert.alertInstant
-            ))
+            identifiers.insert(
+                try codec.oneShotIdentifier(
+                    reminderID: group.id.reminderID,
+                    alertInstant: alert.alertInstant
+                ))
         }
     }
     for (reminderID, candidates) in repeatingByReminder {
         for candidate in candidates {
-            identifiers.insert(try codec.repeatingIdentifier(
-                reminderID: reminderID,
-                components: candidate.components
-            ))
+            identifiers.insert(
+                try codec.repeatingIdentifier(
+                    reminderID: reminderID,
+                    components: candidate.components
+                ))
         }
     }
     return identifiers.count
@@ -468,11 +578,13 @@ private func logicalRequests(
     var requests = oneShots.values.map { accumulator in
         var seen: Set<ReasonIdentity> = []
         let reasons = accumulator.reasons.filter { reason in
-            seen.insert(ReasonIdentity(
-                kind: reason.kind == .main ? 0 : 1,
-                baseInstant: reason.baseOccurrence.instant,
-                alertInstant: reason.alertInstant
-            )).inserted
+            seen.insert(
+                ReasonIdentity(
+                    kind: reason.kind == .main ? 0 : 1,
+                    baseInstant: reason.baseOccurrence.instant,
+                    alertInstant: reason.alertInstant
+                )
+            ).inserted
         }.sorted {
             if $0.kind != $1.kind { return $0.kind == .main }
             return $0.baseOccurrence.instant < $1.baseOccurrence.instant
@@ -486,22 +598,24 @@ private func logicalRequests(
     }
 
     for (reminderID, candidates) in repeatingByReminder {
-        let baselineIDs = Set(selectedGroups.lazy
-            .filter { $0.id.reminderID == reminderID }
-            .map(\.id))
+        let baselineIDs = Set(
+            selectedGroups.lazy
+                .filter { $0.id.reminderID == reminderID }
+                .map(\.id))
         for candidate in candidates {
-            requests.append(LogicalNotificationRequest(
-                identifier: try codec.repeatingIdentifier(
+            requests.append(
+                LogicalNotificationRequest(
+                    identifier: try codec.repeatingIdentifier(
+                        reminderID: reminderID,
+                        components: candidate.components
+                    ),
                     reminderID: reminderID,
-                    components: candidate.components
-                ),
-                reminderID: reminderID,
-                payload: .repeating(
-                    components: candidate.components,
-                    contributors: candidate.contributors
-                ),
-                contributingGroupIDs: baselineIDs
-            ))
+                    payload: .repeating(
+                        components: candidate.components,
+                        contributors: candidate.contributors
+                    ),
+                    contributingGroupIDs: baselineIDs
+                ))
         }
     }
 
@@ -523,9 +637,11 @@ private struct FutureAlertGroupCursor {
         evaluationNow: Date,
         environment: any RecurrenceEnvironment
     ) throws {
-        guard let timeZone = environment.timeZone(
-            identifier: schedule.source.timeZoneIdentifier
-        ) else {
+        guard
+            let timeZone = environment.timeZone(
+                identifier: schedule.source.timeZoneIdentifier
+            )
+        else {
             throw SourceWallClockResolutionError.unknownTimeZone
         }
         let calendar = environment.gregorianCalendar(in: timeZone)
@@ -560,9 +676,10 @@ private struct FutureAlertGroupCursor {
                 baseOccurrenceInstant: group.baseOccurrence.instant
             )
             guard seenIDs.insert(id).inserted else { continue }
-            let futureAlerts = uniqueAlerts(group.alerts.filter {
-                $0.alertInstant > evaluationNow
-            })
+            let futureAlerts = uniqueAlerts(
+                group.alerts.filter {
+                    $0.alertInstant > evaluationNow
+                })
             guard !futureAlerts.isEmpty else { continue }
             return PlanningGroup(id: id, alerts: futureAlerts)
         }
@@ -573,11 +690,13 @@ private struct FutureAlertGroupCursor {
 private func uniqueAlerts(_ alerts: [EffectiveAlert]) -> [EffectiveAlert] {
     var seen: Set<ReasonIdentity> = []
     return alerts.filter { alert in
-        seen.insert(ReasonIdentity(
-            kind: alert.kind == .main ? 0 : 1,
-            baseInstant: alert.baseOccurrence.instant,
-            alertInstant: alert.alertInstant
-        )).inserted
+        seen.insert(
+            ReasonIdentity(
+                kind: alert.kind == .main ? 0 : 1,
+                baseInstant: alert.baseOccurrence.instant,
+                alertInstant: alert.alertInstant
+            )
+        ).inserted
     }.sorted {
         if $0.alertInstant != $1.alertInstant { return $0.alertInstant < $1.alertInstant }
         if $0.kind != $1.kind { return $0.kind == .main }
@@ -590,11 +709,14 @@ private func planningRange(
     evaluationNow: Date,
     calendar: Calendar
 ) throws -> Range<Date>? {
-    guard let supportedLowerBound = calendar.date(
-        from: DateComponents(year: 1, month: 1, day: 1, hour: 0, minute: 0, second: 0)
-    ), let supportedUpperBound = calendar.date(
-        from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
-    ) else {
+    guard
+        let supportedLowerBound = calendar.date(
+            from: DateComponents(year: 1, month: 1, day: 1, hour: 0, minute: 0, second: 0)
+        ),
+        let supportedUpperBound = calendar.date(
+            from: DateComponents(year: 10_000, month: 1, day: 1, hour: 0, minute: 0, second: 0)
+        )
+    else {
         throw FoundationRecurrenceError.arithmeticOverflow
     }
 
@@ -602,12 +724,13 @@ private func planningRange(
     var candidates: [Date] = []
     if schedule.early?.mainEnabled != false { candidates.append(evaluationNow) }
     if let early = schedule.early {
-        candidates.append(try baseCandidate(
-            after: evaluationNow,
-            early: early,
-            rule: schedule.rule,
-            calendar: calendar
-        ))
+        candidates.append(
+            try baseCandidate(
+                after: evaluationNow,
+                early: early,
+                rule: schedule.rule,
+                calendar: calendar
+            ))
     }
     guard let candidate = candidates.min() else { return nil }
 
@@ -615,21 +738,24 @@ private func planningRange(
     switch schedule.rule {
     case .none:
         proposedLowerBound = min(anchor, candidate)
-    case let .hourly(interval):
+    case .hourly(let interval):
         proposedLowerBound = try addFixed(-Int64(interval) * 3_600, to: candidate)
-    case let .daily(interval):
-        proposedLowerBound = try addCalendar(.day, value: -interval, to: candidate, calendar: calendar)
-    case let .weekly(interval, _, _):
+    case .daily(let interval):
+        proposedLowerBound = try addCalendar(
+            .day, value: -interval, to: candidate, calendar: calendar)
+    case .weekly(let interval, _, _):
         proposedLowerBound = try addCalendar(
             .weekOfYear,
             value: -interval,
             to: candidate,
             calendar: calendar
         )
-    case let .monthly(interval, _):
-        proposedLowerBound = try addCalendar(.month, value: -interval, to: candidate, calendar: calendar)
-    case let .yearly(interval, _, _):
-        proposedLowerBound = try addCalendar(.year, value: -interval, to: candidate, calendar: calendar)
+    case .monthly(let interval, _):
+        proposedLowerBound = try addCalendar(
+            .month, value: -interval, to: candidate, calendar: calendar)
+    case .yearly(let interval, _, _):
+        proposedLowerBound = try addCalendar(
+            .year, value: -interval, to: candidate, calendar: calendar)
     }
     let lowerBound = max(supportedLowerBound, proposedLowerBound)
     guard lowerBound < supportedUpperBound else { return nil }
@@ -650,7 +776,8 @@ private func baseCandidate(
     case (.days, _):
         return try addCalendar(.day, value: early.value, to: evaluationNow, calendar: calendar)
     case (.weeks, _):
-        return try addCalendar(.weekOfYear, value: early.value, to: evaluationNow, calendar: calendar)
+        return try addCalendar(
+            .weekOfYear, value: early.value, to: evaluationNow, calendar: calendar)
     case (.minutes, _):
         return try addFixed(Int64(early.value) * 60, to: evaluationNow)
     case (.hours, _):

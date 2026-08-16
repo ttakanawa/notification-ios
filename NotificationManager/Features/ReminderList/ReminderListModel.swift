@@ -44,11 +44,8 @@ final class ReminderActionCoordinator {
         self.handlers = handlers
     }
 
-    var enabledCapacityConfirmation: (
-        reminderID: UUID,
-        warning: CapacityWarning
-    )? {
-        guard case let .requiresCapacityConfirmation(id, _, warning) = state else {
+    var enabledCapacityConfirmation: (reminderID: UUID, warning: CapacityWarning)? {
+        guard case .requiresCapacityConfirmation(let id, _, let warning) = state else {
             return nil
         }
         return (id, warning)
@@ -94,8 +91,8 @@ final class ReminderActionCoordinator {
     @discardableResult
     func confirmEnabledCapacityChange(_ id: UUID) async -> Bool {
         guard let pending = pendingEnabledCapacityChange,
-              pending.command.reminderID == id,
-              case .requiresCapacityConfirmation(id, _, _) = state
+            pending.command.reminderID == id,
+            case .requiresCapacityConfirmation(id, _, _) = state
         else {
             return false
         }
@@ -114,8 +111,8 @@ final class ReminderActionCoordinator {
 
     func cancelEnabledCapacityChange(_ id: UUID) {
         guard let pending = pendingEnabledCapacityChange,
-              pending.command.reminderID == id,
-              case .requiresCapacityConfirmation(id, _, _) = state
+            pending.command.reminderID == id,
+            case .requiresCapacityConfirmation(id, _, _) = state
         else {
             return
         }
@@ -168,7 +165,7 @@ final class ReminderActionCoordinator {
 
     fileprivate func ingest(_ snapshot: ReminderListSnapshot) {
         if let latestSnapshotGeneration,
-           snapshot.generation <= latestSnapshotGeneration
+            snapshot.generation <= latestSnapshotGeneration
         {
             return
         }
@@ -180,7 +177,7 @@ final class ReminderActionCoordinator {
         )
         for (id, override) in enabledOverrides where override.isCompleted {
             if let completionGeneration = override.completionSnapshotGeneration,
-               snapshot.generation <= completionGeneration
+                snapshot.generation <= completionGeneration
             {
                 continue
             }
@@ -196,12 +193,12 @@ final class ReminderActionCoordinator {
         do {
             let outcome = try await handlers.setEnabled(command)
             switch outcome {
-            case let .saved(savedID) where savedID == command.reminderID:
+            case .saved(let savedID) where savedID == command.reminderID:
                 completeEnabledOverride(for: command.reminderID, generation: generation)
                 pendingEnabledCapacityChange = nil
                 state = .idle
                 return true
-            case let .requiresCapacityConfirmation(warning):
+            case .requiresCapacityConfirmation(let warning):
                 pendingEnabledCapacityChange = PendingEnabledCapacityChange(
                     command: command,
                     generation: generation,
@@ -341,7 +338,7 @@ final class ReminderListModel {
         self.snapshot = snapshot
         actions.ingest(snapshot)
         if let selectedTagID,
-           !snapshot.availableTags.contains(where: { $0.id == selectedTagID })
+            !snapshot.availableTags.contains(where: { $0.id == selectedTagID })
         {
             self.selectedTagID = nil
         }

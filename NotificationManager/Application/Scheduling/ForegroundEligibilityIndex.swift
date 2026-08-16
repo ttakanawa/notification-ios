@@ -37,18 +37,22 @@ public final class ForegroundEligibilityIndexStore: @unchecked Sendable {
     }
 
     public func markStale() {
-        lock.withLock { value = ForegroundEligibilityIndex(
-            generation: value.generation,
-            isStale: true,
-            eligibleReminderIDs: value.eligibleReminderIDs
-        ) }
+        lock.withLock {
+            value = ForegroundEligibilityIndex(
+                generation: value.generation,
+                isStale: true,
+                eligibleReminderIDs: value.eligibleReminderIDs
+            )
+        }
     }
 
     public func publish(eligibleReminderIDs: Set<UUID>) {
-        lock.withLock { value = ForegroundEligibilityIndex(
-            generation: value.generation &+ 1,
-            isStale: false,
-            eligibleReminderIDs: eligibleReminderIDs
-        ) }
+        lock.withLock {
+            value = ForegroundEligibilityIndex(
+                generation: value.generation &+ 1,
+                isStale: false,
+                eligibleReminderIDs: eligibleReminderIDs
+            )
+        }
     }
 }

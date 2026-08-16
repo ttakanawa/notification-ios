@@ -37,7 +37,7 @@ struct CompactScheduleLineView: View {
             HStack(alignment: .firstTextBaseline, spacing: 4) {
                 Text(verbatim: presentation.localTime)
                 if let sourceTime = presentation.sourceTime,
-                   let sourceZone = presentation.sourceTimeZoneLabel
+                    let sourceZone = presentation.sourceTimeZoneLabel
                 {
                     Text(verbatim: "(\(sourceTime)")
                     if let dayOffsetLabel = presentation.dayOffsetLabel {

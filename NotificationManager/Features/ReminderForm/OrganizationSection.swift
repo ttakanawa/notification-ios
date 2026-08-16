@@ -7,12 +7,13 @@ struct OrganizationSection: View {
     var body: some View {
         Section {
             Toggle(isOn: $model.enabled) {
-                Text(LocalizedStringResource(
-                    "reminder.field.enabled",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.field.enabled",
+                        table: "ReminderForm"
+                    ))
             }
-                .accessibilityIdentifier("reminder-form.enabled")
+            .accessibilityIdentifier("reminder-form.enabled")
 
             if !tags.isEmpty {
                 ForEach(tags) { tag in
@@ -37,8 +38,8 @@ struct OrganizationSection: View {
                     ),
                     systemImage: "exclamationmark.triangle"
                 )
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.save-error")
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("reminder-form.save-error")
             } else if model.saveState == .failed(.delete) {
                 Label(
                     LocalizedStringResource(
@@ -47,19 +48,21 @@ struct OrganizationSection: View {
                     ),
                     systemImage: "exclamationmark.triangle"
                 )
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.delete-error")
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("reminder-form.delete-error")
             }
         } header: {
-            Text(LocalizedStringResource(
-                "reminder.form.section.organization",
-                table: "ReminderForm"
-            ))
-                .background {
-                    AccessibilityIdentifierContainer(
-                        identifier: "reminder-form.section.organization"
-                    )
-                }
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.section.organization",
+                    table: "ReminderForm"
+                )
+            )
+            .background {
+                AccessibilityIdentifierContainer(
+                    identifier: "reminder-form.section.organization"
+                )
+            }
         }
         .accessibilityElement(children: .contain)
     }

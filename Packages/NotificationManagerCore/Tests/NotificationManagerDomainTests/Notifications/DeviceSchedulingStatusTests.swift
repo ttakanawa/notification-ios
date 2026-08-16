@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Notifications.DeviceSchedulingStatus")
@@ -11,45 +12,52 @@ struct DeviceSchedulingStatusTests {
         .invalidSchedule
     ])
     func nonSchedulableLifecycleAlwaysWins(_ lifecycle: LifecycleStatus) {
-        #expect(status(
-            lifecycle: lifecycle,
-            deviceEnabled: false,
-            authorization: .denied,
-            earliestOutcome: .unscheduledError,
-            isReconciling: true,
-            isPresent: false
-        ) == .notApplicable)
+        #expect(
+            status(
+                lifecycle: lifecycle,
+                deviceEnabled: false,
+                authorization: .denied,
+                earliestOutcome: .unscheduledError,
+                isReconciling: true,
+                isPresent: false
+            ) == .notApplicable)
     }
 
     @Test func exactDeviceAuthorizationAndPipelinePrecedence() {
-        #expect(status(deviceEnabled: false, authorization: .notDetermined) == .notScheduledThisDeviceOff)
+        #expect(
+            status(deviceEnabled: false, authorization: .notDetermined)
+                == .notScheduledThisDeviceOff)
         #expect(status(authorization: .notDetermined) == .permissionNotDetermined)
         #expect(status(authorization: .denied) == .notScheduledPermissionDenied)
         #expect(status(authorization: .unknown) == .notScheduledAuthorizationUnknown)
-        #expect(status(
-            earliestOutcome: .unscheduledError,
-            isReconciling: true,
-            isPresent: false
-        ) == .unscheduledError)
-        #expect(status(
-            earliestOutcome: .unscheduledCapacity,
-            isReconciling: true,
-            isPresent: false
-        ) == .scheduling)
-        #expect(status(earliestOutcome: .unscheduledCapacity, isPresent: false) == .unscheduledCapacity)
+        #expect(
+            status(
+                earliestOutcome: .unscheduledError,
+                isReconciling: true,
+                isPresent: false
+            ) == .unscheduledError)
+        #expect(
+            status(
+                earliestOutcome: .unscheduledCapacity,
+                isReconciling: true,
+                isPresent: false
+            ) == .scheduling)
+        #expect(
+            status(earliestOutcome: .unscheduledCapacity, isPresent: false) == .unscheduledCapacity)
         #expect(status(earliestOutcome: .scheduled, isPresent: true) == .scheduled)
     }
 
     @Test func laterCapacityDoesNotOverrideScheduledEarliestGroup() {
-        let value = DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: .active,
-            deviceNotificationsEnabled: true,
-            authorization: .allowed,
-            earliestGroupOutcome: .scheduled,
-            laterGroupOutcomes: [.unscheduledCapacity],
-            reconcileInProgressOrQueued: false,
-            earliestRequestPresentOrLatestAddSucceeded: true
-        ))
+        let value = DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: .active,
+                deviceNotificationsEnabled: true,
+                authorization: .allowed,
+                earliestGroupOutcome: .scheduled,
+                laterGroupOutcomes: [.unscheduledCapacity],
+                reconcileInProgressOrQueued: false,
+                earliestRequestPresentOrAddSucceeded: true
+            ))
 
         #expect(value == .scheduled)
     }
@@ -62,14 +70,15 @@ struct DeviceSchedulingStatusTests {
         isReconciling: Bool = false,
         isPresent: Bool = true
     ) -> DeviceSchedulingStatus {
-        DeviceSchedulingStatus.resolve(DeviceSchedulingStatusInput(
-            lifecycleStatus: lifecycle,
-            deviceNotificationsEnabled: deviceEnabled,
-            authorization: authorization,
-            earliestGroupOutcome: earliestOutcome,
-            laterGroupOutcomes: [],
-            reconcileInProgressOrQueued: isReconciling,
-            earliestRequestPresentOrLatestAddSucceeded: isPresent
-        ))
+        DeviceSchedulingStatus.resolve(
+            DeviceSchedulingStatusInput(
+                lifecycleStatus: lifecycle,
+                deviceNotificationsEnabled: deviceEnabled,
+                authorization: authorization,
+                earliestGroupOutcome: earliestOutcome,
+                laterGroupOutcomes: [],
+                reconcileInProgressOrQueued: isReconciling,
+                earliestRequestPresentOrAddSucceeded: isPresent
+            ))
     }
 }

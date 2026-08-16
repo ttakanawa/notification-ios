@@ -1,5 +1,6 @@
 import NotificationManagerDomain
 import Testing
+
 @testable import NotificationManager
 
 struct NotificationAuthorizationServiceTests {

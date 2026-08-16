@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Testing
 @preconcurrency import UserNotifications
+
 @testable import NotificationManager
 
 @Suite("App lifecycle reconciliation")
@@ -15,14 +16,15 @@ struct AppLifecycleReconcileTests {
         await coordinator.handle(.launch)
         await coordinator.handle(.foreground)
 
-        #expect(await trace.events == [
-            .deviceStateRefreshed,
-            .modelSnapshotRefreshed,
-            .reconcile(.foreground),
-            .deviceStateRefreshed,
-            .modelSnapshotRefreshed,
-            .reconcile(.foreground)
-        ])
+        #expect(
+            await trace.events == [
+                .deviceStateRefreshed,
+                .modelSnapshotRefreshed,
+                .reconcile(.foreground),
+                .deviceStateRefreshed,
+                .modelSnapshotRefreshed,
+                .reconcile(.foreground)
+            ])
     }
 
     @MainActor
@@ -93,11 +95,13 @@ struct AppLifecycleReconcileTests {
 
         #expect(await snapshotLoader.callCount == 0)
         #expect(await stateStore.snapshot().reconcileInProgressOrQueued == false)
-        #expect(await worker.timerState() == NotificationReconcileTimerState(
-            retryScheduled: false,
-            foregroundReplenishmentScheduled: false,
-            retryAttempt: 0
-        ))
+        #expect(
+            await worker.timerState()
+                == NotificationReconcileTimerState(
+                    retryScheduled: false,
+                    foregroundReplenishmentScheduled: false,
+                    retryAttempt: 0
+                ))
     }
 
     @MainActor
@@ -269,13 +273,14 @@ struct AppLifecycleReconcileTests {
         await coordinator.handle(.foreground)
         await coordinator.handle(.notificationResponseCompleted)
 
-        #expect(await trace.reconcileReasons == [
-            .foreground,
-            .foreground,
-            .modelChanged,
-            .foreground,
-            .foreground
-        ])
+        #expect(
+            await trace.reconcileReasons == [
+                .foreground,
+                .foreground,
+                .modelChanged,
+                .foreground,
+                .foreground
+            ])
     }
 
     @MainActor
@@ -299,12 +304,13 @@ struct AppLifecycleReconcileTests {
         await observerGate.release()
         await startup.value
 
-        #expect(await trace.events == [
-            .deviceStateRefreshed,
-            .modelSnapshotRefreshed,
-            .reconcile(.foreground),
-            .backgroundEntered
-        ])
+        #expect(
+            await trace.events == [
+                .deviceStateRefreshed,
+                .modelSnapshotRefreshed,
+                .reconcile(.foreground),
+                .backgroundEntered
+            ])
     }
 
     @MainActor
@@ -337,10 +343,11 @@ struct AppLifecycleReconcileTests {
         await gate.releaseFirstRefresh()
         await older.value
 
-        #expect(await trace.events == [
-            .modelSnapshotRefreshed,
-            .reconcile(.foreground)
-        ])
+        #expect(
+            await trace.events == [
+                .modelSnapshotRefreshed,
+                .reconcile(.foreground)
+            ])
     }
 
     @MainActor
@@ -393,23 +400,25 @@ struct AppLifecycleReconcileTests {
         await coordinator.handle(.background)
         await coordinator.backgroundRefresh()
 
-        #expect(await trace.reconcileReasons == [
-            .foreground,
-            .foreground,
-            .foreground,
-            .modelChanged,
-            .modelChanged,
-            .modelChanged,
-            .modelChanged,
-            .deviceSettingsChanged,
-            .modelChanged
-        ])
+        #expect(
+            await trace.reconcileReasons == [
+                .foreground,
+                .foreground,
+                .foreground,
+                .modelChanged,
+                .modelChanged,
+                .modelChanged,
+                .modelChanged,
+                .deviceSettingsChanged,
+                .modelChanged
+            ])
         #expect(await trace.backgroundEntryCount == 2)
-        #expect(await trace.events.suffix(3) == [
-            .backgroundEntered,
-            .modelSnapshotRefreshed,
-            .reconcile(.modelChanged)
-        ])
+        #expect(
+            await trace.events.suffix(3) == [
+                .backgroundEntered,
+                .modelSnapshotRefreshed,
+                .reconcile(.modelChanged)
+            ])
     }
 
     @MainActor
@@ -435,12 +444,13 @@ struct AppLifecycleReconcileTests {
         center.post(name: names.modelImported, object: nil)
         await trace.waitForReconcileCount(4)
 
-        #expect(await trace.reconcileReasons == [
-            .modelChanged,
-            .modelChanged,
-            .modelChanged,
-            .modelChanged
-        ])
+        #expect(
+            await trace.reconcileReasons == [
+                .modelChanged,
+                .modelChanged,
+                .modelChanged,
+                .modelChanged
+            ])
 
         coordinator.stopObservingSystemChanges()
         center.post(name: names.modelImported, object: nil)
@@ -544,10 +554,11 @@ struct AppLifecycleReconcileTests {
         )!
         let gate = PresentationSnapshotGate<String>()
         let recorder = PresentationProjectionRecorder(reminderID: reminderID)
-        recorder.router.register(form: lifecycleFormModel(
-            reminderID: reminderID,
-            title: "Unsaved draft"
-        ))
+        recorder.router.register(
+            form: lifecycleFormModel(
+                reminderID: reminderID,
+                title: "Unsaved draft"
+            ))
 
         // A successful save removes the detached editor before its refresh begins.
         recorder.router.reminderFormWasSaved(reminderID)
@@ -572,17 +583,19 @@ struct AppLifecycleReconcileTests {
 
         await gate.resolve(attempt: 1, value: "Saved current value")
         _ = await newerStateRefresh.value
-        #expect(recorder.projections == [
-            PresentationProjection(snapshot: "Saved current value", state: 2)
-        ])
+        #expect(
+            recorder.projections == [
+                PresentationProjection(snapshot: "Saved current value", state: 2)
+            ])
         #expect(recorder.router.formModel(for: reminderID)?.title == "Saved current value")
 
         await gate.resolve(attempt: 0, value: "Stale pre-import value")
         _ = await saveHookRefresh.value
 
-        #expect(recorder.projections == [
-            PresentationProjection(snapshot: "Saved current value", state: 2)
-        ])
+        #expect(
+            recorder.projections == [
+                PresentationProjection(snapshot: "Saved current value", state: 2)
+            ])
         #expect(recorder.router.formModel(for: reminderID)?.title == "Saved current value")
     }
 
@@ -605,11 +618,13 @@ struct AppLifecycleReconcileTests {
         let preview = Date(timeIntervalSince1970: 2_229_996_400)
         let physical = PhysicalNotificationPresentation(
             alertInstant: preview,
-            reasons: [PhysicalNotificationReasonPresentation(
-                role: .primary,
-                kind: .main,
-                baseOccurrenceInstant: preview
-            )],
+            reasons: [
+                PhysicalNotificationReasonPresentation(
+                    role: .primary,
+                    kind: .main,
+                    baseOccurrenceInstant: preview
+                )
+            ],
             sourceTime: preview,
             deviceLocalTime: preview
         )
@@ -635,10 +650,12 @@ struct AppLifecycleReconcileTests {
             state: state
         )
 
-        #expect(projected == .directOSFire(
-            authoritative: authoritative,
-            foundationPreview: preview
-        ))
+        #expect(
+            projected
+                == .directOSFire(
+                    authoritative: authoritative,
+                    foundationPreview: preview
+                ))
     }
 
     @Test func workerPublishesAuthoritativeNextOSFireIntoPresentationState() async throws {
@@ -664,10 +681,12 @@ struct AppLifecycleReconcileTests {
             reminderID: reminderID,
             payload: .repeating(
                 components: components,
-                contributors: [RepeatingTriggerContributor(
-                    kind: .main,
-                    sourceComponents: components
-                )]
+                contributors: [
+                    RepeatingTriggerContributor(
+                        kind: .main,
+                        sourceComponents: components
+                    )
+                ]
             ),
             contributingGroupIDs: [groupID]
         )
@@ -685,22 +704,24 @@ struct AppLifecycleReconcileTests {
         let stateStore = DeviceSchedulingStateStore()
         let authoritative = Date(timeIntervalSince1970: 2_230_000_000)
         let worker = NotificationReconcileWorker(
-            snapshotLoader: LifecycleSnapshotLoader(snapshot: CompleteReminderSnapshot(
-                reminders: [reminder],
-                tags: []
-            )),
+            snapshotLoader: LifecycleSnapshotLoader(
+                snapshot: CompleteReminderSnapshot(
+                    reminders: [reminder],
+                    tags: []
+                )),
             preferenceStore: LifecyclePreferenceStore(),
             authorizationProvider: LifecycleAuthorizationProvider(),
             notificationCenter: LifecycleNotificationCenter(),
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             stateStore: stateStore,
-            planner: LifecycleNotificationPlanner(plan: LogicalPlan(
-                requests: [request],
-                outcomes: [groupID: .scheduled],
-                selectedGroupIDs: [groupID],
-                scheduledThrough: [:],
-                reminderStatuses: [:]
-            )),
+            planner: LifecycleNotificationPlanner(
+                plan: LogicalPlan(
+                    requests: [request],
+                    outcomes: [groupID: .scheduled],
+                    selectedGroupIDs: [groupID],
+                    scheduledThrough: [:],
+                    reminderStatuses: [:]
+                )),
             materializer: LifecycleNotificationMaterializer(),
             clock: NotificationReconcileClock(
                 now: { Date(timeIntervalSince1970: 2_200_000_000) },
@@ -763,13 +784,14 @@ struct AppLifecycleReconcileTests {
             notificationCenter: LifecycleNotificationCenter(),
             eligibilityIndexStore: ForegroundEligibilityIndexStore(),
             stateStore: stateStore,
-            planner: LifecycleNotificationPlanner(plan: LogicalPlan(
-                requests: [],
-                outcomes: [:],
-                selectedGroupIDs: [],
-                scheduledThrough: [:],
-                reminderStatuses: [:]
-            )),
+            planner: LifecycleNotificationPlanner(
+                plan: LogicalPlan(
+                    requests: [],
+                    outcomes: [:],
+                    selectedGroupIDs: [],
+                    scheduledThrough: [:],
+                    reminderStatuses: [:]
+                )),
             retryDelays: []
         )
     }
@@ -820,7 +842,7 @@ private actor LifecycleTraceRecorder {
 
     var reconcileReasons: [ReconcileReason] {
         events.compactMap { event in
-            guard case let .reconcile(reason) = event else { return nil }
+            guard case .reconcile(let reason) = event else { return nil }
             return reason
         }
     }
@@ -857,7 +879,9 @@ private actor FirstLifecycleDeviceRefreshGate {
         callCount += 1
         let ready = callWaiters.filter { callCount >= $0.0 }
         callWaiters.removeAll { callCount >= $0.0 }
-        ready.forEach { $0.1.resume() }
+        for waiter in ready {
+            waiter.1.resume()
+        }
         guard callCount == 1 else { return }
         await withCheckedContinuation { continuation in
             firstRelease = continuation
@@ -895,7 +919,9 @@ private actor LifecycleForegroundIngressGate {
         entered = true
         let waiters = entryWaiters
         entryWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             releaseContinuation = continuation
         }
@@ -923,7 +949,9 @@ private actor LifecycleBackgroundIngressGate {
         entered = true
         let waiters = entryWaiters
         entryWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { releaseContinuation = $0 }
     }
 
@@ -947,7 +975,9 @@ private actor LifecycleStateWriteGate {
         entered = true
         let waiters = entryWaiters
         entryWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { releaseContinuation = $0 }
     }
 
@@ -971,7 +1001,9 @@ private actor LifecycleObserverStartGate {
         didStart = true
         let waiters = startWaiters
         startWaiters.removeAll()
-        waiters.forEach { $0.resume() }
+        for waiter in waiters {
+            waiter.resume()
+        }
         await withCheckedContinuation { continuation in
             releaseContinuation = continuation
         }
@@ -1035,12 +1067,13 @@ private final class PresentationProjectionRecorder {
 
     init(reminderID: UUID) {
         self.reminderID = reminderID
-        router = AppRouter(actions: ReminderActionCoordinator(
-            handlers: ReminderActionHandlers(
-                setEnabled: { command in .saved(command.reminderID) },
-                delete: { _ in }
-            )
-        ))
+        router = AppRouter(
+            actions: ReminderActionCoordinator(
+                handlers: ReminderActionHandlers(
+                    setEnabled: { command in .saved(command.reminderID) },
+                    delete: { _ in }
+                )
+            ))
     }
 
     func publish(snapshot: String, state: Int) {

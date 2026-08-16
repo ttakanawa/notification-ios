@@ -7,40 +7,47 @@ struct CustomRepeatField: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             TextField(text: customTextBinding, axis: .vertical) {
-                Text(LocalizedStringResource(
-                    "reminder.form.custom.placeholder",
-                    table: "ReminderForm"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.custom.placeholder",
+                        table: "ReminderForm"
+                    ))
             }
-                .lineLimit(2...5)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("reminder-form.custom.input")
+            .lineLimit(2...5)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .accessibilityIdentifier("reminder-form.custom.input")
 
-            Button(LocalizedStringResource(
-                "reminder.form.custom.preview",
-                table: "ReminderForm"
-            )) {
+            Button(
+                LocalizedStringResource(
+                    "reminder.form.custom.preview",
+                    table: "ReminderForm"
+                )
+            ) {
                 Task { await model.submitCustomRepeat() }
             }
-            .disabled(model.customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(
+                model.customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            )
             .accessibilityIdentifier("reminder-form.custom.preview-button")
 
             switch model.customRepeatState {
             case .idle:
                 EmptyView()
-            case let .failed(error):
+            case .failed(let error):
                 Label(error.localizedResource, systemImage: "exclamationmark.triangle")
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.custom.error")
-            case let .awaitingSuggestion(suggestion):
+            case .awaitingSuggestion(let suggestion):
                 VStack(alignment: .leading, spacing: 6) {
-                    Text(LocalizedStringResource(
-                        "reminder.form.custom.did-you-mean",
-                        table: "ReminderForm"
-                    ))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.form.custom.did-you-mean",
+                            table: "ReminderForm"
+                        )
+                    )
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                     Button {
                         Task { await model.selectCustomRepeatSuggestion() }
                     } label: {
@@ -48,21 +55,24 @@ struct CustomRepeatField: View {
                     }
                     .accessibilityIdentifier("reminder-form.custom.suggestion")
                 }
-            case let .awaitingConfirmation(preview):
+            case .awaitingConfirmation(let preview):
                 previewView(preview)
-                Button(LocalizedStringResource(
-                    "reminder.form.custom.apply",
-                    table: "ReminderForm"
-                )) {
+                Button(
+                    LocalizedStringResource(
+                        "reminder.form.custom.apply",
+                        table: "ReminderForm"
+                    )
+                ) {
                     Task { await model.confirmCustomRepeat() }
                 }
                 .buttonStyle(.borderedProminent)
                 .accessibilityIdentifier("reminder-form.custom.apply")
-            case let .confirmed(preview):
-                Label(LocalizedStringResource(
-                    "reminder.form.custom.applied",
-                    table: "ReminderForm"
-                ), systemImage: "checkmark.circle")
+            case .confirmed(let preview):
+                Label(
+                    LocalizedStringResource(
+                        "reminder.form.custom.applied",
+                        table: "ReminderForm"
+                    ), systemImage: "checkmark.circle")
                 Text(verbatim: preview.canonicalEnglish)
                     .font(.caption)
             }

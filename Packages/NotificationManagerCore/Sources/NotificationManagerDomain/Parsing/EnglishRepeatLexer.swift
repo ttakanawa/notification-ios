@@ -46,17 +46,12 @@ struct EnglishRepeatLexer: Sendable {
             let start = index
             let value = scalars[index].value
             if value == 44 {
-                tokens.append(Token(kind: .comma, scalarRange: start ..< start + 1))
+                tokens.append(Token(kind: .comma, scalarRange: start..<start + 1))
                 index += 1
             } else if Self.isLetter(scalars[index]) {
                 index += 1
                 while index < upperBound, Self.isLetter(scalars[index]) { index += 1 }
-                if let previous = tokens.last,
-                   previous.scalarRange.upperBound == start,
-                   previous.kind != .comma
-                {
-                    throw Failure.invalidInput
-                }
+                try Self.validateTokenBoundary(tokens, nextStart: start)
                 let word = String(String.UnicodeScalarView(scalars[start..<index])).lowercased()
                 tokens.append(Token(kind: .word(word), scalarRange: start..<index))
             } else if Self.isDigit(scalars[index]) {
@@ -64,17 +59,13 @@ struct EnglishRepeatLexer: Sendable {
                 while index < upperBound, Self.isDigit(scalars[index]) { index += 1 }
                 let numberEnd = index
                 while index < upperBound, Self.isLetter(scalars[index]) { index += 1 }
-                if let previous = tokens.last,
-                   previous.scalarRange.upperBound == start,
-                   previous.kind != .comma
-                {
-                    throw Failure.invalidInput
-                }
+                try Self.validateTokenBoundary(tokens, nextStart: start)
                 let number = String(String.UnicodeScalarView(scalars[start..<numberEnd]))
                 if numberEnd == index {
                     tokens.append(Token(kind: .integer(number), scalarRange: start..<index))
                 } else {
-                    let suffix = String(String.UnicodeScalarView(scalars[numberEnd..<index])).lowercased()
+                    let suffix = String(String.UnicodeScalarView(scalars[numberEnd..<index]))
+                        .lowercased()
                     tokens.append(
                         Token(
                             kind: .ordinal(number: number, suffix: suffix),
@@ -87,6 +78,15 @@ struct EnglishRepeatLexer: Sendable {
             }
         }
         return Lexed(input: input, tokens: tokens)
+    }
+
+    private static func validateTokenBoundary(_ tokens: [Token], nextStart: Int) throws {
+        if let previous = tokens.last,
+            previous.scalarRange.upperBound == nextStart,
+            previous.kind != .comma
+        {
+            throw Failure.invalidInput
+        }
     }
 
     private static func isWhitespace(_ scalar: Unicode.Scalar) -> Bool {

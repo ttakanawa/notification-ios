@@ -27,7 +27,7 @@ public struct CompleteSchedulingSnapshotLoader: CompleteSchedulingSnapshotLoadin
         }
 
         guard Set(snapshot.reminders.map(\.id)).count == snapshot.reminders.count,
-              Set(snapshot.tags.map(\.id)).count == snapshot.tags.count
+            Set(snapshot.tags.map(\.id)).count == snapshot.tags.count
         else {
             throw CompleteSchedulingSnapshotLoadError.classification
         }

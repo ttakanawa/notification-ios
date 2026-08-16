@@ -155,7 +155,8 @@ final class AppRouter {
         guard newLayout != layout else { return }
         switch newLayout {
         case .regular:
-            regularDestination = compactPath.last
+            regularDestination =
+                compactPath.last
                 ?? selectedReminderID.map(AppRouterDestination.reminderEdit)
             compactPath = []
         case .compact:
@@ -175,9 +176,9 @@ final class AppRouter {
 
     private func isRegisteredDestination(_ destination: AppRouterDestination) -> Bool {
         switch destination {
-        case let .reminderEdit(id):
+        case .reminderEdit(let id):
             persistedReminderIDs.contains(id) && formsByID[id] != nil
-        case let .reminderCreate(id):
+        case .reminderCreate(let id):
             formsByID[id] != nil
         case .settings, .notificationUnavailable:
             true
@@ -185,27 +186,27 @@ final class AppRouter {
     }
 }
 
-private extension AppRouterDestination {
-    var reminderID: UUID? {
+extension AppRouterDestination {
+    fileprivate var reminderID: UUID? {
         switch self {
-        case let .reminderEdit(id), let .reminderCreate(id):
+        case .reminderEdit(let id), .reminderCreate(let id):
             id
         case .settings, .notificationUnavailable:
             nil
         }
     }
 
-    var formReminderID: UUID? {
+    fileprivate var formReminderID: UUID? {
         switch self {
-        case let .reminderEdit(id), let .reminderCreate(id):
+        case .reminderEdit(let id), .reminderCreate(let id):
             id
         case .settings, .notificationUnavailable:
             nil
         }
     }
 
-    var editReminderID: UUID? {
-        guard case let .reminderEdit(id) = self else { return nil }
+    fileprivate var editReminderID: UUID? {
+        guard case .reminderEdit(let id) = self else { return nil }
         return id
     }
 }

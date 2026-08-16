@@ -1,9 +1,10 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Notifications.NotificationIdentifierCodec")
-struct NotificationsNotificationIdentifierCodecTests {
+struct NotificationIdentifierCodecTests {
     @Test func reproducesNormativeRepeatingDocumentDigestAndIdentifier() throws {
         let components = RepeatingTriggerComponents(
             timeZoneIdentifier: "America/New_York",
@@ -13,14 +14,24 @@ struct NotificationsNotificationIdentifierCodecTests {
             second: 0
         )
 
-        #expect(try components.canonicalDocument() == Data(
-            #"{"calendar":"gregorian","hour":9,"minute":30,"repeats":true,"second":0,"timeZone":"America/New_York","weekday":2}"#.utf8
-        ))
-        #expect(try codec.repeatingDigest(components: components) == "04fcbfbe9200234ade132aff6e19d6c9cc7e4ee07c8d0fc4505c6f622a1750af")
-        #expect(try codec.repeatingIdentifier(
-            reminderID: UUID(uuidString: "123E4567-E89B-12D3-A456-426614174000")!,
-            components: components
-        ) == "notification-manager.local.v1.r.123e4567-e89b-12d3-a456-426614174000.04fcbfbe9200234ade132aff6e19d6c9cc7e4ee07c8d0fc4505c6f622a1750af")
+        #expect(
+            try components.canonicalDocument()
+                == Data(
+                    #"{"calendar":"gregorian","hour":9,"minute":30,"repeats":true,"second":0,"timeZone":"America/New_York","weekday":2}"#
+                        .utf8
+                ))
+        #expect(
+            try codec.repeatingDigest(components: components)
+                == "04fcbfbe9200234ade132aff6e19d6c9cc7e4ee07c8d0fc4505c6f622a1750af")
+        let expectedIdentifier =
+            "notification-manager.local.v1.r.123e4567-e89b-12d3-a456-426614174000."
+            + "04fcbfbe9200234ade132aff6e19d6c9cc7e4ee07c8d0fc4505c6f622a1750af"
+        #expect(
+            try codec.repeatingIdentifier(
+                reminderID: UUID(uuidString: "123E4567-E89B-12D3-A456-426614174000")!,
+                components: components
+            ) == expectedIdentifier
+        )
     }
 
     @Test func canonicalDocumentsContainOnlyPresentFieldsInSortedOrder() throws {
@@ -34,7 +45,9 @@ struct NotificationsNotificationIdentifierCodecTests {
                 #"{"calendar":"gregorian","day":31,"hour":23,"minute":59,"repeats":true,"second":0,"timeZone":"Asia/Manila"}"#
             ),
             (
-                .init(timeZoneIdentifier: "Asia/Tokyo", month: 2, day: 29, hour: 0, minute: 0, second: 0),
+                .init(
+                    timeZoneIdentifier: "Asia/Tokyo", month: 2, day: 29, hour: 0, minute: 0,
+                    second: 0),
                 #"{"calendar":"gregorian","day":29,"hour":0,"minute":0,"month":2,"repeats":true,"second":0,"timeZone":"Asia/Tokyo"}"#
             )
         ]
@@ -46,10 +59,14 @@ struct NotificationsNotificationIdentifierCodecTests {
 
     @Test func rejectsComponentsThatCannotBeExactGregorianRepeatingTriggers() {
         let invalid = [
-            RepeatingTriggerComponents(timeZoneIdentifier: "Not/A_Zone", hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 0, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", day: 32, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", weekday: 0, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "Not/A_Zone", hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 0, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", day: 32, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", weekday: 0, hour: 9, minute: 0, second: 0),
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 24, minute: 0, second: 0),
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 60, second: 0),
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 9, minute: 0, second: 1)
@@ -64,12 +81,19 @@ struct NotificationsNotificationIdentifierCodecTests {
 
     @Test func rejectsImpossibleMixedAndPartialTriggerShapes() {
         let invalid = [
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 30, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 4, day: 31, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, weekday: 2, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", day: 15, weekday: 2, hour: 9, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 29, weekday: 2, hour: 9, minute: 0, second: 0)
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 2, day: 30, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 4, day: 31, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 2, weekday: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", day: 15, weekday: 2, hour: 9, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 2, day: 29, weekday: 2, hour: 9, minute: 0,
+                second: 0)
         ]
 
         for components in invalid {
@@ -88,10 +112,14 @@ struct NotificationsNotificationIdentifierCodecTests {
     @Test func acceptsEveryAllowedTriggerShapeAtItsBoundaries() throws {
         let allowed = [
             RepeatingTriggerComponents(timeZoneIdentifier: "UTC", hour: 0, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", weekday: 7, hour: 23, minute: 59, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", day: 31, hour: 23, minute: 59, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 2, day: 29, hour: 0, minute: 0, second: 0),
-            RepeatingTriggerComponents(timeZoneIdentifier: "UTC", month: 12, day: 31, hour: 23, minute: 59, second: 0)
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", weekday: 7, hour: 23, minute: 59, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", day: 31, hour: 23, minute: 59, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 2, day: 29, hour: 0, minute: 0, second: 0),
+            RepeatingTriggerComponents(
+                timeZoneIdentifier: "UTC", month: 12, day: 31, hour: 23, minute: 59, second: 0)
         ]
 
         for components in allowed {
@@ -110,8 +138,10 @@ struct NotificationsNotificationIdentifierCodecTests {
         ]
 
         for (instant, suffix) in fixtures {
-            #expect(try codec.oneShotIdentifier(reminderID: reminderID, alertInstant: instant)
-                == "notification-manager.local.v1.o.aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.\(suffix)")
+            #expect(
+                try codec.oneShotIdentifier(reminderID: reminderID, alertInstant: instant)
+                    == "notification-manager.local.v1.o.aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee.\(suffix)"
+            )
         }
     }
 
@@ -136,12 +166,20 @@ struct NotificationsNotificationIdentifierCodecTests {
         let uuid = UUID(uuidString: "123E4567-E89B-12D3-A456-426614174000")!
         let digest = String(repeating: "a", count: 64)
 
-        #expect(codec.classify("notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.-9223372036854775808")
-            == .currentOneShot(reminderID: uuid, unixSeconds: .min))
-        #expect(codec.classify("notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.9223372036854775807")
-            == .currentOneShot(reminderID: uuid, unixSeconds: .max))
-        #expect(codec.classify("notification-manager.local.v1.r.123e4567-e89b-12d3-a456-426614174000.\(digest)")
-            == .currentRepeating(reminderID: uuid, digest: digest))
+        #expect(
+            codec.classify(
+                "notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.-9223372036854775808"
+            )
+                == .currentOneShot(reminderID: uuid, unixSeconds: .min))
+        #expect(
+            codec.classify(
+                "notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.9223372036854775807"
+            )
+                == .currentOneShot(reminderID: uuid, unixSeconds: .max))
+        #expect(
+            codec.classify(
+                "notification-manager.local.v1.r.123e4567-e89b-12d3-a456-426614174000.\(digest)")
+                == .currentRepeating(reminderID: uuid, digest: digest))
 
         let stale = [
             "notification-manager.local.",
@@ -162,8 +200,14 @@ struct NotificationsNotificationIdentifierCodecTests {
             #expect(codec.classify(rawValue) == .appOwnedStale)
         }
 
-        #expect(codec.classify("notification-manager.locals.v1.o.123e4567-e89b-12d3-a456-426614174000.0") == .unrelated)
-        #expect(codec.classify("other.notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.0") == .unrelated)
+        #expect(
+            codec.classify(
+                "notification-manager.locals.v1.o.123e4567-e89b-12d3-a456-426614174000.0")
+                == .unrelated)
+        #expect(
+            codec.classify(
+                "other.notification-manager.local.v1.o.123e4567-e89b-12d3-a456-426614174000.0")
+                == .unrelated)
     }
 
     private let codec = NotificationIdentifierCodec()

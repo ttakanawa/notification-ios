@@ -1,9 +1,10 @@
 import Foundation
 import NotificationManagerDomain
-#if canImport(UIKit)
-import UIKit
-#endif
 import UserNotifications
+
+#if canImport(UIKit)
+    import UIKit
+#endif
 
 enum NotificationResponseDestination: Sendable, Equatable {
     case reminderEdit(UUID)
@@ -24,14 +25,16 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     nonisolated static let openLinkActionIdentifier = "notification-manager.open-link-action"
     nonisolated static let pendingResponseLimit = 16
 
-    typealias InstallHandler = @MainActor (
-        NotificationApplicationDelegate,
-        Set<UNNotificationCategory>
-    ) -> Void
+    typealias InstallHandler =
+        @MainActor (
+            NotificationApplicationDelegate,
+            Set<UNNotificationCategory>
+        ) -> Void
     typealias ReminderLookup = @Sendable (UUID) async throws -> ReminderSnapshot?
-    typealias ResponseRouter = @MainActor @Sendable (
-        NotificationResponseDestination
-    ) -> Void
+    typealias ResponseRouter =
+        @MainActor @Sendable (
+            NotificationResponseDestination
+        ) -> Void
     typealias URLOpener = @MainActor @Sendable (URL) -> Void
 
     nonisolated private let eligibilityIndexStore: ForegroundEligibilityIndexStore
@@ -75,9 +78,10 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         reminderLookup: @escaping ReminderLookup = { _ in nil },
         routeResponse: @escaping ResponseRouter = { _ in },
         openURL: @escaping URLOpener = { _ in },
-        reconcileAfterNotification: @escaping @Sendable (
-            AppLifecycleTrigger
-        ) async -> Void = { _ in },
+        reconcileAfterNotification:
+            @escaping @Sendable (
+                AppLifecycleTrigger
+            ) async -> Void = { _ in },
         responseHandlingInitiallyBound: Bool = true
     ) {
         self.eligibilityIndexStore = eligibilityIndexStore
@@ -117,12 +121,13 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         reminderLookup: @escaping ReminderLookup,
         routeResponse: @escaping ResponseRouter,
         openURL: @escaping URLOpener,
-        reconcileAfterNotification: @escaping @Sendable (
-            AppLifecycleTrigger
-        ) async -> Void
+        reconcileAfterNotification:
+            @escaping @Sendable (
+                AppLifecycleTrigger
+            ) async -> Void
     ) {
         let binding = responseIngress.bind()
-        guard case let .bound(shouldScheduleDrain) = binding else { return }
+        guard case .bound(let shouldScheduleDrain) = binding else { return }
         self.reminderLookup = reminderLookup
         self.routeResponse = routeResponse
         self.openURL = openURL
@@ -136,8 +141,8 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         for request: UNNotificationRequest
     ) -> UNNotificationPresentationOptions {
         guard request.identifier.hasPrefix(NotificationIdentifierCodec.root),
-              let reminderID = Self.reminderID(from: request.content.userInfo),
-              eligibilityIndexStore.isEligible(reminderID)
+            let reminderID = Self.reminderID(from: request.content.userInfo),
+            eligibilityIndexStore.isEligible(reminderID)
         else {
             return []
         }
@@ -160,11 +165,12 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         categoryIdentifier: String,
         userInfo: [AnyHashable: Any]
     ) async -> NotificationResponseOutcome {
-        await handleResponse(Self.responseValue(
-            actionIdentifier: actionIdentifier,
-            categoryIdentifier: categoryIdentifier,
-            userInfo: userInfo
-        ))
+        await handleResponse(
+            Self.responseValue(
+                actionIdentifier: actionIdentifier,
+                categoryIdentifier: categoryIdentifier,
+                userInfo: userInfo
+            ))
     }
 
     nonisolated func receiveResponse(
@@ -211,7 +217,7 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
 
     private func startResponseDrainIfNeeded() {
         guard responseDrainTask == nil,
-              !responseQueue.isEmpty
+            !responseQueue.isEmpty
         else {
             return
         }
@@ -256,7 +262,7 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         case UNNotificationDismissActionIdentifier:
             action = .ignored
         case Self.openLinkActionIdentifier
-            where categoryIdentifier == Self.openLinkCategoryIdentifier:
+        where categoryIdentifier == Self.openLinkCategoryIdentifier:
             action = .openLink
         default:
             action = .ignored
@@ -270,9 +276,10 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     nonisolated func userNotificationCenter(
         _ center: UNUserNotificationCenter,
         willPresent notification: UNNotification,
-        withCompletionHandler completionHandler: @escaping @Sendable (
-            UNNotificationPresentationOptions
-        ) -> Void
+        withCompletionHandler completionHandler:
+            @escaping @Sendable (
+                UNNotificationPresentationOptions
+            ) -> Void
     ) {
         presentationOptions(for: notification.request, completion: completionHandler)
     }
@@ -295,16 +302,16 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         reminderID: UUID?
     ) async -> NotificationResponseOutcome {
         guard let reminderID,
-              let reminder = try? await reminderLookup(reminderID),
-              reminder.id == reminderID
+            let reminder = try? await reminderLookup(reminderID),
+            reminder.id == reminderID
         else {
             return .notificationUnavailable
         }
 
         if action == .openLink,
-           let value = reminder.urlString,
-           let canonical = try? CanonicalHTTPURL(value),
-           let url = URL(string: canonical.string)
+            let value = reminder.urlString,
+            let canonical = try? CanonicalHTTPURL(value),
+            let url = URL(string: canonical.string)
         {
             return .openedURL(url)
         }
@@ -313,9 +320,9 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
 
     private func apply(_ outcome: NotificationResponseOutcome) {
         switch outcome {
-        case let .reminderEdit(reminderID):
+        case .reminderEdit(let reminderID):
             routeResponse(.reminderEdit(reminderID))
-        case let .openedURL(url):
+        case .openedURL(let url):
             openURL(url)
         case .notificationUnavailable:
             routeResponse(.notificationUnavailable)
@@ -328,9 +335,9 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
         from userInfo: [AnyHashable: Any]
     ) -> UUID? {
         guard let rawValue = userInfo[reminderIDKey] as? String,
-              rawValue == rawValue.lowercased(),
-              let identifier = UUID(uuidString: rawValue),
-              identifier.uuidString.lowercased() == rawValue
+            rawValue == rawValue.lowercased(),
+            let identifier = UUID(uuidString: rawValue),
+            identifier.uuidString.lowercased() == rawValue
         else {
             return nil
         }
@@ -339,17 +346,16 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
 }
 
 #if canImport(UIKit)
-extension NotificationApplicationDelegate: UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        didFinishLaunchingWithOptions launchOptions: [
-            UIApplication.LaunchOptionsKey: Any
-        ]? = nil
-    ) -> Bool {
-        install()
-        return true
+    extension NotificationApplicationDelegate: UIApplicationDelegate {
+        func application(
+            _ application: UIApplication,
+            didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? =
+                nil
+        ) -> Bool {
+            install()
+            return true
+        }
     }
-}
 #endif
 
 private enum ResponseAction: Sendable, Equatable {
@@ -411,20 +417,22 @@ private final class NotificationResponseIngress: @unchecked Sendable {
                 if queuedResponses.count == pendingLimit {
                     queuedResponses.removeFirst()
                 }
-                queuedResponses.append(QueuedNotificationResponse(
-                    response: response,
-                    completion: nil
-                ))
+                queuedResponses.append(
+                    QueuedNotificationResponse(
+                        response: response,
+                        completion: nil
+                    ))
                 return EnqueueResult(
                     shouldCompleteImmediately: true,
                     shouldScheduleDrain: false
                 )
             }
 
-            queuedResponses.append(QueuedNotificationResponse(
-                response: response,
-                completion: completion
-            ))
+            queuedResponses.append(
+                QueuedNotificationResponse(
+                    response: response,
+                    completion: completion
+                ))
             let shouldScheduleDrain = !drainIsScheduled
             drainIsScheduled = true
             return EnqueueResult(

@@ -53,7 +53,9 @@ enum GeneratedRepeatGrammarFixtures {
             Form(input: "weekend", canonical: "weekend")
         ]
         return forms.map {
-            .init(production: "simple-frequency", input: "Every \($0.input)", canonical: "Every \($0.canonical)")
+            .init(
+                production: "simple-frequency", input: "Every \($0.input)",
+                canonical: "Every \($0.canonical)")
         }
     }()
 
@@ -100,8 +102,10 @@ enum GeneratedRepeatGrammarFixtures {
                         fixtures.append(
                             .init(
                                 production: "yearly-rule / \(selector.production)",
-                                input: "Every \(frequency.input) on \(article)\(selector.input) of \(month.input)",
-                                canonical: "Every \(frequency.canonical) on the \(selector.canonical) of \(month.canonical)"
+                                input:
+                                    "Every \(frequency.input) on \(article)\(selector.input) of \(month.input)",
+                                canonical:
+                                    "Every \(frequency.canonical) on the \(selector.canonical) of \(month.canonical)"
                             )
                         )
                     }
@@ -119,7 +123,8 @@ enum GeneratedRepeatGrammarFixtures {
             ("October", "Oct"), ("November", "Nov"), ("December", "Dec")
         ]
         return months.flatMap { full, abbreviation in
-            let spellings = full == abbreviation
+            let spellings =
+                full == abbreviation
                 ? [full, full.uppercased()]
                 : [full, abbreviation, abbreviation.uppercased()]
             return spellings.map {
@@ -148,10 +153,18 @@ enum GeneratedRepeatGrammarFixtures {
             }
         }
         fixtures += [
-            .init(production: "two-item weekday-list", input: "Every Monday and Tuesday", canonical: "Every Monday and Tuesday"),
-            .init(production: "two-item weekday-list", input: "Every Mon\tand\tTUE", canonical: "Every Monday and Tuesday"),
-            .init(production: "two-item weekday-list", input: "Every Sunday and Monday", canonical: "Every Monday and Sunday"),
-            .init(production: "two-item duplicate normalization", input: "Every Mon and Monday", canonical: "Every Monday")
+            .init(
+                production: "two-item weekday-list", input: "Every Monday and Tuesday",
+                canonical: "Every Monday and Tuesday"),
+            .init(
+                production: "two-item weekday-list", input: "Every Mon\tand\tTUE",
+                canonical: "Every Monday and Tuesday"),
+            .init(
+                production: "two-item weekday-list", input: "Every Sunday and Monday",
+                canonical: "Every Monday and Sunday"),
+            .init(
+                production: "two-item duplicate normalization", input: "Every Mon and Monday",
+                canonical: "Every Monday")
         ]
 
         let abbreviations = weekdays.map(\.1)
@@ -160,7 +173,14 @@ enum GeneratedRepeatGrammarFixtures {
         for count in 3...7 {
             let inputNames = Array(abbreviations.prefix(count))
             let outputNames = Array(canonicalNames.prefix(count))
-            let canonical = "Every " + outputNames.dropLast().joined(separator: ", ") + ", and " + outputNames.last!
+            guard let finalInputName = inputNames.last, let finalOutputName = outputNames.last
+            else {
+                preconditionFailure(
+                    "Generated weekday prefixes must contain at least three entries")
+            }
+            let canonical =
+                "Every " + outputNames.dropLast().joined(separator: ", ") + ", and "
+                + finalOutputName
             for comma in commaForms {
                 fixtures.append(
                     .init(
@@ -172,14 +192,16 @@ enum GeneratedRepeatGrammarFixtures {
                 fixtures.append(
                     .init(
                         production: "\(count)-item no-Oxford weekday-list",
-                        input: "Every " + inputNames.dropLast().joined(separator: comma) + " and " + inputNames.last!,
+                        input: "Every " + inputNames.dropLast().joined(separator: comma) + " and "
+                            + finalInputName,
                         canonical: canonical
                     )
                 )
                 fixtures.append(
                     .init(
                         production: "\(count)-item Oxford weekday-list",
-                        input: "Every " + inputNames.dropLast().joined(separator: comma) + comma + "and " + inputNames.last!,
+                        input: "Every " + inputNames.dropLast().joined(separator: comma) + comma
+                            + "and " + finalInputName,
                         canonical: canonical
                     )
                 )
@@ -246,7 +268,8 @@ enum GeneratedRepeatGrammarFixtures {
         for plural in plurals {
             fixtures.append(.init(mutation: "zero interval", input: "Every 0 \(plural)"))
             fixtures.append(.init(mutation: "leading-zero interval", input: "Every 01 \(plural)"))
-            fixtures.append(.init(mutation: "interval above maximum", input: "Every 10000 \(plural)"))
+            fixtures.append(
+                .init(mutation: "interval above maximum", input: "Every 10000 \(plural)"))
         }
         return fixtures
     }()
@@ -263,7 +286,8 @@ enum GeneratedRepeatGrammarFixtures {
         .init(mutation: "invalid fixed February date", input: "Every year on the 30th of February"),
         .init(mutation: "invalid fixed April date", input: "Every year on the 31st of April"),
         .init(mutation: "invalid fixed June date", input: "Every year on the 31st of June"),
-        .init(mutation: "invalid fixed September date", input: "Every year on the 31st of September"),
+        .init(
+            mutation: "invalid fixed September date", input: "Every year on the 31st of September"),
         .init(mutation: "invalid fixed November date", input: "Every year on the 31st of November"),
         .init(mutation: "yearly selector missing month", input: "Every year on the 1st"),
         .init(mutation: "yearly month missing selector", input: "Every year on January"),
@@ -283,7 +307,9 @@ enum GeneratedRepeatGrammarFixtures {
         .init(mutation: "multiple and", input: "Every Mon and Tue and Wed"),
         .init(mutation: "empty comma element", input: "Every Mon,,Tue"),
         .init(mutation: "trailing separator", input: "Every Mon, Tue, and"),
-        .init(mutation: "more than seven items", input: "Every Mon, Tue, Wed, Thu, Fri, Sat, Sun, Mon")
+        .init(
+            mutation: "more than seven items", input: "Every Mon, Tue, Wed, Thu, Fri, Sat, Sun, Mon"
+        )
     ]
 
     private static let eofMutations: [GeneratedRejectedRepeatFixture] = [
@@ -300,6 +326,8 @@ enum GeneratedRepeatGrammarFixtures {
         .init(mutation: "non-ASCII whitespace", input: "Every\u{00A0}week"),
         .init(mutation: "non-ASCII letter", input: "Évery week"),
         .init(mutation: "unsupported punctuation", input: "Every week."),
-        .init(mutation: "input above scalar limit", input: String(repeating: " ", count: 247) + "Every week")
+        .init(
+            mutation: "input above scalar limit",
+            input: String(repeating: " ", count: 247) + "Every week")
     ]
 }

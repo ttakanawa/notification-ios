@@ -57,18 +57,20 @@ public struct AlertGroupCursor {
                 rule: schedule.rule,
                 calendar: calendar
             )
-            alerts.append(EffectiveAlert(
-                kind: .early,
-                baseOccurrence: occurrence,
-                alertInstant: instant
-            ))
+            alerts.append(
+                EffectiveAlert(
+                    kind: .early,
+                    baseOccurrence: occurrence,
+                    alertInstant: instant
+                ))
         }
         if schedule.early?.mainEnabled != false {
-            alerts.append(EffectiveAlert(
-                kind: .main,
-                baseOccurrence: occurrence,
-                alertInstant: occurrence.instant
-            ))
+            alerts.append(
+                EffectiveAlert(
+                    kind: .main,
+                    baseOccurrence: occurrence,
+                    alertInstant: occurrence.instant
+                ))
         }
         return AlertGroup(baseOccurrence: occurrence, alerts: alerts)
     }
@@ -81,28 +83,32 @@ func earlyAlertInstant(
     calendar: Calendar
 ) throws -> Date {
     if usesCalendarOffset(early.unit, rule: rule) {
-        let component: Calendar.Component = switch early.unit {
-        case .days: .day
-        case .weeks: .weekOfYear
-        case .minutes, .hours:
-            preconditionFailure("Fixed-duration unit reached calendar offset")
-        }
-        guard let result = calendar.date(
-            byAdding: component,
-            value: -early.value,
-            to: baseInstant
-        ) else {
+        let component: Calendar.Component =
+            switch early.unit {
+            case .days: .day
+            case .weeks: .weekOfYear
+            case .minutes, .hours:
+                preconditionFailure("Fixed-duration unit reached calendar offset")
+            }
+        guard
+            let result = calendar.date(
+                byAdding: component,
+                value: -early.value,
+                to: baseInstant
+            )
+        else {
             throw NotificationDerivationError.arithmeticOverflow
         }
         return result
     }
 
-    let secondsPerUnit: Int64 = switch early.unit {
-    case .minutes: 60
-    case .hours: 3_600
-    case .days: 86_400
-    case .weeks: 604_800
-    }
+    let secondsPerUnit: Int64 =
+        switch early.unit {
+        case .minutes: 60
+        case .hours: 3_600
+        case .days: 86_400
+        case .weeks: 604_800
+        }
     let (seconds, overflow) = Int64(early.value).multipliedReportingOverflow(
         by: secondsPerUnit
     )

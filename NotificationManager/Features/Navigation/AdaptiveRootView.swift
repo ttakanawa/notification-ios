@@ -106,7 +106,7 @@ struct AdaptiveRootView: View {
             get: { actions.enabledCapacityConfirmation != nil },
             set: { presented in
                 guard !presented,
-                      let confirmation = actions.enabledCapacityConfirmation
+                    let confirmation = actions.enabledCapacityConfirmation
                 else {
                     return
                 }
@@ -140,20 +140,23 @@ struct AdaptiveRootView: View {
     private var reminderConfirmationAlertTitle: Text {
         switch reminderConfirmations.alertKind {
         case .expiredSchedule:
-            Text(LocalizedStringResource(
-                "reminder.form.expired-confirmation.title",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.expired-confirmation.title",
+                    table: "ReminderForm"
+                ))
         case .delete:
-            Text(LocalizedStringResource(
-                "reminder.form.delete-confirmation.title",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.delete-confirmation.title",
+                    table: "ReminderForm"
+                ))
         case .discardChanges:
-            Text(LocalizedStringResource(
-                "reminder.form.discard-confirmation.title",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.discard-confirmation.title",
+                    table: "ReminderForm"
+                ))
         case nil:
             Text("")
         }
@@ -162,20 +165,23 @@ struct AdaptiveRootView: View {
     private var reminderConfirmationAlertMessage: Text {
         switch reminderConfirmations.alertKind {
         case .expiredSchedule:
-            Text(LocalizedStringResource(
-                "reminder.form.expired-confirmation.message",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.expired-confirmation.message",
+                    table: "ReminderForm"
+                ))
         case .delete:
-            Text(LocalizedStringResource(
-                "reminder.form.delete-confirmation.message",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.delete-confirmation.message",
+                    table: "ReminderForm"
+                ))
         case .discardChanges:
-            Text(LocalizedStringResource(
-                "reminder.form.discard-confirmation.message",
-                table: "ReminderForm"
-            ))
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.discard-confirmation.message",
+                    table: "ReminderForm"
+                ))
         case nil:
             Text("")
         }
@@ -186,52 +192,63 @@ struct AdaptiveRootView: View {
         switch reminderConfirmations.alertKind {
         case .expiredSchedule:
             Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.form.expired-confirmation.confirm",
-                    table: "ReminderForm"
-                ))
-                    .accessibilityIdentifier("reminder-form.expired-confirm")
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.expired-confirmation.confirm",
+                        table: "ReminderForm"
+                    )
+                )
+                .accessibilityIdentifier("reminder-form.expired-confirm")
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
             Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.action.cancel",
-                    table: "Reminder"
-                ))
+                Text(
+                    LocalizedStringResource(
+                        "reminder.action.cancel",
+                        table: "Reminder"
+                    ))
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
         case .delete:
             Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.form.delete-confirmation.confirm",
-                    table: "ReminderForm"
-                ))
-                    .accessibilityIdentifier("reminder-form.delete-confirm")
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.delete-confirmation.confirm",
+                        table: "ReminderForm"
+                    )
+                )
+                .accessibilityIdentifier("reminder-form.delete-confirm")
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
             Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.action.cancel",
-                    table: "Reminder"
-                ))
-                    .accessibilityIdentifier("reminder-form.delete-cancel")
+                Text(
+                    LocalizedStringResource(
+                        "reminder.action.cancel",
+                        table: "Reminder"
+                    )
+                )
+                .accessibilityIdentifier("reminder-form.delete-cancel")
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
         case .discardChanges:
             Button(role: .destructive, action: reminderConfirmations.confirmAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.form.discard-confirmation.confirm",
-                    table: "ReminderForm"
-                ))
-                    .accessibilityIdentifier("reminder-form.discard-confirm")
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.discard-confirmation.confirm",
+                        table: "ReminderForm"
+                    )
+                )
+                .accessibilityIdentifier("reminder-form.discard-confirm")
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
             Button(role: .cancel, action: reminderConfirmations.cancelAlert) {
-                Text(LocalizedStringResource(
-                    "reminder.action.cancel",
-                    table: "Reminder"
-                ))
-                    .accessibilityIdentifier("reminder-form.discard-cancel")
+                Text(
+                    LocalizedStringResource(
+                        "reminder.action.cancel",
+                        table: "Reminder"
+                    )
+                )
+                .accessibilityIdentifier("reminder-form.discard-cancel")
             }
             .disabled(reminderConfirmations.isPersistenceOperationInFlight)
         case nil:

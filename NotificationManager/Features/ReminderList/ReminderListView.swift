@@ -44,10 +44,12 @@ struct ReminderListView: View {
             )
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(LocalizedStringResource(
-            "reminder.list.title",
-            table: "Reminder"
-        ))
+        .navigationTitle(
+            LocalizedStringResource(
+                "reminder.list.title",
+                table: "Reminder"
+            )
+        )
         .toolbar {
             ToolbarItem(placement: .topBarLeading) {
                 Button {
@@ -103,11 +105,11 @@ struct ReminderListView: View {
                             failure.localizedResource,
                             systemImage: "exclamationmark.triangle"
                         )
-                            .foregroundStyle(.red)
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier(
-                                "reminder-row.action-error.\(item.id.uuidString.lowercased())"
-                            )
+                        .foregroundStyle(.red)
+                        .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier(
+                            "reminder-row.action-error.\(item.id.uuidString.lowercased())"
+                        )
                     }
                 }
             }
@@ -120,12 +122,12 @@ struct ReminderListView: View {
     }
 
     private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {
-        guard case let .failed(_, failure) = actions.state else { return [] }
+        guard case .failed(_, let failure) = actions.state else { return [] }
         return [failure.accessibilityIdentity]
     }
 
     private func actionFailure(for reminderID: UUID) -> ReminderActionFailure? {
-        guard case let .failed(id, failure) = actions.state, id == reminderID else {
+        guard case .failed(let id, let failure) = actions.state, id == reminderID else {
             return nil
         }
         return failure

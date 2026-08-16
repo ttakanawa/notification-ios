@@ -1,25 +1,28 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Notifications.LogicalNotificationPlanner")
 struct LogicalNotificationPlannerTests {
     @Test func allocatesEveryReminderEarliestGroupBeforeLaterGroups() throws {
-        let plan = try planner.plan(input(
-            reminders: [
-                reminder("00000000-0000-0000-0000-00000000000A", hour: 13, interval: 1),
-                reminder("00000000-0000-0000-0000-00000000000B", hour: 14, interval: 24),
-                reminder("00000000-0000-0000-0000-00000000000C", hour: 15, interval: 24)
-            ],
-            capacity: 4
-        ))
+        let plan = try planner.plan(
+            input(
+                reminders: [
+                    reminder("00000000-0000-0000-0000-00000000000A", hour: 13, interval: 1),
+                    reminder("00000000-0000-0000-0000-00000000000B", hour: 14, interval: 24),
+                    reminder("00000000-0000-0000-0000-00000000000C", hour: 15, interval: 24)
+                ],
+                capacity: 4
+            ))
 
-        #expect(plan.selectedGroupIDs == [
-            group("00000000-0000-0000-0000-00000000000A", "2026-08-06T13:00:00Z"),
-            group("00000000-0000-0000-0000-00000000000B", "2026-08-06T14:00:00Z"),
-            group("00000000-0000-0000-0000-00000000000C", "2026-08-06T15:00:00Z"),
-            group("00000000-0000-0000-0000-00000000000A", "2026-08-06T14:00:00Z")
-        ])
+        #expect(
+            plan.selectedGroupIDs == [
+                group("00000000-0000-0000-0000-00000000000A", "2026-08-06T13:00:00Z"),
+                group("00000000-0000-0000-0000-00000000000B", "2026-08-06T14:00:00Z"),
+                group("00000000-0000-0000-0000-00000000000C", "2026-08-06T15:00:00Z"),
+                group("00000000-0000-0000-0000-00000000000A", "2026-08-06T14:00:00Z")
+            ])
     }
 
     @Test func doesNotSplitTwoRequestAlertGroupWhenOneSlotRemains() throws {
@@ -57,16 +60,19 @@ struct LogicalNotificationPlannerTests {
         )
 
         let plan = try planner.plan(input(reminders: [value], capacity: 2))
-        let collision = try #require(plan.requests.first(where: {
-            $0.oneShotAlertInstant == date("2026-08-06T13:00:00Z")
-        }))
+        let collision = try #require(
+            plan.requests.first(where: {
+                $0.oneShotAlertInstant == date("2026-08-06T13:00:00Z")
+            }))
 
         #expect(plan.selectedGroupIDs.count == 2)
         #expect(plan.requests.count == 2)
-        #expect(collision.contributingGroupIDs == Set([
-            group(value.id, "2026-08-06T13:00:00Z"),
-            group(value.id, "2026-08-07T13:00:00Z")
-        ]))
+        #expect(
+            collision.contributingGroupIDs
+                == Set([
+                    group(value.id, "2026-08-06T13:00:00Z"),
+                    group(value.id, "2026-08-07T13:00:00Z")
+                ]))
         #expect(collision.oneShotReasons.count == 2)
     }
 
@@ -91,7 +97,9 @@ struct LogicalNotificationPlannerTests {
         #expect(fits.requests.allSatisfy { $0.isRepeating })
         #expect(fits.scheduledThrough[repeatable.id] == nil)
         #expect(cannotFit.requests.count == 1)
-        #expect(try #require(cannotFit.requests.first).oneShotAlertInstant == date("2026-08-06T13:00:00Z"))
+        #expect(
+            try #require(cannotFit.requests.first).oneShotAlertInstant
+                == date("2026-08-06T13:00:00Z"))
         #expect(cannotFit.scheduledThrough[repeatable.id] == date("2026-08-06T13:00:00Z"))
     }
 
@@ -107,20 +115,22 @@ struct LogicalNotificationPlannerTests {
             interval: 24
         )
         let failingID = failing.id
-        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
-            if point == .repeatingReplacement, reminderID == failingID {
-                throw InjectedPlannerFailure.expected
-            }
-        })
+        let planner = LogicalNotificationPlanner(
+            dependencies: .init { point, reminderID in
+                if point == .repeatingReplacement, reminderID == failingID {
+                    throw InjectedPlannerFailure.expected
+                }
+            })
 
         let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 3))
 
         #expect(plan.outcomes[group(failing.id, "2026-08-06T13:00:00Z")] == .scheduled)
-        #expect(plan.requests.contains {
-            $0.reminderID == failing.id
-                && !$0.isRepeating
-                && $0.oneShotAlertInstant == date("2026-08-06T13:00:00Z")
-        })
+        #expect(
+            plan.requests.contains {
+                $0.reminderID == failing.id
+                    && !$0.isRepeating
+                    && $0.oneShotAlertInstant == date("2026-08-06T13:00:00Z")
+            })
         #expect(plan.requests.contains { $0.reminderID == unrelated.id })
         #expect(plan.requests.allSatisfy { !$0.isRepeating })
         #expect(plan.scheduledThrough[failing.id] == date("2026-08-06T13:00:00Z"))
@@ -139,11 +149,12 @@ struct LogicalNotificationPlannerTests {
             interval: 1
         )
         let failingID = failing.id
-        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
-            if point == .initialContinuation, reminderID == failingID {
-                throw InjectedPlannerFailure.expected
-            }
-        })
+        let planner = LogicalNotificationPlanner(
+            dependencies: .init { point, reminderID in
+                if point == .initialContinuation, reminderID == failingID {
+                    throw InjectedPlannerFailure.expected
+                }
+            })
 
         let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 3))
 
@@ -166,21 +177,23 @@ struct LogicalNotificationPlannerTests {
             interval: 1
         )
         let failingID = failing.id
-        let planner = LogicalNotificationPlanner(dependencies: .init { point, reminderID in
-            if point == .acceptedContinuationAdvance, reminderID == failingID {
-                throw InjectedPlannerFailure.expected
-            }
-        })
+        let planner = LogicalNotificationPlanner(
+            dependencies: .init { point, reminderID in
+                if point == .acceptedContinuationAdvance, reminderID == failingID {
+                    throw InjectedPlannerFailure.expected
+                }
+            })
         let acceptedID = group(failing.id, "2026-08-06T14:00:00Z")
 
         let plan = try planner.plan(input(reminders: [failing, unrelated], capacity: 5))
 
         #expect(plan.outcomes[acceptedID] == .scheduled)
         #expect(plan.selectedGroupIDs.contains(acceptedID))
-        #expect(plan.requests.contains {
-            $0.reminderID == failing.id
-                && $0.oneShotAlertInstant == date("2026-08-06T14:00:00Z")
-        })
+        #expect(
+            plan.requests.contains {
+                $0.reminderID == failing.id
+                    && $0.oneShotAlertInstant == date("2026-08-06T14:00:00Z")
+            })
         #expect(plan.scheduledThrough[failing.id] == date("2026-08-06T14:00:00Z"))
         #expect(plan.outcomes[group(unrelated.id, "2026-08-06T14:30:00Z")] == .scheduled)
         #expect(plan.outcomes[group(unrelated.id, "2026-08-06T15:30:00Z")] == .scheduled)
@@ -223,7 +236,8 @@ struct LogicalNotificationPlannerTests {
     }
 
     @Test func classifiedNonActiveRemindersAreExcludedFromRequests() throws {
-        let disabled = reminder("00000000-0000-0000-0000-00000000000A", hour: 13, interval: 24, enabled: false)
+        let disabled = reminder(
+            "00000000-0000-0000-0000-00000000000A", hour: 13, interval: 24, enabled: false)
         let unsupported = classifiedReminder(
             "00000000-0000-0000-0000-00000000000B",
             schedule: .unsupportedFuture(version: 2, originalData: Data([2]))
@@ -240,7 +254,8 @@ struct LogicalNotificationPlannerTests {
             endDay: 5
         )
 
-        let plan = try planner.plan(input(reminders: [disabled, unsupported, invalid, expired], capacity: 60))
+        let plan = try planner.plan(
+            input(reminders: [disabled, unsupported, invalid, expired], capacity: 60))
 
         #expect(plan.requests.isEmpty)
         #expect(plan.reminderStatuses[disabled.id]?.primary == .disabled)
@@ -252,7 +267,8 @@ struct LogicalNotificationPlannerTests {
     @Test func deviceAndAuthorizationOffClearTargetsButRetainClassifications() throws {
         let active = reminder("00000000-0000-0000-0000-00000000000A", hour: 13, interval: 24)
         let off = try planner.plan(input(reminders: [active], capacity: 60, deviceEnabled: false))
-        let denied = try planner.plan(input(reminders: [active], capacity: 60, authorization: false))
+        let denied = try planner.plan(
+            input(reminders: [active], capacity: 60, authorization: false))
 
         #expect(off.requests.isEmpty)
         #expect(denied.requests.isEmpty)
@@ -273,8 +289,12 @@ struct LogicalNotificationPlannerTests {
             capacity: 1,
             environment: FixedOffsetEnvironment(secondsFromGMT: -3_600)
         )
-        #expect(try #require(planner.plan(fixed).requests.first).oneShotAlertInstant == date("2026-08-06T13:00:00Z"))
-        #expect(try #require(planner.plan(shifted).requests.first).oneShotAlertInstant == date("2026-08-06T14:00:00Z"))
+        #expect(
+            try #require(planner.plan(fixed).requests.first).oneShotAlertInstant
+                == date("2026-08-06T13:00:00Z"))
+        #expect(
+            try #require(planner.plan(shifted).requests.first).oneShotAlertInstant
+                == date("2026-08-06T14:00:00Z"))
     }
 
     private let planner = LogicalNotificationPlanner()
@@ -365,8 +385,11 @@ struct LogicalNotificationPlannerTests {
         schedule: ScheduleReadState,
         enabled: Bool = true
     ) -> ReminderSnapshot {
-        ReminderSnapshot(
-            id: UUID(uuidString: id)!,
+        guard let reminderID = UUID(uuidString: id) else {
+            preconditionFailure("Invalid reminder UUID fixture: \(id)")
+        }
+        return ReminderSnapshot(
+            id: reminderID,
             title: id,
             notes: nil,
             urlString: nil,
@@ -379,7 +402,10 @@ struct LogicalNotificationPlannerTests {
     }
 
     private func group(_ reminderID: String, _ instant: String) -> AlertGroupID {
-        group(UUID(uuidString: reminderID)!, instant)
+        guard let id = UUID(uuidString: reminderID) else {
+            preconditionFailure("Invalid reminder UUID fixture: \(reminderID)")
+        }
+        return group(id, instant)
     }
 
     private func group(_ reminderID: UUID, _ instant: String) -> AlertGroupID {

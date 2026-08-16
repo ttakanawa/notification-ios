@@ -40,10 +40,12 @@ struct AboutPrivacyView: View {
                 ]
             )
         }
-        .navigationTitle(LocalizedStringResource(
-            "privacy.title",
-            table: "Settings"
-        ))
+        .navigationTitle(
+            LocalizedStringResource(
+                "privacy.title",
+                table: "Settings"
+            )
+        )
         .accessibilityIdentifier("privacy.root")
     }
 

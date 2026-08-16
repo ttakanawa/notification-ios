@@ -89,9 +89,10 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     private let localeProvider: @Sendable () -> Locale
     private let clock: NotificationReconcileClock
     private let retryDelays: [TimeInterval]
-    private let triggerInspector: @Sendable (
-        UNNotificationRequest
-    ) -> NotificationTriggerInspection?
+    private let triggerInspector:
+        @Sendable (
+            UNNotificationRequest
+        ) -> NotificationTriggerInspection?
 
     private var isLoopRunning = false
     private var isForeground = false
@@ -119,9 +120,10 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         localeProvider: @escaping @Sendable () -> Locale = { .current },
         clock: NotificationReconcileClock = .continuous,
         retryDelays: [TimeInterval] = [1, 2, 4, 8, 16, 32, 60],
-        triggerInspector: @escaping @Sendable (
-            UNNotificationRequest
-        ) -> NotificationTriggerInspection? = { NotificationTriggerInspection.live($0) }
+        triggerInspector:
+            @escaping @Sendable (
+                UNNotificationRequest
+            ) -> NotificationTriggerInspection? = { NotificationTriggerInspection.live($0) }
     ) {
         self.snapshotLoader = snapshotLoader
         self.preferenceStore = preferenceStore
@@ -233,7 +235,9 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             isLoopRunning = false
             let waiters = idleWaiters
             idleWaiters.removeAll()
-            waiters.forEach { $0.resume() }
+            for waiter in waiters {
+                waiter.resume()
+            }
             return
         }
     }
@@ -263,14 +267,15 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
         let logicalPlan: LogicalPlan
         do {
-            logicalPlan = try planner.makePlan(PlannerInput(
-                snapshot: snapshot,
-                evaluationNow: evaluationNow,
-                deviceNotificationsEnabled: deviceEnabled,
-                authorizationAllowsScheduling: authorization.allowsScheduling,
-                capacity: 60,
-                recurrenceEnvironment: environment
-            ))
+            logicalPlan = try planner.makePlan(
+                PlannerInput(
+                    snapshot: snapshot,
+                    evaluationNow: evaluationNow,
+                    deviceNotificationsEnabled: deviceEnabled,
+                    authorizationAllowsScheduling: authorization.allowsScheduling,
+                    capacity: 60,
+                    recurrenceEnvironment: environment
+                ))
         } catch {
             eligibilityIndexStore.markStale()
             await stateStore.publishFailure(.planning)
@@ -298,7 +303,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
                     )
                 )
                 materialized.append(MaterializedRequest(logical: logical, request: request))
-                materializedKinds[logical.identifier] = logical.isRepeating
+                materializedKinds[logical.identifier] =
+                    logical.isRepeating
                     ? .repeating : .oneShot
             } catch {
                 markError(logical.contributingGroupIDs, outcomes: &outcomes)
@@ -307,9 +313,10 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
         // Membership comes from a fully classified snapshot and a matching materialized request,
         // not from the later lifecycle projection at the instant a one-shot fires.
-        eligibilityIndexStore.publish(eligibleReminderIDs: Set(
-            materialized.map(\.logical.reminderID)
-        ))
+        eligibilityIndexStore.publish(
+            eligibleReminderIDs: Set(
+                materialized.map(\.logical.reminderID)
+            ))
 
         let pending: [NotificationInventoryItem]
         do {
@@ -346,7 +353,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             }
 
             switch value.logical.payload {
-            case let .oneShot(alertInstant, _):
+            case .oneShot(let alertInstant, _):
                 guard alertInstant > dispatchNow else {
                     crossedBoundary = true
                     continue
@@ -412,8 +419,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
     private func scheduleRetryIfPossible() {
         guard isForeground,
-              retryTask == nil,
-              retryAttempt < retryDelays.count
+            retryTask == nil,
+            retryAttempt < retryDelays.count
         else {
             return
         }
@@ -434,8 +441,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
     private func retryTimerFired(token: UInt64) {
         guard !Task.isCancelled,
-              isForeground,
-              token == retryTimerToken
+            isForeground,
+            token == retryTimerToken
         else {
             return
         }
@@ -447,7 +454,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     private func scheduleForegroundReplenishment(for requests: [MaterializedRequest]) {
         invalidateForegroundTimer()
         guard isForeground,
-              let alertInstant = requests.compactMap(\.logical.oneShotAlertInstant).min()
+            let alertInstant = requests.compactMap(\.logical.oneShotAlertInstant).min()
         else {
             return
         }
@@ -467,8 +474,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
 
     private func foregroundTimerFired(token: UInt64) {
         guard !Task.isCancelled,
-              isForeground,
-              token == foregroundTimerToken
+            isForeground,
+            token == foregroundTimerToken
         else {
             return
         }
@@ -490,8 +497,8 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     }
 }
 
-private extension ReconcileReason {
-    var observesModelChange: Bool {
+extension ReconcileReason {
+    fileprivate var observesModelChange: Bool {
         switch self {
         case .reminderSaved, .reminderDeleted, .modelChanged, .deviceSettingsChanged:
             true

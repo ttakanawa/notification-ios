@@ -21,10 +21,13 @@ struct ReminderFormView: View {
 
     var body: some View {
         reminderForm
-            .navigationTitle(Text(LocalizedStringResource(
-                model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title",
-                table: "ReminderForm"
-            )))
+            .navigationTitle(
+                Text(
+                    LocalizedStringResource(
+                        model.canDelete ? "reminder.form.edit.title" : "reminder.form.create.title",
+                        table: "ReminderForm"
+                    ))
+            )
             .navigationBarTitleDisplayMode(.inline)
             .navigationBarBackButtonHidden(model.canDelete)
             .toolbar {
@@ -80,10 +83,11 @@ struct ReminderFormView: View {
             ToolbarItem(placement: .cancellationAction) {
                 Button(action: attemptDismiss) {
                     Label {
-                        Text(LocalizedStringResource(
-                            "reminder.action.back",
-                            table: "Reminder"
-                        ))
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.action.back",
+                                table: "Reminder"
+                            ))
                     } icon: {
                         Image(systemName: "chevron.backward")
                     }
@@ -102,23 +106,28 @@ struct ReminderFormView: View {
                     .disabled(
                         confirmations.isPersistenceOperationInFlight || !model.canSave
                     )
-                    .accessibilityLabel(Text(LocalizedStringResource(
-                        "reminder.action.save",
-                        table: "Reminder"
-                    )))
+                    .accessibilityLabel(
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.action.save",
+                                table: "Reminder"
+                            ))
+                    )
                     .accessibilityIdentifier("reminder-form.save")
                 }
             }
         } else {
             ToolbarItem(placement: .confirmationAction) {
-                Button(LocalizedStringResource(
-                    "reminder.action.save",
-                    table: "Reminder"
-                ), action: save)
-                    .disabled(
-                        confirmations.isPersistenceOperationInFlight || !model.canSave
-                    )
-                    .accessibilityIdentifier("reminder-form.save")
+                Button(
+                    LocalizedStringResource(
+                        "reminder.action.save",
+                        table: "Reminder"
+                    ), action: save
+                )
+                .disabled(
+                    confirmations.isPersistenceOperationInFlight || !model.canSave
+                )
+                .accessibilityIdentifier("reminder-form.save")
             }
         }
     }
@@ -161,18 +170,18 @@ struct ReminderFormView: View {
             model.earlyReminderValueTextIsValid ? nil : .reminderEarlyValueInvalid
         ].compactMap { $0 }
 
-        if case let .failed(error) = model.customRepeatState {
+        if case .failed(let error) = model.customRepeatState {
             result.append(error.accessibilityIdentity)
         }
-        if case let .failed(error) = model.saveState {
+        if case .failed(let error) = model.saveState {
             result.append(error == .save ? .reminderSaveFailed : .reminderDeleteFailed)
         }
         return result
     }
 }
 
-private extension ReminderFormFieldIssue {
-    var accessibilityIdentity: AccessibilityErrorIdentity {
+extension ReminderFormFieldIssue {
+    fileprivate var accessibilityIdentity: AccessibilityErrorIdentity {
         switch self {
         case .titleRequired: .reminderTitleRequired
         case .titleTooLarge: .reminderTitleTooLarge
@@ -187,8 +196,8 @@ private extension ReminderFormFieldIssue {
     }
 }
 
-private extension CustomRepeatResolutionError {
-    var accessibilityIdentity: AccessibilityErrorIdentity {
+extension CustomRepeatResolutionError {
+    fileprivate var accessibilityIdentity: AccessibilityErrorIdentity {
         switch self {
         case .assistanceUnavailable: .reminderCustomAssistanceUnavailable
         case .safetyGuard: .reminderCustomSafety

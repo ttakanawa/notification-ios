@@ -3,6 +3,7 @@ import NotificationManagerApplication
 import NotificationManagerDomain
 import Observation
 import Testing
+
 @testable import NotificationManager
 
 @MainActor
@@ -38,10 +39,11 @@ struct ReminderFormConfirmationCoordinatorTests {
         #expect(router.compactPath.isEmpty)
         #expect(router.selectedReminderID == nil)
         #expect(router.formModel(for: id) == nil)
-        #expect(await recorder.recordedConsents() == [
-            CoordinatorSaveConsent(.notProvided, .notProvided),
-            CoordinatorSaveConsent(.notProvided, .acknowledged)
-        ])
+        #expect(
+            await recorder.recordedConsents() == [
+                CoordinatorSaveConsent(.notProvided, .notProvided),
+                CoordinatorSaveConsent(.notProvided, .acknowledged)
+            ])
     }
 
     @Test func capacityConfirmationWaitsForSheetDismissalThenPresentsExpiredAlert() async {
@@ -81,29 +83,32 @@ struct ReminderFormConfirmationCoordinatorTests {
 
         #expect(coordinator.capacityWarning == nil)
         #expect(coordinator.isPersistenceOperationInFlight)
-        #expect(await recorder.recordedConsents() == [
-            CoordinatorSaveConsent(.notProvided, .notProvided)
-        ])
+        #expect(
+            await recorder.recordedConsents() == [
+                CoordinatorSaveConsent(.notProvided, .notProvided)
+            ])
 
         coordinator.capacitySheetDidDismiss()
         await waitUntilSettled(coordinator)
 
         #expect(coordinator.alertKind == .expiredSchedule)
-        #expect(await recorder.recordedConsents() == [
-            CoordinatorSaveConsent(.notProvided, .notProvided),
-            CoordinatorSaveConsent(.acknowledged, .notProvided)
-        ])
+        #expect(
+            await recorder.recordedConsents() == [
+                CoordinatorSaveConsent(.notProvided, .notProvided),
+                CoordinatorSaveConsent(.acknowledged, .notProvided)
+            ])
 
         model.notes = model.notes
         coordinator.confirmAlert()
         await waitUntilSettled(coordinator)
 
         #expect(router.compactPath.isEmpty)
-        #expect(await recorder.recordedConsents() == [
-            CoordinatorSaveConsent(.notProvided, .notProvided),
-            CoordinatorSaveConsent(.acknowledged, .notProvided),
-            CoordinatorSaveConsent(.acknowledged, .acknowledged)
-        ])
+        #expect(
+            await recorder.recordedConsents() == [
+                CoordinatorSaveConsent(.notProvided, .notProvided),
+                CoordinatorSaveConsent(.acknowledged, .notProvided),
+                CoordinatorSaveConsent(.acknowledged, .acknowledged)
+            ])
     }
 
     @Test func deleteConfirmationClosesRouteAfterSuccessfulDeletion() async {
@@ -218,14 +223,14 @@ struct ReminderFormConfirmationCoordinatorTests {
         #expect(!coordinator.isPersistenceOperationInFlight)
     }
 
-    @Test func successfulSaveReleasesRetainedModelAndRouterContexts() async {
+    @Test func successfulSaveReleasesRetainedModelAndRouterContexts() async throws {
         var (model, router): (ReminderFormModel?, AppRouter?) = makeExistingScenario()
         weak let retainedModel = model
         weak let retainedRouter = router
         model?.title = "Changed title"
         let coordinator = ReminderFormConfirmationCoordinator()
 
-        coordinator.save(model: model!, router: router!)
+        coordinator.save(model: try #require(model), router: try #require(router))
         await waitUntilSettled(coordinator)
         model = nil
         router = nil
@@ -234,7 +239,7 @@ struct ReminderFormConfirmationCoordinatorTests {
         #expect(retainedRouter == nil)
     }
 
-    @Test func failedSaveReleasesRetainedModelAndRouterContexts() async {
+    @Test func failedSaveReleasesRetainedModelAndRouterContexts() async throws {
         var (model, router): (ReminderFormModel?, AppRouter?) = makeExistingScenario(
             save: { _, _, _ in throw CoordinatorProbeError.failed }
         )
@@ -243,7 +248,7 @@ struct ReminderFormConfirmationCoordinatorTests {
         model?.title = "Changed title"
         let coordinator = ReminderFormConfirmationCoordinator()
 
-        coordinator.save(model: model!, router: router!)
+        coordinator.save(model: try #require(model), router: try #require(router))
         await waitUntilSettled(coordinator)
         model = nil
         router = nil
@@ -252,7 +257,7 @@ struct ReminderFormConfirmationCoordinatorTests {
         #expect(retainedRouter == nil)
     }
 
-    @Test func alertCancellationReleasesRetainedModelAndRouterContexts() async {
+    @Test func alertCancellationReleasesRetainedModelAndRouterContexts() async throws {
         let warning = expiredWarning(id: reminderID)
         var (model, router): (ReminderFormModel?, AppRouter?) = makeExistingScenario(
             save: { _, _, _ in .requiresExpiredScheduleConfirmation(warning) }
@@ -262,7 +267,7 @@ struct ReminderFormConfirmationCoordinatorTests {
         model?.title = "Changed title"
         let coordinator = ReminderFormConfirmationCoordinator()
 
-        coordinator.save(model: model!, router: router!)
+        coordinator.save(model: try #require(model), router: try #require(router))
         await waitUntilSettled(coordinator)
         coordinator.cancelAlert()
         model = nil
@@ -519,19 +524,21 @@ struct ReminderFormConfirmationCoordinatorTests {
     }
 
     private func makeExistingScenario(
-        save: @escaping @Sendable (
-            ReminderDraft,
-            CapacityConsent,
-            ExpiredScheduleConsent
-        ) async throws -> SaveReminderOutcome = { draft, _, _ in .saved(draft.id) },
+        save:
+            @escaping @Sendable (
+                ReminderDraft,
+                CapacityConsent,
+                ExpiredScheduleConsent
+            ) async throws -> SaveReminderOutcome = { draft, _, _ in .saved(draft.id) },
         delete: @escaping @Sendable (UUID) async throws -> Void = { _ in }
     ) -> (ReminderFormModel, AppRouter) {
-        let router = AppRouter(actions: ReminderActionCoordinator(
-            handlers: ReminderActionHandlers(
-                setEnabled: { command in .saved(command.reminderID) },
-                delete: { _ in }
-            )
-        ))
+        let router = AppRouter(
+            actions: ReminderActionCoordinator(
+                handlers: ReminderActionHandlers(
+                    setEnabled: { command in .saved(command.reminderID) },
+                    delete: { _ in }
+                )
+            ))
         let schedule = ScheduleDefinition(
             source: SourceWallClock(
                 year: 2040,
@@ -611,7 +618,10 @@ struct ReminderFormConfirmationCoordinatorTests {
     }
 
     private func date(_ value: String) -> Date {
-        ISO8601DateFormatter().date(from: value)!
+        guard let date = ISO8601DateFormatter().date(from: value) else {
+            preconditionFailure("Invalid ISO-8601 test fixture: \(value)")
+        }
+        return date
     }
 }
 
@@ -667,7 +677,9 @@ private actor CoordinatorSuspendedSaveAction {
     func save(_ draft: ReminderDraft) async -> SaveReminderOutcome {
         let pendingWaiters = waiters
         waiters.removeAll()
-        pendingWaiters.forEach { $0.resume() }
+        for waiter in pendingWaiters {
+            waiter.resume()
+        }
         return await withCheckedContinuation { resultContinuation = $0 }
     }
 

@@ -17,7 +17,8 @@ public struct NotificationCleanupService: NotificationCleanup, PendingAppNotific
 
     public func removeNotifications(for reminderID: UUID) async {
         let pending = (try? await notificationCenter.pendingNotificationInventory()) ?? []
-        let pendingIdentifiers = pending
+        let pendingIdentifiers =
+            pending
             .filter { matches($0, reminderID: reminderID) }
             .map(\.identifier)
         if !pendingIdentifiers.isEmpty {
@@ -27,7 +28,8 @@ public struct NotificationCleanupService: NotificationCleanup, PendingAppNotific
         }
 
         let delivered = await notificationCenter.deliveredNotificationInventory()
-        let deliveredIdentifiers = delivered
+        let deliveredIdentifiers =
+            delivered
             .filter { matches($0, reminderID: reminderID) }
             .map(\.identifier)
         if !deliveredIdentifiers.isEmpty {
@@ -43,7 +45,8 @@ public struct NotificationCleanupService: NotificationCleanup, PendingAppNotific
 
     func removeAllPendingAppNotificationsReportingFailure() async throws {
         let pending = try await notificationCenter.pendingNotificationInventory()
-        let identifiers = pending
+        let identifiers =
+            pending
             .filter { $0.identifier.hasPrefix(NotificationIdentifierCodec.root) }
             .map(\.identifier)
         guard !identifiers.isEmpty else { return }
@@ -52,15 +55,15 @@ public struct NotificationCleanupService: NotificationCleanup, PendingAppNotific
 
     private func matches(_ item: NotificationInventoryItem, reminderID: UUID) -> Bool {
         switch identifierCodec.classify(item.identifier) {
-        case let .currentOneShot(identifierReminderID, _),
-             let .currentRepeating(identifierReminderID, _):
+        case .currentOneShot(let identifierReminderID, _),
+            .currentRepeating(let identifierReminderID, _):
             if identifierReminderID == reminderID { return true }
         case .appOwnedStale, .unrelated:
             break
         }
 
         guard let rawValue = item.reminderRoutingValue,
-              let routedReminderID = UUID(uuidString: rawValue)
+            let routedReminderID = UUID(uuidString: rawValue)
         else {
             return false
         }

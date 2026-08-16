@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+
 @testable import NotificationManagerDomain
 
 @Suite("Recurrence.SourceWallClockResolver")
@@ -98,7 +99,8 @@ struct SourceWallClockResolverTests {
 
         for invalidSource in invalidSources {
             #expect(throws: SourceWallClockResolutionError.self) {
-                _ = try resolver.resolve(invalidSource, environment: FoundationRecurrenceEnvironment())
+                _ = try resolver.resolve(
+                    invalidSource, environment: FoundationRecurrenceEnvironment())
             }
         }
     }
@@ -119,9 +121,10 @@ struct SourceWallClockResolverTests {
         var utc = Calendar(identifier: .gregorian)
         utc.timeZone = try #require(TimeZone(secondsFromGMT: 0))
         let nominal = try #require(
-            utc.date(from: DateComponents(
-                year: 2026, month: 6, day: 15, hour: 12, minute: 0, second: 0
-            ))
+            utc.date(
+                from: DateComponents(
+                    year: 2026, month: 6, day: 15, hour: 12, minute: 0, second: 0
+                ))
         )
         let probe = nominal.addingTimeInterval(-7 * 24 * 3_600)
         let environment = FoundationRecurrenceEnvironment()
