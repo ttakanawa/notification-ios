@@ -17,12 +17,13 @@ public struct TagManagementUseCase: Sendable {
     }
 
     public func create(name: String, id: UUID = UUID()) async throws -> TagSnapshot {
+        let displayName = TagNameNormalizerV1.trimmedDisplayName(name)
         let normalizedName = try normalizer.normalize(name)
         let timestamp = Self.integralSecond(now())
         return try await repository.saveTag(
             EncodedTagMutation(
                 id: id,
-                name: name,
+                name: displayName,
                 normalizedName: normalizedName,
                 normalizationVersion: TagLimits.normalizationVersion,
                 createdAt: timestamp,
@@ -32,6 +33,7 @@ public struct TagManagementUseCase: Sendable {
     }
 
     public func rename(tagID: UUID, name: String) async throws -> TagSnapshot {
+        let displayName = TagNameNormalizerV1.trimmedDisplayName(name)
         let normalizedName = try normalizer.normalize(name)
         let snapshot = try await repository.fetchCompleteSnapshot()
         guard let current = snapshot.tags.first(where: { $0.id == tagID }) else {
@@ -40,7 +42,7 @@ public struct TagManagementUseCase: Sendable {
         return try await repository.saveTag(
             EncodedTagMutation(
                 id: current.id,
-                name: name,
+                name: displayName,
                 normalizedName: normalizedName,
                 normalizationVersion: TagLimits.normalizationVersion,
                 createdAt: current.createdAt,

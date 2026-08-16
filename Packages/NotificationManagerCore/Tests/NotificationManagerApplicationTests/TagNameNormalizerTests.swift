@@ -52,6 +52,12 @@ import Testing
         }
     }
 
+    @Test func trimsUnicode151BoundaryWhitespaceWithoutChangingCaseOrInteriorWhitespace() {
+        #expect(TagNameNormalizerV1.trimmedDisplayName("\u{2003}Work Tag\u{00A0}") == "Work Tag")
+        #expect(TagNameNormalizerV1.trimmedDisplayName("Work  Tag") == "Work  Tag")
+        #expect(TagNameNormalizerV1.trimmedDisplayName("work") == "work")
+    }
+
     @Test func preservesEmbeddedWhitespaceWithoutCollapsingIt() throws {
         #expect(try normalizer.normalize(" A\tB ") == "a\tb")
         #expect(try normalizer.normalize("A\u{2003}\u{2003}B") == "a  b")

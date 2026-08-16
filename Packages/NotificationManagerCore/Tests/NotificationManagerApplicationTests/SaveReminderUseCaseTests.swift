@@ -951,9 +951,12 @@ actor InMemoryReminderRepository: ReminderRepository {
             }
         }
         if tagsByID.values.contains(where: {
-            $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+            $0.id != mutation.id
+                && TagNameNormalizerV1.trimmedDisplayName($0.name)
+                    == TagNameNormalizerV1.trimmedDisplayName(mutation.name)
         }) {
-            throw TagRepositoryError.duplicateNormalizedName(mutation.normalizedName)
+            throw TagRepositoryError.duplicateName(
+                TagNameNormalizerV1.trimmedDisplayName(mutation.name))
         }
         trace?.record(.tagSaved)
         let tag = TagSnapshot(

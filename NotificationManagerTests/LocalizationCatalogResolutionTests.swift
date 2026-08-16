@@ -17,6 +17,11 @@ struct LocalizationCatalogResolutionTests {
             ),
             ("settings.title", "Settings", "設定"),
             ("tags.action.create", "Create Tag", "タグを作成"),
+            (
+                "tags.picker.create-suggestion",
+                "Create “%1$@”",
+                "「%1$@」を作成"
+            ),
             ("data_unavailable.title", "Data Unavailable", "データを利用できません")
         ]
 

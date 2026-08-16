@@ -305,20 +305,20 @@ struct RecoveryPrivacyBoundaryTests {
 @Suite("Tag management and picker")
 struct TagManagementPresentationTests {
     @MainActor
-    @Test func createUsesTask11NormalizationAndSurfacesRepositoryDuplicateWithoutLosingTags()
-        async throws
-    {
+    @Test func createTrimsDisplayNameAndPreservesTagsForCaseVariants() async throws {
         let (model, _) = makeTagModel()
         await model.load()
 
-        let created = await model.create(name: "  ＷＯＲＫ  ")
-        let duplicate = await model.create(name: "work")
+        let created = try #require(await model.create(name: "  ＷＯＲＫ  "))
+        let caseVariant = try #require(await model.create(name: "work"))
 
-        #expect(created?.name == "  ＷＯＲＫ  ")
-        #expect(created?.normalizedName == "work")
-        #expect(duplicate == nil)
-        #expect(model.actionError == .duplicateName)
-        #expect(model.tags.map(\.id) == [created?.id].compactMap { $0 })
+        #expect(created.name == "ＷＯＲＫ")
+        #expect(created.normalizedName == "work")
+        #expect(caseVariant.name == "work")
+        #expect(caseVariant.normalizedName == "work")
+        #expect(model.actionError == nil)
+        #expect(model.tags.count == 2)
+        #expect(Set(model.tags.map(\.id)) == Set([created.id, caseVariant.id]))
     }
 
     @MainActor
@@ -372,6 +372,148 @@ struct TagManagementPresentationTests {
 
         #expect(pruned == [existing])
         #expect(selected == [existing, created])
+    }
+
+    @Test func pickerSuggestionsRankMatchesAndOfferCreationOnlyWithoutAnExactDisplayName() {
+        let workUpper = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Work"
+        )
+        let homework = tagFixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            name: "Homework"
+        )
+        let afterWork = tagFixture(
+            id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            name: "AfterWork"
+        )
+        let travel = tagFixture(
+            id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            name: "Travel"
+        )
+
+        let state = TagPickerSuggestionState(
+            tags: [travel, afterWork, homework, workUpper],
+            query: "  work  "
+        )
+
+        #expect(state.matches.map(\.name) == ["Work", "AfterWork", "Homework"])
+        #expect(state.trimmedQuery == "work")
+        #expect(state.creationName == "work")
+        #expect(state.exactMatch == nil)
+    }
+
+    @Test func pickerSuggestionsUseCaseSensitiveExactDisplayNameToSuppressCreation() {
+        let workUpper = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Work"
+        )
+        let workLower = tagFixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            name: "work"
+        )
+
+        let exact = TagPickerSuggestionState(tags: [workUpper, workLower], query: "work")
+
+        #expect(exact.matches.map(\.name) == ["Work", "work"])
+        #expect(exact.exactMatch?.id == workLower.id)
+        #expect(exact.creationName == nil)
+    }
+
+    @Test func pickerSuggestionsLeaveEmptyQueriesUnfilteredWithoutCreation() {
+        let work = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Work"
+        )
+        let travel = tagFixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            name: "Travel"
+        )
+
+        let empty = TagPickerSuggestionState(tags: [travel, work], query: "")
+        let whitespace = TagPickerSuggestionState(tags: [travel, work], query: " \u{2003}\u{00A0} ")
+
+        #expect(empty.matches.map(\.id) == [travel.id, work.id])
+        #expect(empty.trimmedQuery.isEmpty)
+        #expect(empty.creationName == nil)
+        #expect(empty.exactMatch == nil)
+        #expect(whitespace.matches.map(\.id) == [travel.id, work.id])
+        #expect(whitespace.trimmedQuery.isEmpty)
+        #expect(whitespace.creationName == nil)
+        #expect(whitespace.exactMatch == nil)
+    }
+
+    @Test func pickerSuggestionsIncludeMiddleAndSuffixMatches() {
+        let homework = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Homework"
+        )
+        let afterWork = tagFixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            name: "AfterWork"
+        )
+        let travel = tagFixture(
+            id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            name: "Travel"
+        )
+
+        let middle = TagPickerSuggestionState(tags: [travel, afterWork, homework], query: "ter")
+        let suffix = TagPickerSuggestionState(tags: [travel, afterWork, homework], query: "vel")
+
+        #expect(middle.matches.map(\.name) == ["AfterWork"])
+        #expect(suffix.matches.map(\.name) == ["Travel"])
+    }
+
+    @Test func pickerSuggestionsBreakEqualMatchesByNormalizedNameDisplayNameThenUUID() {
+        let nameLater = tagFixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            name: "Work"
+        )
+        let nameEarlier = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Work"
+        )
+        let lowercase = tagFixture(
+            id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            name: "work"
+        )
+
+        let state = TagPickerSuggestionState(
+            tags: [nameLater, lowercase, nameEarlier],
+            query: "work"
+        )
+
+        #expect(state.matches.map(\.id) == [nameEarlier.id, nameLater.id, lowercase.id])
+    }
+
+    @MainActor
+    @Test func pickerDelayedCreatePreservesNewerQuery() async {
+        let createdID = UUID(uuidString: "dddddddd-dddd-dddd-dddd-dddddddddddd")!
+        let creation = DelayedTagCreation(createdID: createdID)
+        let state = TagPickerCreateTestState(query: "  work  ")
+        let submission = TagPickerCreateSubmission(
+            name: "work",
+            rawQuery: state.query
+        )
+
+        let createTask = Task { @MainActor in
+            let tagID = await creation.create()
+            let completion = submission.completion(
+                createdTagID: tagID,
+                currentQuery: state.query,
+                selectedTagIDs: state.selectedTagIDs
+            )
+            state.query = completion.query
+            state.selectedTagIDs = completion.selectedTagIDs
+        }
+
+        await creation.waitUntilStarted()
+        state.query = "travel"
+        await creation.release()
+        await createTask.value
+
+        #expect(state.query == "travel")
+        #expect(state.selectedTagIDs == [createdID])
     }
 
     @MainActor
@@ -834,6 +976,52 @@ private actor BlockingRetryAction {
     }
 }
 
+@MainActor
+private final class TagPickerCreateTestState {
+    var query: String
+    var selectedTagIDs: Set<UUID> = []
+
+    init(query: String) {
+        self.query = query
+    }
+}
+
+private actor DelayedTagCreation {
+    private let createdID: UUID
+    private var isStarted = false
+    private var startWaiters: [CheckedContinuation<Void, Never>] = []
+    private var releaseContinuation: CheckedContinuation<Void, Never>?
+
+    init(createdID: UUID) {
+        self.createdID = createdID
+    }
+
+    func create() async -> UUID {
+        isStarted = true
+        let waiters = startWaiters
+        startWaiters.removeAll()
+        for waiter in waiters {
+            waiter.resume()
+        }
+        await withCheckedContinuation { continuation in
+            releaseContinuation = continuation
+        }
+        return createdID
+    }
+
+    func waitUntilStarted() async {
+        guard !isStarted else { return }
+        await withCheckedContinuation { continuation in
+            startWaiters.append(continuation)
+        }
+    }
+
+    func release() {
+        releaseContinuation?.resume()
+        releaseContinuation = nil
+    }
+}
+
 private enum ControlledTagSnapshotRepositoryError: Error {
     case fetchFailed
     case unsupportedMutation
@@ -881,10 +1069,13 @@ private actor TagPresentationRepository: ReminderRepository {
         }
         guard
             !tags.values.contains(where: {
-                $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+                $0.id != mutation.id
+                    && TagNameNormalizerV1.trimmedDisplayName($0.name)
+                        == TagNameNormalizerV1.trimmedDisplayName(mutation.name)
             })
         else {
-            throw TagRepositoryError.duplicateNormalizedName(mutation.normalizedName)
+            throw TagRepositoryError.duplicateName(
+                TagNameNormalizerV1.trimmedDisplayName(mutation.name))
         }
         let tag = TagSnapshot(
             id: mutation.id,

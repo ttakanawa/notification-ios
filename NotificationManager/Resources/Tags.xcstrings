@@ -98,13 +98,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A tag with the same normalized name already exists on this device."
+            "value": "A tag with the same name already exists on this device."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "正規化後に同じ名前となるタグがこの端末にすでにあります。"
+            "value": "同じ名前のタグがこの端末にすでにあります。"
           }
         }
       }
@@ -303,6 +303,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "タグ"
+          }
+        }
+      }
+    },
+    "tags.picker.create-suggestion": {
+      "comment": "Inline action for creating a tag from the current picker query. Placeholder 1 is the trimmed tag display name (String).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Create “%1$@”"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "「%1$@」を作成"
           }
         }
       }

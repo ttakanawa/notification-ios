@@ -3,6 +3,7 @@
     import NotificationManagerApplication
     import NotificationManagerDomain
     import NotificationManagerPersistence
+    import SwiftData
     import SwiftUI
 
     @MainActor
@@ -373,13 +374,26 @@
 
         @MainActor
         private static func makeTagManagementModel() -> TagManagementModel {
+            let now = Date(timeIntervalSince1970: 2_225_052_800)
             let repository: SwiftDataReminderRepository
             do {
-                repository = try SwiftDataReminderRepository.inMemory()
+                let container = try ModelContainerFactory.inMemory()
+                let context = ModelContext(container)
+                context.insert(
+                    TagRecordV1(
+                        id: uuid("88888888-8888-8888-8888-888888888888"),
+                        name: "Work",
+                        normalizedName: "work",
+                        normalizationVersion: TagLimits.normalizationVersion,
+                        createdAt: now,
+                        updatedAt: now
+                    )
+                )
+                try context.save()
+                repository = SwiftDataReminderRepository(container: container)
             } catch {
                 preconditionFailure("Task 14 UI fixture requires an in-memory repository: \(error)")
             }
-            let now = Date(timeIntervalSince1970: 2_225_052_800)
             return TagManagementModel(
                 repository: repository,
                 useCase: TagManagementUseCase(

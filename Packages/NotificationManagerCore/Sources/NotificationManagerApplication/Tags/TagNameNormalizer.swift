@@ -8,23 +8,10 @@ public struct TagNameNormalizerV1: TagNameNormalizing, Sendable {
             throw TagValidationIssue.nameTooLarge
         }
 
-        let input = name.unicodeScalars.map(\.value)
-        var lowerBound = input.startIndex
-        var upperBound = input.endIndex
-        while lowerBound < upperBound,
-            UnicodeNormalizationDataV1.isWhiteSpace(input[lowerBound])
-        {
-            lowerBound += 1
-        }
-        while upperBound > lowerBound,
-            UnicodeNormalizationDataV1.isWhiteSpace(input[upperBound - 1])
-        {
-            upperBound -= 1
-        }
-
+        let input = Self.trimmedDisplayName(name).unicodeScalars.map(\.value)
         var mapped: [UInt32] = []
-        mapped.reserveCapacity(upperBound - lowerBound)
-        for scalar in input[lowerBound..<upperBound] {
+        mapped.reserveCapacity(input.count)
+        for scalar in input {
             if let replacement = UnicodeNormalizationDataV1.nfkcCaseFoldMapping(for: scalar) {
                 mapped.append(contentsOf: replacement)
             } else {
@@ -50,6 +37,32 @@ public struct TagNameNormalizerV1: TagNameNormalizing, Sendable {
             throw TagValidationIssue.normalizedNameTooLarge
         }
         return normalized
+    }
+
+    public static func trimmedDisplayName(_ name: String) -> String {
+        let input = name.unicodeScalars.map(\.value)
+        var lowerBound = input.startIndex
+        var upperBound = input.endIndex
+        while lowerBound < upperBound,
+            UnicodeNormalizationDataV1.isWhiteSpace(input[lowerBound])
+        {
+            lowerBound += 1
+        }
+        while upperBound > lowerBound,
+            UnicodeNormalizationDataV1.isWhiteSpace(input[upperBound - 1])
+        {
+            upperBound -= 1
+        }
+
+        var scalars = String.UnicodeScalarView()
+        scalars.reserveCapacity(upperBound - lowerBound)
+        for value in input[lowerBound..<upperBound] {
+            guard let scalar = UnicodeScalar(value) else {
+                preconditionFailure("Unicode scalar input must remain valid")
+            }
+            scalars.append(scalar)
+        }
+        return String(scalars)
     }
 }
 

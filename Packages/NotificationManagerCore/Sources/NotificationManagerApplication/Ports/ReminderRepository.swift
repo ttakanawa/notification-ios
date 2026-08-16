@@ -94,7 +94,7 @@ public struct EncodedTagMutation: Sendable, Equatable {
 public enum TagRepositoryError: Error, Sendable, Equatable {
     case notFound(UUID)
     case duplicateID(UUID)
-    case duplicateNormalizedName(String)
+    case duplicateName(String)
     case invalid(TagValidationIssue)
     case unavailable
 }

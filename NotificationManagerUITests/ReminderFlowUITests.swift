@@ -217,6 +217,41 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testTagPickerOffersInlineCaseSensitiveCreationSuggestion() {
+        let app = launch(scenario: "navigation-with-tags")
+        app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()
+
+        let input = app.textFields["tags.picker.new-name"]
+        scrollToHittable(input, in: app)
+        let emptyInputValue = input.value as? String ?? ""
+        XCTAssertFalse(app.buttons["tags.picker.create"].exists)
+
+        input.tap()
+        input.typeText("work")
+        let workID = "88888888-8888-8888-8888-888888888888"
+        let existingWork = app.switches["tags.picker.tag.\(workID)"]
+        XCTAssertTrue(existingWork.waitForExistence(timeout: 1))
+        let createSuggestion = app.buttons["tags.picker.create-suggestion"]
+        XCTAssertTrue(createSuggestion.waitForExistence(timeout: 1))
+
+        createSuggestion.tap()
+        let queryCleared = NSPredicate(format: "value == %@", emptyInputValue)
+        expectation(for: queryCleared, evaluatedWith: input)
+        waitForExpectations(timeout: 2)
+
+        input.tap()
+        input.typeText("work")
+        XCTAssertTrue(createSuggestion.waitForNonExistence(timeout: 1))
+        XCTAssertTrue(existingWork.waitForExistence(timeout: 1))
+        let createdWork = app.switches.matching(
+            NSPredicate(format: "identifier BEGINSWITH %@", "tags.picker.tag.")
+        ).matching(NSPredicate(format: "label == %@", "work")).firstMatch
+        XCTAssertTrue(
+            createdWork.waitForExistence(timeout: 1)
+        )
+    }
+
+    @MainActor
     func testPersistenceStartImmediatelyDisablesRegisteredFormActions() {
         let app = launch(scenario: "slow-persistence")
         app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()

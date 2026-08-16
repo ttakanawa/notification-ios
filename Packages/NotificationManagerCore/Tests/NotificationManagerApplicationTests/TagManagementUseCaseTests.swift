@@ -20,7 +20,7 @@ struct TagManagementUseCaseTests {
         )
 
         #expect(tag.id == TestApplicationValues.tagID)
-        #expect(tag.name == "  ＷＯＲＫ  ")
+        #expect(tag.name == "ＷＯＲＫ")
         #expect(tag.normalizedName == "work")
         #expect(tag.normalizationVersion == TagLimits.normalizationVersion)
         #expect(tag.createdAt == testDate("2026-08-06T12:00:00Z"))
@@ -42,7 +42,24 @@ struct TagManagementUseCaseTests {
         #expect(await repository.savedTagMutations.isEmpty)
     }
 
-    @Test func createDelegatesNormalizedDuplicateRejectionToTheRepository() async throws {
+    @Test func createRejectsAnOversizedRawNameBeforeBoundaryTrimming() async throws {
+        let repository = InMemoryReminderRepository()
+        let useCase = TagManagementUseCase(
+            repository: repository,
+            normalizer: TagNameNormalizerV1(),
+            now: { testDate("2026-08-06T12:00:00Z") }
+        )
+        let rawName = String(repeating: "\u{2003}", count: 85) + "Work"
+
+        #expect(rawName.utf8.count > TagLimits.nameBytes)
+        #expect(TagNameNormalizerV1.trimmedDisplayName(rawName) == "Work")
+        await #expect(throws: TagValidationIssue.nameTooLarge) {
+            try await useCase.create(name: rawName, id: TestApplicationValues.tagID)
+        }
+        #expect(await repository.savedTagMutations.isEmpty)
+    }
+
+    @Test func createDelegatesExactNameDuplicateRejectionToTheRepository() async throws {
         let existing = tagSnapshot(
             id: TestApplicationValues.otherTagID,
             name: "Work",
@@ -57,8 +74,8 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:00:00Z") }
         )
 
-        await #expect(throws: TagRepositoryError.duplicateNormalizedName("work")) {
-            try await useCase.create(name: "WORK", id: TestApplicationValues.tagID)
+        await #expect(throws: TagRepositoryError.duplicateName("Work")) {
+            try await useCase.create(name: "Work", id: TestApplicationValues.tagID)
         }
         #expect(await repository.savedTagMutations.isEmpty)
     }
@@ -78,7 +95,7 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:30:00.500Z") }
         )
 
-        let renamed = try await useCase.rename(tagID: existing.id, name: "Trips")
+        let renamed = try await useCase.rename(tagID: existing.id, name: "\u{2003}Trips\u{00A0}")
 
         #expect(renamed.id == existing.id)
         #expect(renamed.createdAt == existing.createdAt)
@@ -108,9 +125,34 @@ struct TagManagementUseCaseTests {
             now: { testDate("2026-08-06T12:30:00Z") }
         )
 
-        await #expect(throws: TagRepositoryError.duplicateNormalizedName("work")) {
-            try await useCase.rename(tagID: existing.id, name: "WORK")
+        await #expect(throws: TagRepositoryError.duplicateName("Work")) {
+            try await useCase.rename(tagID: existing.id, name: "Work")
         }
+        #expect(await repository.storedTag(id: existing.id) == existing)
+    }
+
+    @Test func renameRejectsAnOversizedRawNameBeforeBoundaryTrimming() async throws {
+        let existing = tagSnapshot(
+            id: TestApplicationValues.tagID,
+            name: "Travel",
+            normalizedName: "travel"
+        )
+        let repository = InMemoryReminderRepository(
+            snapshot: CompleteReminderSnapshot(reminders: [], tags: [existing])
+        )
+        let useCase = TagManagementUseCase(
+            repository: repository,
+            normalizer: TagNameNormalizerV1(),
+            now: { testDate("2026-08-06T12:30:00Z") }
+        )
+        let rawName = "Work" + String(repeating: "\u{2003}", count: 85)
+
+        #expect(rawName.utf8.count > TagLimits.nameBytes)
+        #expect(TagNameNormalizerV1.trimmedDisplayName(rawName) == "Work")
+        await #expect(throws: TagValidationIssue.nameTooLarge) {
+            try await useCase.rename(tagID: existing.id, name: rawName)
+        }
+        #expect(await repository.savedTagMutations.isEmpty)
         #expect(await repository.storedTag(id: existing.id) == existing)
     }
 

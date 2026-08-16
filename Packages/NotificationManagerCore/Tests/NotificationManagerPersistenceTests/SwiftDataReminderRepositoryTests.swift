@@ -501,20 +501,32 @@ import Testing
         #expect(try await repository.fetchCompleteSnapshot().reminders.isEmpty)
     }
 
-    @Test func localNormalizedTagDuplicateIsRejectedAtomicallyWithoutMergingUUIDs() async throws {
+    @Test func caseVariantsShareSearchNormalizationButPersistAsDistinctTags() async throws {
         let repository = try SwiftDataReminderRepository.inMemory()
-        let first = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "ＴｅＳＴ"))
+        let upper = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Work"))
+        let lower = try await repository.saveTag(.fixture(id: TestValues.otherTagID, name: "work"))
 
-        await #expect(throws: TagRepositoryError.duplicateNormalizedName("test")) {
-            try await repository.saveTag(.fixture(id: TestValues.otherTagID, name: "test"))
+        #expect(upper.normalizedName == "work")
+        #expect(lower.normalizedName == "work")
+        #expect(try await repository.fetchCompleteSnapshot().tags.count == 2)
+    }
+
+    @Test func exactCaseSensitiveTagNameDuplicateIsRejectedAtomically() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory()
+        _ = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Work"))
+
+        await #expect(throws: TagRepositoryError.duplicateName("Work")) {
+            try await repository.saveTag(.fixture(id: TestValues.otherTagID, name: "Work"))
         }
 
         let snapshot = try await repository.fetchCompleteSnapshot()
-        #expect(snapshot.tags == [first])
+        #expect(snapshot.tags.count == 1)
         #expect(snapshot.tags.first?.id == TestValues.tagID)
     }
 
-    @Test func concurrentRepositoriesAllowOneNormalizedTagNamePerContainer() async throws {
+    @Test func concurrentRepositoriesAllowCaseVariantsWithSameSearchNormalizationPerContainer()
+        async throws
+    {
         let container = try ModelContainerFactory.inMemory()
         let firstRepository = SwiftDataReminderRepository(container: container)
         let secondRepository = SwiftDataReminderRepository(container: container)
@@ -523,23 +535,22 @@ import Testing
         defer { NotificationCenter.default.removeObserver(observer) }
 
         async let first = tagSaveOutcome(
-            .fixture(id: TestValues.tagID, name: "ＴｅＳＴ"),
+            .fixture(id: TestValues.tagID, name: "Work"),
             in: firstRepository
         )
         async let second = tagSaveOutcome(
-            .fixture(id: TestValues.otherTagID, name: "test"),
+            .fixture(id: TestValues.otherTagID, name: "work"),
             in: secondRepository
         )
         let outcomes = await [first, second]
 
-        #expect(outcomes.filter(\.isSaved).count == 1)
-        #expect(outcomes.filter { $0 == .duplicate("test") }.count == 1)
+        #expect(outcomes.filter(\.isSaved).count == 2)
         let snapshot = try await firstRepository.fetchCompleteSnapshot()
-        #expect(snapshot.tags.count == 1)
-        #expect(snapshot.tags.first?.normalizedName == "test")
+        #expect(snapshot.tags.count == 2)
+        #expect(snapshot.tags.allSatisfy { $0.normalizedName == "work" })
     }
 
-    @Test func repositoriesForTheSamePersistentStoreURLShareDuplicateCoordination() async throws {
+    @Test func repositoriesForTheSamePersistentStoreURLRejectExactDuplicateNames() async throws {
         let directory = FileManager.default.temporaryDirectory.appending(
             path: "NotificationManagerPersistenceTests-\(UUID().uuidString)",
             directoryHint: .isDirectory
@@ -566,17 +577,17 @@ import Testing
         defer { NotificationCenter.default.removeObserver(observer) }
 
         async let first = tagSaveOutcome(
-            .fixture(id: TestValues.tagID, name: "ＴｅＳＴ"),
+            .fixture(id: TestValues.tagID, name: "Work"),
             in: firstRepository
         )
         async let second = tagSaveOutcome(
-            .fixture(id: TestValues.otherTagID, name: "test"),
+            .fixture(id: TestValues.otherTagID, name: "Work"),
             in: secondRepository
         )
         let outcomes = await [first, second]
 
         #expect(outcomes.filter(\.isSaved).count == 1)
-        #expect(outcomes.filter { $0 == .duplicate("test") }.count == 1)
+        #expect(outcomes.filter { $0 == .duplicate("Work") }.count == 1)
         #expect(try await firstRepository.fetchCompleteSnapshot().tags.count == 1)
         #expect(try await secondRepository.fetchCompleteSnapshot().tags.count == 1)
     }
@@ -890,7 +901,7 @@ private func tagSaveOutcome(
 ) async -> TagSaveOutcome {
     do {
         return .saved(try await repository.saveTag(mutation).id)
-    } catch let TagRepositoryError.duplicateNormalizedName(name) {
+    } catch let TagRepositoryError.duplicateName(name) {
         return .duplicate(name)
     } catch let error as TagRepositoryError {
         return .otherTagRepositoryError(error)

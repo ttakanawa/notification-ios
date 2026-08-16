@@ -14,7 +14,7 @@ public enum PersistenceError: Error, Sendable, Equatable {
     case tagNotFound(UUID)
     case duplicateReminderID(UUID)
     case duplicateTagID(UUID)
-    case duplicateNormalizedTagName(String)
+    case duplicateTagName(String)
     case invalidReminder(ReminderValidationIssue)
     case invalidTag(TagValidationIssue)
     case scheduleReplacementNotAllowed(UUID, currentState: ScheduleReplacementBlockedState)
@@ -300,10 +300,12 @@ public actor SwiftDataReminderRepository: ReminderRepository {
                 }
                 record = existing
             }
+            let displayName = TagNameNormalizerV1.trimmedDisplayName(mutation.name)
             if allTags.contains(where: {
-                $0.id != mutation.id && $0.normalizedName == mutation.normalizedName
+                $0.id != mutation.id
+                    && TagNameNormalizerV1.trimmedDisplayName($0.name) == displayName
             }) {
-                throw PersistenceError.duplicateNormalizedTagName(mutation.normalizedName)
+                throw PersistenceError.duplicateTagName(displayName)
             }
             if record.modelContext == nil {
                 context.insert(record)
@@ -342,8 +344,8 @@ public actor SwiftDataReminderRepository: ReminderRepository {
             .notFound(id)
         case .duplicateTagID(let id):
             .duplicateID(id)
-        case .duplicateNormalizedTagName(let name):
-            .duplicateNormalizedName(name)
+        case .duplicateTagName(let name):
+            .duplicateName(name)
         case .invalidTag(let issue):
             .invalid(issue)
         default:

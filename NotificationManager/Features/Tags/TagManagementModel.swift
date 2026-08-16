@@ -113,6 +113,9 @@ final class TagManagementModel {
             if $0.normalizedName != $1.normalizedName {
                 return $0.normalizedName < $1.normalizedName
             }
+            if $0.name != $1.name {
+                return $0.name < $1.name
+            }
             return $0.id.uuidString.lowercased() < $1.id.uuidString.lowercased()
         }
     }
@@ -124,7 +127,7 @@ final class TagManagementModel {
         if let error = error as? TagRepositoryError {
             switch error {
             case .notFound: return .notFound
-            case .duplicateNormalizedName: return .duplicateName
+            case .duplicateName: return .duplicateName
             case .invalid(let issue):
                 return errorIdentity(for: issue)
             case .duplicateID, .unavailable: return .storeUnavailable
@@ -169,5 +172,49 @@ enum TagPickerSelection {
     ) -> Set<UUID> {
         guard case .acceptedCompleteSnapshot = outcome else { return selectedIDs }
         return reconciled(selectedIDs: selectedIDs, availableIDs: availableIDs)
+    }
+}
+
+struct TagPickerSuggestionState {
+    let matches: [TagSnapshot]
+    let trimmedQuery: String
+    let creationName: String?
+    let exactMatch: TagSnapshot?
+
+    init(tags: [TagSnapshot], query: String) {
+        let trimmed = TagNameNormalizerV1.trimmedDisplayName(query)
+        trimmedQuery = trimmed
+        exactMatch = tags.first {
+            TagNameNormalizerV1.trimmedDisplayName($0.name) == trimmed
+        }
+
+        guard !trimmed.isEmpty,
+            let normalizedQuery = try? TagNameNormalizerV1().normalize(trimmed)
+        else {
+            matches = tags
+            creationName = nil
+            return
+        }
+
+        matches =
+            tags
+            .filter { $0.normalizedName.contains(normalizedQuery) }
+            .sorted {
+                let lhsRank = Self.rank($0.normalizedName, query: normalizedQuery)
+                let rhsRank = Self.rank($1.normalizedName, query: normalizedQuery)
+                if lhsRank != rhsRank { return lhsRank < rhsRank }
+                if $0.normalizedName != $1.normalizedName {
+                    return $0.normalizedName < $1.normalizedName
+                }
+                if $0.name != $1.name { return $0.name < $1.name }
+                return $0.id.uuidString.lowercased() < $1.id.uuidString.lowercased()
+            }
+        creationName = exactMatch == nil ? trimmed : nil
+    }
+
+    private static func rank(_ name: String, query: String) -> Int {
+        if name == query { return 0 }
+        if name.hasPrefix(query) { return 1 }
+        return 2
     }
 }
