@@ -28,7 +28,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         return decodeV1(document, originalData: data)
     }
 
-    public func encodeCurrent(_ definition: ScheduleDefinition) throws -> Data {
+    public func encodeCurrent(_ definition: ScheduleDefinition) throws -> EncodedSchedulePayload {
         let issues = ReminderAggregateValidator().scheduleIssues(for: definition)
         guard issues.isEmpty else {
             throw SchedulePayloadCodecError.invalidSchedule(issues)
@@ -41,7 +41,8 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        return try encoder.encode(envelope)
+        let data = try encoder.encode(envelope)
+        return EncodedSchedulePayload(version: Self.currentVersion, data: data)
     }
 
     private func decodeV1(_ document: StrictJSONValue, originalData: Data) -> ScheduleReadState {

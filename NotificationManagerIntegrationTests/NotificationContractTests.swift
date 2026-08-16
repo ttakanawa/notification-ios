@@ -82,10 +82,10 @@ private struct NotificationContractHarness {
         let codec = SchedulePayloadCodec()
         let directSchedule = weekdaySchedule()
         let payload = try codec.encodeCurrent(directSchedule)
-        guard case .valid(let decodedSchedule, let sourceVersion, _) = codec.decode(payload),
-            sourceVersion == 1,
+        guard case .valid(let decodedSchedule, let sourceVersion, _) = codec.decode(payload.data),
+            sourceVersion == payload.version,
             decodedSchedule == directSchedule,
-            let envelope = try JSONSerialization.jsonObject(with: payload) as? [String: Any],
+            let envelope = try JSONSerialization.jsonObject(with: payload.data) as? [String: Any],
             let payloadFormat = envelope["format"] as? String,
             let payloadVersionNumber = envelope["version"] as? NSNumber
         else {
@@ -363,7 +363,7 @@ private struct NotificationContractHarness {
         title: String,
         urlString: String? = nil,
         schedule: ScheduleDefinition,
-        payload: Data
+        payload: EncodedSchedulePayload
     ) -> ReminderSnapshot {
         ReminderSnapshot(
             id: id,
@@ -371,7 +371,11 @@ private struct NotificationContractHarness {
             notes: nil,
             urlString: urlString,
             enabled: true,
-            schedule: .valid(schedule, sourceVersion: 1, originalData: payload),
+            schedule: .valid(
+                schedule,
+                sourceVersion: payload.version,
+                originalData: payload.data
+            ),
             tagIDs: [],
             createdAt: evaluationNow,
             updatedAt: evaluationNow

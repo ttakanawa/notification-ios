@@ -249,7 +249,7 @@ import Testing
             command: .updateMetadataPreservingCurrentSchedule,
             updatedAt: TestValues.later
         )
-        let current = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule)
+        let current = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule).data
         try updateScheduleData(current, in: container)
 
         let saved = try await repository.save(staleMetadataMutation)
@@ -318,7 +318,7 @@ import Testing
 
         let updated = try await repository.save(
             .fixture(
-                command: .replaceSchedule(scheduleData: encoded),
+                command: .replaceSchedule(scheduleData: encoded.data),
                 updatedAt: TestValues.later
             )
         )
@@ -329,7 +329,7 @@ import Testing
         }
         #expect(decoded == definition)
         #expect(version == SchedulePayloadCodec.currentVersion)
-        #expect(originalData == encoded)
+        #expect(originalData == encoded.data)
     }
 
     @Test(arguments: ScheduleReplacementBlockedCase.allCases)
@@ -339,7 +339,7 @@ import Testing
         let container = try ModelContainerFactory.inMemory()
         try insertReminder(scheduleData: blocked.data, in: container)
         let repository = SwiftDataReminderRepository(container: container)
-        let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule)
+        let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule).data
 
         await #expect(throws: blocked.expectedError) {
             try await repository.save(
@@ -359,7 +359,7 @@ import Testing
         let container = try ModelContainerFactory.inMemory()
         try insertReminder(scheduleData: TestValues.domainInvalidScheduleData, in: container)
         let repository = SwiftDataReminderRepository(container: container)
-        let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule)
+        let replacement = try SchedulePayloadCodec().encodeCurrent(TestValues.schedule).data
 
         let saved = try await repository.save(
             .fixture(
@@ -700,7 +700,7 @@ private enum TestValues {
         early: EarlyReminder(value: 5, unit: .minutes)
     )
     static let validScheduleData: Data = {
-        guard let data = try? SchedulePayloadCodec().encodeCurrent(schedule) else {
+        guard let data = try? SchedulePayloadCodec().encodeCurrent(schedule).data else {
             preconditionFailure("Valid schedule fixture must encode")
         }
         return data

@@ -705,8 +705,11 @@ private struct AcceptanceScheduleCodec: SchedulePayloadCoding {
         .corrupt(originalData: data)
     }
 
-    func encodeCurrent(_ definition: ScheduleDefinition) -> Data {
-        Data("acceptance-schedule".utf8)
+    func encodeCurrent(_ definition: ScheduleDefinition) -> EncodedSchedulePayload {
+        EncodedSchedulePayload(
+            version: 1,
+            data: Data("acceptance-schedule".utf8)
+        )
     }
 }
 

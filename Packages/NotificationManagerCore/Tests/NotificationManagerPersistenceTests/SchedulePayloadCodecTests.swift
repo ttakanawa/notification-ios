@@ -8,13 +8,26 @@ import Testing
     private let codec = SchedulePayloadCodec()
 
     @Test func encodesNormativeV1GoldenBytes() throws {
-        let data = try codec.encodeCurrent(.weekdayFixture)
+        let data = try codec.encodeCurrent(.weekdayFixture).data
         let expected = Data(
             #"{"format":"notification-manager.schedule","payload":{"early":{"mainEnabled":true,"unit":"minutes","value":5},"end":{"type":"never"},"rule":{"interval":1,"type":"weekly","weekdaySetKind":"weekday","weekdays":["monday","tuesday","wednesday","thursday","friday"]},"source":{"day":3,"hour":9,"minute":30,"month":8,"timeZone":"America/New_York","year":2026}},"version":1}"#
                 .utf8
         )
 
         #expect(data == expected)
+    }
+
+    @Test func currentEncodingCarriesMatchingVersionAndBytes() throws {
+        let encoded = try codec.encodeCurrent(.weekdayFixture)
+
+        #expect(encoded.version == SchedulePayloadCodec.currentVersion)
+        #expect(
+            codec.decode(encoded.data)
+                == .valid(
+                    .weekdayFixture,
+                    sourceVersion: encoded.version,
+                    originalData: encoded.data
+                ))
     }
 
     @Test(arguments: ["0", "-1", "1.0", "1e0", "null"])
@@ -294,7 +307,12 @@ import Testing
         for schedule in schedules {
             let encoded = try codec.encodeCurrent(schedule)
             #expect(
-                codec.decode(encoded) == .valid(schedule, sourceVersion: 1, originalData: encoded))
+                codec.decode(encoded.data)
+                    == .valid(
+                        schedule,
+                        sourceVersion: encoded.version,
+                        originalData: encoded.data
+                    ))
         }
     }
 

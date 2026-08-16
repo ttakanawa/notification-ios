@@ -79,11 +79,11 @@ public struct SaveReminderUseCase: Sendable {
         expiredScheduleConsent: ExpiredScheduleConsent = .notProvided
     ) async throws -> SaveReminderOutcome {
         let replacementSchedule = replacementSchedule(in: draft)
-        let replacementData = try replacementSchedule.map(scheduleCodec.encodeCurrent)
+        let replacementPayload = try replacementSchedule.map(scheduleCodec.encodeCurrent)
 
         let validated = try validatePreflight(
             draft,
-            replacementScheduleData: replacementData
+            replacementScheduleData: replacementPayload?.data
         )
         let saveEvaluationNow: Date?
         if let replacementSchedule {
@@ -113,7 +113,8 @@ public struct SaveReminderUseCase: Sendable {
                     durable: snapshot,
                     draft: draft,
                     aggregate: validated,
-                    replacementSchedule: replacementSchedule
+                    replacementSchedule: replacementSchedule,
+                    replacementPayload: replacementPayload
                 )
                 let evaluationNow = saveEvaluationNow ?? now()
                 let plan = try LogicalNotificationPlanner().plan(
@@ -154,7 +155,7 @@ public struct SaveReminderUseCase: Sendable {
         committingDraft.updatedAt = Self.integralSecond(commitNow)
         let committingAggregate = try validatePreflight(
             committingDraft,
-            replacementScheduleData: replacementData
+            replacementScheduleData: replacementPayload?.data
         )
         let saved = try await repository.save(
             EncodedReminderMutation(
@@ -220,14 +221,18 @@ public struct SaveReminderUseCase: Sendable {
         durable: CompleteReminderSnapshot,
         draft: ReminderDraft,
         aggregate: ValidatedReminderAggregate,
-        replacementSchedule: ScheduleDefinition?
+        replacementSchedule: ScheduleDefinition?,
+        replacementPayload: EncodedSchedulePayload?
     ) throws -> CompleteReminderSnapshot {
         let schedule: ScheduleReadState
         if let replacementSchedule {
+            guard let replacementPayload else {
+                preconditionFailure("Replacement schedules always have an encoded payload")
+            }
             schedule = .valid(
                 replacementSchedule,
-                sourceVersion: 1,
-                originalData: aggregate.scheduleData
+                sourceVersion: replacementPayload.version,
+                originalData: replacementPayload.data
             )
         } else {
             guard let durableReminder = durable.reminders.first(where: { $0.id == draft.id }) else {

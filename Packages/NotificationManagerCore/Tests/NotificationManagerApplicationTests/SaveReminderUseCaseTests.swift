@@ -796,6 +796,7 @@ enum CodecTestError: Error, Equatable {
 final class TestScheduleCodec: SchedulePayloadCoding, @unchecked Sendable {
     private let lock = NSLock()
     private let encodedData: Data
+    private let encodedVersion: UInt32
     private let encodeError: CodecTestError?
     private let trace: LockedApplicationTrace?
     private var storedDecodeCount = 0
@@ -803,10 +804,12 @@ final class TestScheduleCodec: SchedulePayloadCoding, @unchecked Sendable {
 
     init(
         encodedData: Data = Data("encoded-schedule".utf8),
+        encodedVersion: UInt32 = 1,
         encodeError: CodecTestError? = nil,
         trace: LockedApplicationTrace? = nil
     ) {
         self.encodedData = encodedData
+        self.encodedVersion = encodedVersion
         self.encodeError = encodeError
         self.trace = trace
     }
@@ -820,11 +823,11 @@ final class TestScheduleCodec: SchedulePayloadCoding, @unchecked Sendable {
         return .corrupt(originalData: data)
     }
 
-    func encodeCurrent(_ definition: ScheduleDefinition) throws -> Data {
+    func encodeCurrent(_ definition: ScheduleDefinition) throws -> EncodedSchedulePayload {
         lock.withLock { storedEncodeCount += 1 }
         trace?.record(.scheduleEncoded)
         if let encodeError { throw encodeError }
-        return encodedData
+        return EncodedSchedulePayload(version: encodedVersion, data: encodedData)
     }
 }
 
