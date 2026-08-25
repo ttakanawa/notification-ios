@@ -571,9 +571,11 @@ struct ReminderFormModelTests {
 
         await model.submitCustomRepeat()
 
-        #expect(model.customRepeatState == .awaitingSuggestions([
-            "Every Monday", "Every month"
-        ]))
+        #expect(
+            model.customRepeatState
+                == .awaitingSuggestions([
+                    "Every Monday", "Every month"
+                ]))
         #expect(model.customRepeatText == "Every mont")
         #expect(model.repeatRule == originalRule)
     }

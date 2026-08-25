@@ -33,7 +33,10 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
             explored += 1
 
             if state.rank.totalCost > 0 {
-                variants.append(RepairedVariant(rendered: render(lexed, replacements: state.replacements), rank: state.rank))
+                variants.append(
+                    RepairedVariant(
+                        rendered: render(lexed, replacements: state.replacements), rank: state.rank)
+                )
             }
 
             for (index, token) in lexed.tokens.enumerated() {
@@ -107,7 +110,8 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
         if names.count == 2 {
             rendered = "Every \(names[0]) and \(names[1])"
         } else {
-            rendered = "Every \(names.dropLast().joined(separator: ", ")), and \(names.last!)"
+            guard let finalName = names.last else { return nil }
+            rendered = "Every \(names.dropLast().joined(separator: ", ")), and \(finalName)"
         }
         return RepairedVariant(
             rendered: rendered,
@@ -121,7 +125,9 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
         return false
     }
 
-    private func validatedSuggestion(_ variant: RepairedVariant) -> (canonical: String, rank: RepairRank)? {
+    private func validatedSuggestion(_ variant: RepairedVariant) -> (
+        canonical: String, rank: RepairRank
+    )? {
         guard case .success(let candidate) = EnglishRepeatParser().parse(variant.rendered),
             !isSourceAnchoredWeekly(candidate),
             let rule = try? RepeatRuleValidator().validate(candidate, source: Self.validationSource)
@@ -130,7 +136,8 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
     }
 
     private func isSourceAnchoredWeekly(_ candidate: RepeatCandidate) -> Bool {
-        candidate.frequency == .weekly && candidate.weekdaySetKind == nil && candidate.weekdays.isEmpty
+        candidate.frequency == .weekly && candidate.weekdaySetKind == nil
+            && candidate.weekdays.isEmpty
     }
 
     private func render(
@@ -169,7 +176,8 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
 
         for row in 1...lhsCharacters.count {
             for column in 1...rhsCharacters.count {
-                let substitution = matrix[row - 1][column - 1]
+                let substitution =
+                    matrix[row - 1][column - 1]
                     + (lhsCharacters[row - 1] == rhsCharacters[column - 1] ? 0 : 1)
                 var value = min(
                     matrix[row - 1][column] + 1,
@@ -219,7 +227,8 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
     ]
 
     private static func weekdayName(_ weekday: Weekday) -> String {
-        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][weekday.rawValue - 1]
+        ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"][
+            weekday.rawValue - 1]
     }
 }
 
@@ -246,7 +255,9 @@ private struct VariantState {
     let rank: RepairRank
 
     var key: String {
-        replacements.keys.sorted().map { "\($0):\(replacements[$0]!)" }.joined(separator: "|")
+        replacements.sorted { $0.key < $1.key }
+            .map { "\($0.key):\($0.value)" }
+            .joined(separator: "|")
     }
 
     static func isHigherPriority(_ lhs: VariantState, _ rhs: VariantState) -> Bool {

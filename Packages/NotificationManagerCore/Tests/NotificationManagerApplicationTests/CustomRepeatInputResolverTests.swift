@@ -68,9 +68,10 @@ struct CustomRepeatInputResolverTests {
         )
         _ = await makeResolver(assisted: assisted)
             .resolve("Remind me on alternate Mondays", mode: .automatic)
-        #expect(await assisted.events == [
-            .availability, .interpret("Remind me on alternate Mondays")
-        ])
+        #expect(
+            await assisted.events == [
+                .availability, .interpret("Remind me on alternate Mondays")
+            ])
     }
 
     @Test func assistedOnlyBypassesAValidDeterministicCandidate() async {

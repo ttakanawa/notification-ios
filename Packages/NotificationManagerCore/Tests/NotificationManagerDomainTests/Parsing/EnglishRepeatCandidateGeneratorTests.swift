@@ -7,15 +7,18 @@ struct EnglishRepeatCandidateGeneratorTests {
     private let generator = EnglishRepeatCandidateGenerator()
 
     @Test func normalizesTwoAndThreeWeekdaySeparators() {
-        #expect(generator.suggestions(for: "Every Monday, and Wednesday") == [
-            "Every Monday and Wednesday"
-        ])
-        #expect(generator.suggestions(for: "Every Monday Wednesday") == [
-            "Every Monday and Wednesday"
-        ])
-        #expect(generator.suggestions(for: "Every Monday Wednesday Friday") == [
-            "Every Monday, Wednesday, and Friday"
-        ])
+        #expect(
+            generator.suggestions(for: "Every Monday, and Wednesday") == [
+                "Every Monday and Wednesday"
+            ])
+        #expect(
+            generator.suggestions(for: "Every Monday Wednesday") == [
+                "Every Monday and Wednesday"
+            ])
+        #expect(
+            generator.suggestions(for: "Every Monday Wednesday Friday") == [
+                "Every Monday, Wednesday, and Friday"
+            ])
     }
 
     @Test func combinesTwoSingleCostSpellingRepairs() {
@@ -23,9 +26,10 @@ struct EnglishRepeatCandidateGeneratorTests {
     }
 
     @Test func preservesAmbiguityAsMultipleStableCandidates() {
-        #expect(generator.suggestions(for: "Every mont") == [
-            "Every Monday", "Every month"
-        ])
+        #expect(
+            generator.suggestions(for: "Every mont") == [
+                "Every Monday", "Every month"
+            ])
     }
 
     @Test func rejectsOverBudgetUnsafeAndDuplicateRepairs() {
