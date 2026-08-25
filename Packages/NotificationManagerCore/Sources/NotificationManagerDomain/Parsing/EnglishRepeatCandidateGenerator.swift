@@ -7,7 +7,8 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
 
     public func suggestions(for input: String) -> [String] {
         guard case .failure = EnglishRepeatParser().parse(input),
-            let lexed = try? EnglishRepeatLexer().lex(input)
+            let lexed = try? EnglishRepeatLexer().lex(input),
+            !EnglishRepeatLexicalSafety().containsUnsupportedSemanticOperator(in: lexed)
         else { return [] }
         return repairedVariants(from: lexed)
             .compactMap(validatedSuggestion)
@@ -22,7 +23,7 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
     }
 
     private func repairedVariants(from lexed: EnglishRepeatLexer.Lexed) -> [RepairedVariant] {
-        var variants = weekdaySeparatorNormalization(from: lexed).map { [$0] } ?? []
+        var variants = [RepairedVariant]()
         var queue = [VariantState(replacements: [:], rank: .zero)]
         var visited = Set([queue[0].key])
         var explored = 0
@@ -32,6 +33,13 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
             let state = queue.removeFirst()
             explored += 1
 
+            if let normalized = weekdaySeparatorNormalization(
+                from: lexed,
+                replacements: state.replacements,
+                rank: state.rank
+            ) {
+                variants.append(normalized)
+            }
             if state.rank.totalCost > 0 {
                 variants.append(
                     RepairedVariant(
@@ -69,16 +77,22 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
     }
 
     private func weekdaySeparatorNormalization(
-        from lexed: EnglishRepeatLexer.Lexed
+        from lexed: EnglishRepeatLexer.Lexed,
+        replacements: [Int: String],
+        rank: RepairRank
     ) -> RepairedVariant? {
-        guard let first = lexed.tokens.first,
-            first.kind == .word("every")
+        let normalizationRank = RepairRank(
+            totalCost: rank.totalCost + 1,
+            operationCount: rank.operationCount + 1
+        )
+        guard normalizationRank.totalCost <= Self.maxRepairCost,
+            word(at: 0, in: lexed, replacements: replacements) == "every"
         else { return nil }
 
         var index = 1
         var weekdays = [Weekday]()
         while index < lexed.tokens.count {
-            guard case .word(let word) = lexed.tokens[index].kind,
+            guard let word = word(at: index, in: lexed, replacements: replacements),
                 let weekday = Self.weekdays[word]
             else { return nil }
             weekdays.append(weekday)
@@ -87,12 +101,16 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
 
             var sawComma = false
             var sawAnd = false
-            while index < lexed.tokens.count, isSeparator(lexed.tokens[index].kind) {
-                switch lexed.tokens[index].kind {
+            while let separator = weekdaySeparator(
+                at: index,
+                in: lexed,
+                replacements: replacements
+            ) {
+                switch separator {
                 case .comma where !sawComma && !sawAnd:
                     sawComma = true
                     index += 1
-                case .word("and") where !sawAnd:
+                case .and where !sawAnd:
                     sawAnd = true
                     index += 1
                 default:
@@ -115,14 +133,28 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
         }
         return RepairedVariant(
             rendered: rendered,
-            rank: RepairRank(totalCost: 1, operationCount: 1)
+            rank: normalizationRank
         )
     }
 
-    private func isSeparator(_ kind: EnglishRepeatLexer.Token.Kind) -> Bool {
-        if case .comma = kind { return true }
-        if case .word("and") = kind { return true }
-        return false
+    private func word(
+        at index: Int,
+        in lexed: EnglishRepeatLexer.Lexed,
+        replacements: [Int: String]
+    ) -> String? {
+        guard lexed.tokens.indices.contains(index), case .word(let word) = lexed.tokens[index].kind
+        else { return nil }
+        return replacements[index] ?? word
+    }
+
+    private func weekdaySeparator(
+        at index: Int,
+        in lexed: EnglishRepeatLexer.Lexed,
+        replacements: [Int: String]
+    ) -> WeekdaySeparator? {
+        guard lexed.tokens.indices.contains(index) else { return nil }
+        if case .comma = lexed.tokens[index].kind { return .comma }
+        return word(at: index, in: lexed, replacements: replacements) == "and" ? .and : nil
     }
 
     private func validatedSuggestion(_ variant: RepairedVariant) -> (
@@ -263,4 +295,9 @@ private struct VariantState {
     static func isHigherPriority(_ lhs: VariantState, _ rhs: VariantState) -> Bool {
         lhs.rank != rhs.rank ? lhs.rank < rhs.rank : lhs.key < rhs.key
     }
+}
+
+private enum WeekdaySeparator {
+    case comma
+    case and
 }

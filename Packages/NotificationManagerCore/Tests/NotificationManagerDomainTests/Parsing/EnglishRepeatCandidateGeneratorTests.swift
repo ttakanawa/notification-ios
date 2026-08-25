@@ -25,6 +25,13 @@ struct EnglishRepeatCandidateGeneratorTests {
         #expect(generator.suggestions(for: "Evrey Tuseday") == ["Every Tuesday"])
     }
 
+    @Test func composesSpellingAndWeekdaySeparatorRepairsWithinTheCostBudget() {
+        #expect(
+            generator.suggestions(for: "Every mondy wednesday") == [
+                "Every Monday and Wednesday"
+            ])
+    }
+
     @Test func preservesAmbiguityAsMultipleStableCandidates() {
         #expect(
             generator.suggestions(for: "Every mont") == [
@@ -36,6 +43,20 @@ struct EnglishRepeatCandidateGeneratorTests {
         #expect(generator.suggestions(for: "Evrey Tuseday adn Wednesday").isEmpty)
         #expect(generator.suggestions(for: "Every Monday except first Monday").isEmpty)
         #expect(generator.suggestions(for: "Every Monday Monday").isEmpty)
+    }
+
+    @Test func rejectsSemanticOperatorsWithoutDroppingTheirClauses() {
+        #expect(generator.suggestions(for: "Never day").isEmpty)
+        #expect(generator.suggestions(for: "Every month not the first Monday").isEmpty)
+    }
+
+    @Test func detectsExactUnsupportedSemanticOperatorTokensCaseInsensitively() {
+        let safety = EnglishRepeatLexicalSafety()
+
+        #expect(safety.containsUnsupportedSemanticOperator(in: "Never day"))
+        #expect(safety.containsUnsupportedSemanticOperator(in: "Every Monday EXCEPT first Monday"))
+        #expect(safety.containsUnsupportedSemanticOperator(in: "Every month NOT the first Monday"))
+        #expect(!safety.containsUnsupportedSemanticOperator(in: "Every month notation"))
     }
 
     @Test func rejectsMalformedWeekdaySeparatorOrder() {
