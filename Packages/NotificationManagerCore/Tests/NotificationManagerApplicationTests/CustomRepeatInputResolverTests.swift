@@ -146,6 +146,25 @@ struct CustomRepeatInputResolverTests {
     }
 
     @Test(arguments: [
+        CustomRepeatResolutionMode.automatic,
+        .assistedOnly
+    ])
+    func assistedExclusionCannotCreateASchedule(
+        mode: CustomRepeatResolutionMode
+    ) async {
+        let input = "Every Monday except first Monday"
+        let assisted = AssistedRepeatInterpreterSpy(
+            availability: .available,
+            candidate: .weeklyMonday
+        )
+
+        let resolution = await makeResolver(assisted: assisted).resolve(input, mode: mode)
+
+        #expect(resolution == .failed(.validation(.unsupported)))
+        #expect(await assisted.events == [.availability, .interpret(input)])
+    }
+
+    @Test(arguments: [
         AssistedRepeatInterpretationError.safetyGuard,
         .generation
     ])

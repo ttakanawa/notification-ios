@@ -107,6 +107,12 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
 
         do {
             let candidate = try await assistedInterpreter.interpret(input)
+            guard
+                !EnglishRepeatLexicalSafety()
+                    .containsUnsupportedSemanticOperator(in: input)
+            else {
+                return .failed(.validation(.unsupported))
+            }
             return validate(candidate, route: .assisted)
         } catch let error as AssistedRepeatInterpretationError {
             return switch error {
