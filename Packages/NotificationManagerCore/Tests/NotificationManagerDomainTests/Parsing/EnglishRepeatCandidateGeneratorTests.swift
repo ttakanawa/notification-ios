@@ -57,6 +57,17 @@ struct EnglishRepeatCandidateGeneratorTests {
         #expect(safety.containsUnsupportedSemanticOperator(in: "Every Monday EXCEPT first Monday"))
         #expect(safety.containsUnsupportedSemanticOperator(in: "Every month NOT the first Monday"))
         #expect(!safety.containsUnsupportedSemanticOperator(in: "Every month notation"))
+        #expect(!safety.containsUnsupportedSemanticOperator(in: "Every month exception"))
+    }
+
+    @Test func detectsOperatorsOutsideTheStrictLexerGrammar() {
+        let safety = EnglishRepeatLexicalSafety()
+        let overLimit = String(repeating: "x", count: 256) + " except"
+
+        #expect(safety.containsUnsupportedSemanticOperator(in: "Every Monday except first Monday."))
+        #expect(safety.containsUnsupportedSemanticOperator(in: "毎週 except 月曜日"))
+        #expect(overLimit.unicodeScalars.count > 256)
+        #expect(safety.containsUnsupportedSemanticOperator(in: overLimit))
     }
 
     @Test func rejectsMalformedWeekdaySeparatorOrder() {
