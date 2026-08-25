@@ -1,8 +1,12 @@
+import NotificationManagerDomain
 import SwiftUI
 
 struct TagPickerView: View {
     @Bindable var model: TagManagementModel
     @Binding var selectedTagIDs: Set<UUID>
+    let reminderID: UUID?
+    let isInteractionDisabled: Bool
+    let onCommittedRemoval: (UUID) -> Void
 
     @Environment(\.locale) private var locale
     @State private var newName = ""
@@ -29,13 +33,39 @@ struct TagPickerView: View {
             .accessibilityIdentifier("tags.picker.new-name")
 
             ForEach(suggestions.matches, id: \.id) { tag in
-                Toggle(isOn: selectionBinding(for: tag.id)) {
-                    Label {
-                        Text(verbatim: tag.name)
-                    } icon: {
-                        Image(systemName: "tag")
+                let isSelected = selectedTagIDs.contains(tag.id)
+                Button {
+                    if isSelected {
+                        remove(tagID: tag.id)
+                    } else {
+                        select(tagID: tag.id)
                     }
+                } label: {
+                    HStack {
+                        Label {
+                            Text(verbatim: tag.name)
+                        } icon: {
+                            Image(systemName: "tag")
+                        }
+                        .foregroundStyle(.primary)
+
+                        Spacer()
+
+                        Image(
+                            systemName: isSelected
+                                ? "minus.circle.fill"
+                                : "plus.circle"
+                        )
+                        .foregroundStyle(isSelected ? Color.red : Color.accentColor)
+                        .imageScale(.large)
+                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
+                .disabled(model.isWorking || isInteractionDisabled)
+                .accessibilityLabel(
+                    Text(verbatim: actionText(for: tag, isSelected: isSelected))
+                )
                 .accessibilityIdentifier("tags.picker.tag.\(tag.id.uuidString.lowercased())")
             }
 
@@ -71,21 +101,24 @@ struct TagPickerView: View {
         )
     }
 
-    private func selectionBinding(for tagID: UUID) -> Binding<Bool> {
-        Binding(
-            get: { selectedTagIDs.contains(tagID) },
-            set: { selected in
-                if selected {
-                    let wasSelected = selectedTagIDs.contains(tagID)
-                    selectedTagIDs = TagPickerSelection.selecting(tagID, in: selectedTagIDs)
-                    if !wasSelected {
-                        newName = ""
-                    }
-                } else {
-                    selectedTagIDs.remove(tagID)
-                }
-            }
-        )
+    private func select(tagID: UUID) {
+        let wasSelected = selectedTagIDs.contains(tagID)
+        selectedTagIDs = TagPickerSelection.selecting(tagID, in: selectedTagIDs)
+        if !wasSelected {
+            newName = ""
+        }
+    }
+
+    private func remove(tagID: UUID) {
+        Task {
+            guard
+                await model.removeAssociation(
+                    tagID: tagID,
+                    from: reminderID
+                ) != nil
+            else { return }
+            onCommittedRemoval(tagID)
+        }
     }
 
     private func submitSuggestion() {
@@ -124,6 +157,24 @@ struct TagPickerView: View {
             format: format,
             locale: locale,
             arguments: [name]
+        )
+    }
+
+    private func actionText(
+        for tag: TagSnapshot,
+        isSelected: Bool
+    ) -> String {
+        let format = String(
+            localized: isSelected
+                ? "tags.picker.remove-accessibility"
+                : "tags.picker.add-accessibility",
+            table: "Tags",
+            locale: locale
+        )
+        return String(
+            format: format,
+            locale: locale,
+            arguments: [tag.name]
         )
     }
 

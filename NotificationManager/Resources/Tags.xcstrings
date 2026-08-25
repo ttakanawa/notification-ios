@@ -307,6 +307,24 @@
         }
       }
     },
+    "tags.picker.add-accessibility": {
+      "comment": "Accessibility label for adding an existing tag. Placeholder 1 is the tag display name (String).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Add %1$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@を追加"
+          }
+        }
+      }
+    },
     "tags.picker.create-suggestion": {
       "comment": "Inline action for creating a tag from the current picker query. Placeholder 1 is the trimmed tag display name (String).",
       "extractionState": "manual",
@@ -321,6 +339,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "「%1$@」を作成"
+          }
+        }
+      }
+    },
+    "tags.picker.remove-accessibility": {
+      "comment": "Accessibility label for removing a tag from the current reminder. Placeholder 1 is the tag display name (String).",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remove %1$@"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@を外す"
           }
         }
       }

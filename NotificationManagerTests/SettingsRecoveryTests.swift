@@ -348,6 +348,55 @@ struct TagManagementPresentationTests {
     }
 
     @MainActor
+    @Test func removingAnOrphanedAssociationDeletesTheTagPresentationImmediately() async throws {
+        let repository = TagPresentationRepository()
+        let refresh = TagAssociationRefreshRecorder()
+        let model = TagManagementModel(
+            repository: repository,
+            useCase: TagManagementUseCase(
+                repository: repository,
+                normalizer: TagNameNormalizerV1()
+            ),
+            associationRemovalCommitted: {
+                await refresh.record()
+            }
+        )
+        let created = try #require(await model.create(name: "Travel"))
+
+        let outcome = await model.removeAssociation(
+            tagID: created.id,
+            from: nil
+        )
+
+        #expect(outcome == .tagDeleted)
+        #expect(model.tags.isEmpty)
+        #expect(model.actionError == nil)
+        #expect(await refresh.callCount == 1)
+    }
+
+    @MainActor
+    @Test func removingASharedAssociationKeepsTheTagAvailableForAddingAgain() async throws {
+        let tag = tagFixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            name: "Travel"
+        )
+        let repository = TagPresentationRepository(
+            tags: [tag],
+            associationRemovalOutcome: .tagRetained
+        )
+        let model = makeTagModel(repository: repository, initialTags: [tag])
+
+        let outcome = await model.removeAssociation(
+            tagID: tag.id,
+            from: UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        )
+
+        #expect(outcome == .tagRetained)
+        #expect(model.tags == [tag])
+        #expect(model.actionError == nil)
+    }
+
+    @MainActor
     @Test func missingRenameMapsToStableNotFoundIdentity() async throws {
         let (model, _) = makeTagModel()
         let missing = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
@@ -1031,8 +1080,25 @@ private enum TagPresentationRepositoryError: Error {
     case unsupportedReminderMutation
 }
 
+private actor TagAssociationRefreshRecorder {
+    private(set) var callCount = 0
+
+    func record() {
+        callCount += 1
+    }
+}
+
 private actor TagPresentationRepository: ReminderRepository {
-    private var tags: [UUID: TagSnapshot] = [:]
+    private var tags: [UUID: TagSnapshot]
+    private let associationRemovalOutcome: TagAssociationRemovalOutcome
+
+    init(
+        tags: [TagSnapshot] = [],
+        associationRemovalOutcome: TagAssociationRemovalOutcome = .tagDeleted
+    ) {
+        self.tags = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
+        self.associationRemovalOutcome = associationRemovalOutcome
+    }
 
     func fetchCompleteSnapshot() -> CompleteReminderSnapshot {
         CompleteReminderSnapshot(
@@ -1092,6 +1158,17 @@ private actor TagPresentationRepository: ReminderRepository {
     func deleteTag(id: UUID) throws {
         guard tags[id] != nil else { throw TagRepositoryError.notFound(id) }
         tags[id] = nil
+    }
+
+    func removeTagAssociation(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) throws -> TagAssociationRemovalOutcome {
+        guard tags[tagID] != nil else { throw TagRepositoryError.notFound(tagID) }
+        if associationRemovalOutcome == .tagDeleted {
+            tags[tagID] = nil
+        }
+        return associationRemovalOutcome
     }
 }
 

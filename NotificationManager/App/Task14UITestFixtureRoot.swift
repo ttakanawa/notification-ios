@@ -59,10 +59,15 @@
                 default:
                     { nil }
                 }
-            let tagModel =
-                scenario == "navigation-with-tags"
-                ? makeTagManagementModel()
-                : nil
+            let tagModel: TagManagementModel? =
+                switch scenario {
+                case "navigation-with-tags":
+                    makeTagManagementModel(delaysAssociationRemoval: false)
+                case "slow-tag-removal":
+                    makeTagManagementModel(delaysAssociationRemoval: true)
+                default:
+                    nil
+                }
             let router = AppRouter(
                 actions: actionCoordinator,
                 tagManagementModel: tagModel,
@@ -373,27 +378,44 @@
         )
 
         @MainActor
-        private static func makeTagManagementModel() -> TagManagementModel {
+        private static func makeTagManagementModel(
+            delaysAssociationRemoval: Bool
+        ) -> TagManagementModel {
             let now = Date(timeIntervalSince1970: 2_225_052_800)
-            let repository: SwiftDataReminderRepository
+            let baseRepository: SwiftDataReminderRepository
             do {
                 let container = try ModelContainerFactory.inMemory()
                 let context = ModelContext(container)
+                let tag = TagRecordV1(
+                    id: uuid("88888888-8888-8888-8888-888888888888"),
+                    name: "Work",
+                    normalizedName: "work",
+                    normalizationVersion: TagLimits.normalizationVersion,
+                    createdAt: now,
+                    updatedAt: now
+                )
+                context.insert(tag)
                 context.insert(
-                    TagRecordV1(
-                        id: uuid("88888888-8888-8888-8888-888888888888"),
-                        name: "Work",
-                        normalizedName: "work",
-                        normalizationVersion: TagLimits.normalizationVersion,
+                    ReminderRecordV1(
+                        id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                        title: "Visa renewal",
+                        notes: "Renewal documents",
+                        urlString: nil,
+                        enabled: true,
+                        scheduleData: Data([1]),
                         createdAt: now,
                         updatedAt: now
                     )
                 )
                 try context.save()
-                repository = SwiftDataReminderRepository(container: container)
+                baseRepository = SwiftDataReminderRepository(container: container)
             } catch {
                 preconditionFailure("Task 14 UI fixture requires an in-memory repository: \(error)")
             }
+            let repository: any ReminderRepository =
+                delaysAssociationRemoval
+                ? Task14DelayedTagRepository(base: baseRepository)
+                : baseRepository
             return TagManagementModel(
                 repository: repository,
                 useCase: TagManagementUseCase(
@@ -454,6 +476,46 @@
                     ),
                     planningCapacity: 60
                 ))
+        }
+    }
+
+    private actor Task14DelayedTagRepository: ReminderRepository {
+        let base: SwiftDataReminderRepository
+
+        init(base: SwiftDataReminderRepository) {
+            self.base = base
+        }
+
+        func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot {
+            try await base.fetchCompleteSnapshot()
+        }
+
+        func reminder(id: UUID) async throws -> ReminderSnapshot? {
+            try await base.reminder(id: id)
+        }
+
+        func save(_ mutation: EncodedReminderMutation) async throws -> ReminderSnapshot {
+            try await base.save(mutation)
+        }
+
+        func delete(id: UUID) async throws {
+            try await base.delete(id: id)
+        }
+
+        func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot {
+            try await base.saveTag(mutation)
+        }
+
+        func deleteTag(id: UUID) async throws {
+            try await base.deleteTag(id: id)
+        }
+
+        func removeTagAssociation(
+            tagID: UUID,
+            from reminderID: UUID?
+        ) async throws -> TagAssociationRemovalOutcome {
+            try await Task.sleep(for: .seconds(2))
+            return try await base.removeTagAssociation(tagID: tagID, from: reminderID)
         }
     }
 

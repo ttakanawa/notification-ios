@@ -295,6 +295,16 @@ final class ReminderFormModel {
         }
     }
 
+    func commitTagRemoval(_ tagID: UUID) {
+        guard detachedDraft.tagIDs.remove(tagID) != nil else { return }
+        if var baseline {
+            baseline.draft.tagIDs.remove(tagID)
+            baseline.editableContent.tagIDs.remove(tagID)
+            self.baseline = baseline
+        }
+        resetSaveStateAfterEdit()
+    }
+
     var sourceDate: SourceDate? {
         get { detachedDraft.date }
         set {
@@ -1100,7 +1110,7 @@ private struct ReminderFormEditableContent: Equatable {
     let notes: String?
     let urlString: String?
     let enabled: Bool
-    let tagIDs: Set<UUID>
+    var tagIDs: Set<UUID>
     let sourceDate: SourceDate?
     let sourceTime: SourceTime?
     let timeZoneIdentifier: String?
@@ -1115,8 +1125,8 @@ private struct ReminderFormEditableContent: Equatable {
 }
 
 private struct ReminderFormBaseline {
-    let draft: ReminderDraft
-    let editableContent: ReminderFormEditableContent
+    var draft: ReminderDraft
+    var editableContent: ReminderFormEditableContent
     let currentLocalizedRepeatSummary: String?
     let currentRepeatWasCustom: Bool
     let canonicalEnglishDisclosure: String?

@@ -209,7 +209,10 @@ final class AppEnvironment {
         )
         let tagModel = TagManagementModel(
             repository: repository,
-            useCase: tagUseCase
+            useCase: tagUseCase,
+            associationRemovalCommitted: {
+                await relay.refreshPresentation()
+            }
         )
         let router = AppRouter(
             actions: actions,

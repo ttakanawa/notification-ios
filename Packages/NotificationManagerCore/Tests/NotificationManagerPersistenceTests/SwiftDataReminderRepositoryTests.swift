@@ -651,6 +651,75 @@ import Testing
         #expect(snapshot.reminders.first?.tagIDs.isEmpty == true)
     }
 
+    @Test func removingAssociationKeepsATagReferencedByAnotherReminder() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory()
+        _ = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Travel"))
+        _ = try await repository.save(
+            .fixture(id: TestValues.reminderID, tagIDs: [TestValues.tagID])
+        )
+        _ = try await repository.save(
+            .fixture(id: TestValues.otherReminderID, tagIDs: [TestValues.tagID])
+        )
+
+        let outcome = try await repository.removeTagAssociation(
+            tagID: TestValues.tagID,
+            from: TestValues.reminderID
+        )
+
+        #expect(outcome == .tagRetained)
+        let snapshot = try await repository.fetchCompleteSnapshot()
+        #expect(snapshot.tags.map(\.id) == [TestValues.tagID])
+        #expect(
+            snapshot.reminders.first { $0.id == TestValues.reminderID }?.tagIDs.isEmpty == true
+        )
+        #expect(
+            snapshot.reminders.first { $0.id == TestValues.otherReminderID }?.tagIDs
+                == [TestValues.tagID]
+        )
+    }
+
+    @Test func removingTheLastAssociationDeletesTheTagInTheSameMutation() async throws {
+        let repository = try SwiftDataReminderRepository.inMemory()
+        _ = try await repository.saveTag(.fixture(id: TestValues.tagID, name: "Travel"))
+        _ = try await repository.save(
+            .fixture(id: TestValues.reminderID, tagIDs: [TestValues.tagID])
+        )
+
+        let outcome = try await repository.removeTagAssociation(
+            tagID: TestValues.tagID,
+            from: TestValues.reminderID
+        )
+
+        #expect(outcome == .tagDeleted)
+        let snapshot = try await repository.fetchCompleteSnapshot()
+        #expect(snapshot.tags.isEmpty)
+        #expect(snapshot.reminders.first?.tagIDs.isEmpty == true)
+    }
+
+    @Test func failedAssociationRemovalKeepsTheRelationshipAndOrphanTag() async throws {
+        let container = try ModelContainerFactory.inMemory()
+        let setupRepository = SwiftDataReminderRepository(container: container)
+        _ = try await setupRepository.saveTag(.fixture(id: TestValues.tagID, name: "Travel"))
+        _ = try await setupRepository.save(
+            .fixture(id: TestValues.reminderID, tagIDs: [TestValues.tagID])
+        )
+        let failingRepository = SwiftDataReminderRepository(
+            container: container,
+            saveFailure: .diskFull
+        )
+
+        await #expect(throws: TagRepositoryError.unavailable) {
+            try await failingRepository.removeTagAssociation(
+                tagID: TestValues.tagID,
+                from: TestValues.reminderID
+            )
+        }
+
+        let snapshot = try await setupRepository.fetchCompleteSnapshot()
+        #expect(snapshot.tags.map(\.id) == [TestValues.tagID])
+        #expect(snapshot.reminders.first?.tagIDs == [TestValues.tagID])
+    }
+
     @Test func devicePreferenceDefaultsOffPersistsAndUsesOnlyInjectedSuite() async throws {
         let suiteA = "NotificationManagerPersistenceTests.A.\(UUID().uuidString)"
         let suiteB = "NotificationManagerPersistenceTests.B.\(UUID().uuidString)"
@@ -681,6 +750,7 @@ import Testing
 
 private enum TestValues {
     static let reminderID = UUID(uuidString: "11111111-1111-4111-8111-111111111111")!
+    static let otherReminderID = UUID(uuidString: "44444444-4444-4444-8444-444444444444")!
     static let tagID = UUID(uuidString: "22222222-2222-4222-8222-222222222222")!
     static let otherTagID = UUID(uuidString: "33333333-3333-4333-8333-333333333333")!
     static let created = Date(timeIntervalSince1970: 1_700_000_000)
@@ -812,13 +882,14 @@ private func mutationDate(attempt: Int, multiplier: Int) -> Date {
 
 extension EncodedReminderMutation {
     fileprivate static func fixture(
+        id: UUID = TestValues.reminderID,
         title: String = "Reminder",
         command: ReminderMutationCommand = .create(scheduleData: TestValues.validScheduleData),
         tagIDs: Set<UUID> = [],
         updatedAt: Date = TestValues.created
     ) -> EncodedReminderMutation {
         EncodedReminderMutation(
-            id: TestValues.reminderID,
+            id: id,
             title: title,
             notes: "Notes",
             urlString: "https://example.com/reminder",

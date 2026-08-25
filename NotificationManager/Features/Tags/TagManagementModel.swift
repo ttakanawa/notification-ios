@@ -27,14 +27,17 @@ final class TagManagementModel {
 
     @ObservationIgnored private let repository: any ReminderRepository
     @ObservationIgnored private let useCase: TagManagementUseCase
+    @ObservationIgnored private let associationRemovalCommitted: @Sendable () async -> Void
 
     init(
         repository: any ReminderRepository,
         useCase: TagManagementUseCase,
-        initialTags: [TagSnapshot] = []
+        initialTags: [TagSnapshot] = [],
+        associationRemovalCommitted: @escaping @Sendable () async -> Void = {}
     ) {
         self.repository = repository
         self.useCase = useCase
+        self.associationRemovalCommitted = associationRemovalCommitted
         tags = Self.sorted(initialTags)
     }
 
@@ -99,6 +102,30 @@ final class TagManagementModel {
             actionError = Self.errorIdentity(for: error)
             isWorking = false
             return false
+        }
+    }
+
+    func removeAssociation(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) async -> TagAssociationRemovalOutcome? {
+        guard !isWorking else { return nil }
+        isWorking = true
+        actionError = nil
+        defer { isWorking = false }
+        do {
+            let outcome = try await repository.removeTagAssociation(
+                tagID: tagID,
+                from: reminderID
+            )
+            if outcome == .tagDeleted {
+                tags.removeAll { $0.id == tagID }
+            }
+            await associationRemovalCommitted()
+            return outcome
+        } catch {
+            actionError = Self.errorIdentity(for: error)
+            return nil
         }
     }
 

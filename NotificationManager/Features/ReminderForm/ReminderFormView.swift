@@ -57,13 +57,18 @@ struct ReminderFormView: View {
                         .id(Self.earlyReminderScrollID)
                 }
                 if let tagModel {
-                    TagPickerView(model: tagModel, selectedTagIDs: $model.tagIDs)
+                    TagPickerView(
+                        model: tagModel,
+                        selectedTagIDs: $model.tagIDs,
+                        reminderID: model.canDelete ? model.detachedDraft.id : nil,
+                        isInteractionDisabled: isFormMutationInFlight,
+                        onCommittedRemoval: { model.commitTagRemoval($0) }
+                    )
                 }
                 if model.canDelete {
                     DeleteReminderSection(
                         model: model,
-                        isPersistenceOperationInFlight: confirmations
-                            .isPersistenceOperationInFlight,
+                        isPersistenceOperationInFlight: isFormMutationInFlight,
                         onRequestDelete: requestDelete
                     )
                 }
@@ -92,10 +97,7 @@ struct ReminderFormView: View {
                         Image(systemName: "chevron.backward")
                     }
                 }
-                .disabled(
-                    confirmations.isPersistenceOperationInFlight
-                        || model.saveState == .saving
-                )
+                .disabled(isFormMutationInFlight)
                 .accessibilityIdentifier("reminder-form.back")
             }
             if model.hasChanges {
@@ -103,9 +105,7 @@ struct ReminderFormView: View {
                     Button(action: save) {
                         Image(systemName: "checkmark")
                     }
-                    .disabled(
-                        confirmations.isPersistenceOperationInFlight || !model.canSave
-                    )
+                    .disabled(isFormMutationInFlight || !model.canSave)
                     .accessibilityLabel(
                         Text(
                             LocalizedStringResource(
@@ -124,9 +124,7 @@ struct ReminderFormView: View {
                         table: "Reminder"
                     ), action: save
                 )
-                .disabled(
-                    confirmations.isPersistenceOperationInFlight || !model.canSave
-                )
+                .disabled(isFormMutationInFlight || !model.canSave)
                 .accessibilityIdentifier("reminder-form.save")
             }
         }
@@ -141,12 +139,19 @@ struct ReminderFormView: View {
         )
     }
 
+    private var isFormMutationInFlight: Bool {
+        confirmations.isPersistenceOperationInFlight
+            || model.saveState == .saving
+            || tagModel?.isWorking == true
+    }
+
     private func save() {
+        guard !isFormMutationInFlight else { return }
         confirmations.save(model: model, router: router)
     }
 
     private func attemptDismiss() {
-        guard !confirmations.isPersistenceOperationInFlight else { return }
+        guard !isFormMutationInFlight else { return }
         if model.hasChanges {
             confirmations.requestDiscard(model: model, router: router)
         } else {
@@ -156,7 +161,7 @@ struct ReminderFormView: View {
     }
 
     private func requestDelete() {
-        guard !confirmations.isPersistenceOperationInFlight else { return }
+        guard !isFormMutationInFlight else { return }
         confirmations.requestDelete(model: model, router: router)
     }
 

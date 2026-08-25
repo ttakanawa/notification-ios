@@ -338,6 +338,22 @@ public actor SwiftDataReminderRepository: ReminderRepository {
         }
     }
 
+    public func removeTagAssociation(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) async throws -> TagAssociationRemovalOutcome {
+        do {
+            return try storeCoordinator.withCriticalSection {
+                try removeTagAssociationCoordinated(
+                    tagID: tagID,
+                    from: reminderID
+                )
+            }
+        } catch let error as PersistenceError {
+            throw Self.tagRepositoryError(error)
+        }
+    }
+
     private static func tagRepositoryError(_ error: PersistenceError) -> TagRepositoryError {
         switch error {
         case .tagNotFound(let id):
@@ -362,6 +378,49 @@ public actor SwiftDataReminderRepository: ReminderRepository {
             context.delete(record)
             try injectSaveFailureIfNeeded()
             try context.save()
+        } catch let error as PersistenceError {
+            context.rollback()
+            throw error
+        } catch {
+            context.rollback()
+            throw PersistenceError.storeFailure
+        }
+    }
+
+    private func removeTagAssociationCoordinated(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) throws -> TagAssociationRemovalOutcome {
+        let context = makeContext()
+        do {
+            guard let tag = try fetchTag(id: tagID, in: context) else {
+                throw PersistenceError.tagNotFound(tagID)
+            }
+
+            if let reminderID {
+                guard let reminder = try fetchReminder(id: reminderID, in: context) else {
+                    throw PersistenceError.reminderNotFound(reminderID)
+                }
+                reminder.tags = (reminder.tags ?? []).filter { $0.id != tagID }
+            }
+
+            let hasRemainingReference: Bool
+            if let reminderID {
+                hasRemainingReference = (tag.reminders ?? []).contains { $0.id != reminderID }
+            } else {
+                hasRemainingReference = !(tag.reminders ?? []).isEmpty
+            }
+            let outcome: TagAssociationRemovalOutcome
+            if hasRemainingReference {
+                outcome = .tagRetained
+            } else {
+                context.delete(tag)
+                outcome = .tagDeleted
+            }
+
+            try injectSaveFailureIfNeeded()
+            try context.save()
+            return outcome
         } catch let error as PersistenceError {
             context.rollback()
             throw error

@@ -289,6 +289,27 @@ struct ReminderFormModelTests {
         #expect(!model.hasChanges)
     }
 
+    @Test func committedTagRemovalSurvivesDiscardWithoutCommittingOtherEdits() {
+        let tagID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                rule: .daily(interval: 1),
+                tagIDs: [tagID]
+            ),
+            savedRepeatPresentation: .standard(localizedSummary: "Every day."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        model.title = "Changed but not saved"
+
+        model.commitTagRemoval(tagID)
+        model.discardChanges()
+
+        #expect(model.title == "Visa renewal")
+        #expect(model.tagIDs.isEmpty)
+        #expect(!model.hasChanges)
+    }
+
     @Test func existingReminderTracksEveryEditableFieldSemantically() {
         let tagID = UUID(uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")!
 
@@ -1133,7 +1154,8 @@ struct ReminderFormModelTests {
             weekdaySetKind: .explicit,
             weekdays: [.monday]
         ),
-        early: EarlyReminder? = nil
+        early: EarlyReminder? = nil,
+        tagIDs: Set<UUID> = []
     ) -> ReminderSnapshot {
         let definition = ScheduleDefinition(
             source: SourceWallClock(
@@ -1155,7 +1177,7 @@ struct ReminderFormModelTests {
             urlString: nil,
             enabled: true,
             schedule: schedule ?? .valid(definition, sourceVersion: 1, originalData: Data([1])),
-            tagIDs: [],
+            tagIDs: tagIDs,
             createdAt: date("2040-01-01T00:00:00Z"),
             updatedAt: date("2040-07-01T00:00:00Z")
         )

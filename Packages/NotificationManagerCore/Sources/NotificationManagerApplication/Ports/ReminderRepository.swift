@@ -99,6 +99,11 @@ public enum TagRepositoryError: Error, Sendable, Equatable {
     case unavailable
 }
 
+public enum TagAssociationRemovalOutcome: Sendable, Equatable {
+    case tagRetained
+    case tagDeleted
+}
+
 public protocol ReminderRepository: Sendable {
     func fetchCompleteSnapshot() async throws -> CompleteReminderSnapshot
     func reminder(id: UUID) async throws -> ReminderSnapshot?
@@ -106,4 +111,17 @@ public protocol ReminderRepository: Sendable {
     func delete(id: UUID) async throws
     func saveTag(_ mutation: EncodedTagMutation) async throws -> TagSnapshot
     func deleteTag(id: UUID) async throws
+    func removeTagAssociation(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) async throws -> TagAssociationRemovalOutcome
+}
+
+extension ReminderRepository {
+    public func removeTagAssociation(
+        tagID: UUID,
+        from reminderID: UUID?
+    ) async throws -> TagAssociationRemovalOutcome {
+        throw TagRepositoryError.unavailable
+    }
 }

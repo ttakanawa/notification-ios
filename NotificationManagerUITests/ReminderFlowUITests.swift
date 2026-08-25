@@ -229,7 +229,7 @@ final class ReminderFlowUITests: XCTestCase {
         input.tap()
         input.typeText("work")
         let workID = "88888888-8888-8888-8888-888888888888"
-        let existingWork = app.switches["tags.picker.tag.\(workID)"]
+        let existingWork = app.buttons["tags.picker.tag.\(workID)"]
         XCTAssertTrue(existingWork.waitForExistence(timeout: 1))
         let createSuggestion = app.buttons["tags.picker.create-suggestion"]
         XCTAssertTrue(createSuggestion.waitForExistence(timeout: 1))
@@ -243,12 +243,67 @@ final class ReminderFlowUITests: XCTestCase {
         input.typeText("work")
         XCTAssertTrue(createSuggestion.waitForNonExistence(timeout: 1))
         XCTAssertTrue(existingWork.waitForExistence(timeout: 1))
-        let createdWork = app.switches.matching(
+        let createdWork = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "tags.picker.tag.")
-        ).matching(NSPredicate(format: "label == %@", "work")).firstMatch
+        ).matching(NSPredicate(format: "label == %@", "Remove work")).firstMatch
         XCTAssertTrue(
             createdWork.waitForExistence(timeout: 1)
         )
+    }
+
+    @MainActor
+    func testTagPickerUsesExplicitAddAndRemoveActions() {
+        let app = launch(scenario: "navigation-with-tags")
+        app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()
+
+        let input = app.textFields["tags.picker.new-name"]
+        scrollToHittable(input, in: app)
+        let workID = "88888888-8888-8888-8888-888888888888"
+        let work = app.buttons["tags.picker.tag.\(workID)"]
+        XCTAssertTrue(work.waitForExistence(timeout: 1))
+        XCTAssertEqual(work.label, "Add Work")
+        XCTAssertFalse(app.switches["tags.picker.tag.\(workID)"].exists)
+
+        work.tap()
+        let removeWork = app.buttons.matching(
+            identifier: "tags.picker.tag.\(workID)"
+        ).matching(NSPredicate(format: "label == %@", "Remove Work")).firstMatch
+        XCTAssertTrue(removeWork.waitForExistence(timeout: 1))
+
+        removeWork.tap()
+        XCTAssertTrue(work.waitForNonExistence(timeout: 1))
+    }
+
+    @MainActor
+    func testTagRemovalImmediatelyDisablesRegisteredFormActions() {
+        let app = launch(scenario: "slow-tag-removal")
+        app.buttons["reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"].tap()
+
+        let delete = app.buttons["reminder-form.delete"]
+        scrollToHittable(delete, in: app)
+        XCTAssertTrue(delete.exists)
+
+        let input = app.textFields["tags.picker.new-name"]
+        scrollToHittable(input, in: app)
+        let workID = "88888888-8888-8888-8888-888888888888"
+        let work = app.buttons["tags.picker.tag.\(workID)"]
+        XCTAssertTrue(work.waitForExistence(timeout: 1))
+        work.tap()
+
+        let removeWork = app.buttons.matching(
+            identifier: "tags.picker.tag.\(workID)"
+        ).matching(NSPredicate(format: "label == %@", "Remove Work")).firstMatch
+        XCTAssertTrue(removeWork.waitForExistence(timeout: 1))
+        let back = app.buttons["reminder-form.back"]
+        let save = app.buttons["reminder-form.save"]
+        XCTAssertTrue(save.waitForExistence(timeout: 1))
+
+        removeWork.tap()
+
+        XCTAssertFalse(back.isEnabled)
+        XCTAssertFalse(save.isEnabled)
+        XCTAssertFalse(delete.isEnabled)
+        XCTAssertTrue(work.waitForNonExistence(timeout: 3))
     }
 
     @MainActor
