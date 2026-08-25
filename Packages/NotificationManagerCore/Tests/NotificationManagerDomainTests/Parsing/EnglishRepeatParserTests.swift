@@ -169,42 +169,13 @@ struct ParsingEnglishRepeatParserTests {
         }
     }
 
-    @Test func offersAUniqueSingleAlphabeticTokenDamerauLevenshteinSuggestion() {
-        #expect(failure(for: "Evrey day").suggestion == "Every day")
-        #expect(failure(for: "Every Tuseday").suggestion == "Every Tuesday")
-        #expect(
-            failure(for: "Every yer on the 1st of January").suggestion
-                == "Every year on the 1st of January")
-    }
-
-    @Test func doesNotSuggestWhenCorrectionIsAmbiguousRequiresTwoTokensOrFailsValidation() {
-        #expect(failure(for: "Every mont").suggestion == nil)
-        #expect(failure(for: "Evrey Tuseday").suggestion == nil)
-        #expect(failure(for: "Every year on the 31st of Apri").suggestion == nil)
-    }
-
-    @Test func doesNotFabricateAWeekdayForSourceAnchoredWeeklySuggestion() {
-        let parseFailure = failure(for: "Every wekk")
-        let countedParseFailure = failure(for: "Every 2 weks")
-
-        #expect(parseFailure.suggestion == nil)
-        #expect(countedParseFailure.suggestion == nil)
-        #expect(throws: RepeatParseFailure.self) {
-            _ = try parser.parse("Every wekk").get()
+    @Test func rejectsTyposStrictly() {
+        for input in [
+            "Evrey day", "Every Tuseday", "Every mont", "Every wekk", "Every 2 weks",
+            "Every year on the 31st of Apri"
+        ] {
+            #expect(throws: RepeatParseFailure.self) { _ = try parser.parse(input).get() }
         }
-
-        let correctedCandidate = try? parser.parse("Every week").get()
-        let actualSourceRule = correctedCandidate.flatMap {
-            try? validator.validate($0, source: .repeatFixture)
-        }
-        #expect(
-            actualSourceRule
-                == .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.tuesday]))
-    }
-
-    @Test func suggestionNeverAutoAppliesTheCorrection() {
-        let result = parser.parse("Every Tuseday")
-        #expect(throws: RepeatParseFailure.self) { _ = try result.get() }
     }
 
     private let parser = EnglishRepeatParser()
@@ -215,13 +186,4 @@ struct ParsingEnglishRepeatParserTests {
         try validator.validate(parser.parse(input).get(), source: .repeatFixture)
     }
 
-    private func failure(for input: String) -> RepeatParseFailure {
-        switch parser.parse(input) {
-        case .success:
-            Issue.record("Expected parsing to fail: \(input)")
-            return RepeatParseFailure(suggestion: nil)
-        case .failure(let failure):
-            return failure
-        }
-    }
 }

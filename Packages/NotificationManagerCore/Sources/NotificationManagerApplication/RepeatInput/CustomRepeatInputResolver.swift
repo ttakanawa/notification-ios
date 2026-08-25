@@ -71,8 +71,8 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
         switch EnglishRepeatParser().parse(input) {
         case .success(let candidate):
             return validate(candidate, route: .deterministicEnglish)
-        case .failure(let failure):
-            if let suggestion = failure.suggestion {
+        case .failure:
+            if let suggestion = EnglishRepeatCandidateGenerator().suggestions(for: input).first {
                 return .suggested(suggestion)
             }
         }

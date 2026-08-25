@@ -1,9 +1,5 @@
 public struct RepeatParseFailure: Error, Sendable, Equatable {
-    public let suggestion: String?
-
-    public init(suggestion: String?) {
-        self.suggestion = suggestion
-    }
+    public init() {}
 }
 
 public struct EnglishRepeatParser: Sendable {
@@ -15,7 +11,7 @@ public struct EnglishRepeatParser: Sendable {
         do {
             return .success(try parseExact(input))
         } catch {
-            return .failure(RepeatParseFailure(suggestion: suggestion(for: input)))
+            return .failure(RepeatParseFailure())
         }
     }
 
@@ -216,72 +212,6 @@ public struct EnglishRepeatParser: Sendable {
         return .dayOfMonth(ordinal)
     }
 
-    private func suggestion(for input: String) -> String? {
-        guard let lexed = try? EnglishRepeatLexer().lex(input) else { return nil }
-        let scalars = Array(input.unicodeScalars)
-        var canonicalResults = Set<String>()
-
-        for token in lexed.tokens {
-            guard case .word(let original) = token.kind else { continue }
-            for replacement in Self.knownWords
-            where replacement != original && Self.distance(original, replacement) == 1 {
-                let prefix = String(
-                    String.UnicodeScalarView(scalars[..<token.scalarRange.lowerBound]))
-                let suffix = String(
-                    String.UnicodeScalarView(scalars[token.scalarRange.upperBound...]))
-                let replaced = prefix + replacement + suffix
-                guard let candidate = try? parseExact(replaced),
-                    !candidate.requiresSourceResolution,
-                    let rule = try? RepeatRuleValidator().validate(
-                        candidate,
-                        source: Self.validationSource
-                    )
-                else {
-                    continue
-                }
-                canonicalResults.insert(CanonicalRepeatFormatter().string(for: rule))
-            }
-        }
-
-        let sorted = canonicalResults.sorted()
-        return sorted.count == 1 ? sorted[0] : nil
-    }
-
-    private static func distance(_ lhs: String, _ rhs: String) -> Int {
-        let lhsCharacters = Array(lhs)
-        let rhsCharacters = Array(rhs)
-        var matrix = Array(
-            repeating: Array(repeating: 0, count: rhsCharacters.count + 1),
-            count: lhsCharacters.count + 1
-        )
-        for index in 0...lhsCharacters.count { matrix[index][0] = index }
-        for index in 0...rhsCharacters.count { matrix[0][index] = index }
-        guard !lhsCharacters.isEmpty, !rhsCharacters.isEmpty else {
-            return max(lhsCharacters.count, rhsCharacters.count)
-        }
-
-        for row in 1...lhsCharacters.count {
-            for column in 1...rhsCharacters.count {
-                let substitution =
-                    matrix[row - 1][column - 1]
-                    + (lhsCharacters[row - 1] == rhsCharacters[column - 1] ? 0 : 1)
-                var value = min(
-                    matrix[row - 1][column] + 1,
-                    matrix[row][column - 1] + 1,
-                    substitution
-                )
-                if row > 1, column > 1,
-                    lhsCharacters[row - 1] == rhsCharacters[column - 2],
-                    lhsCharacters[row - 2] == rhsCharacters[column - 1]
-                {
-                    value = min(value, matrix[row - 2][column - 2] + 1)
-                }
-                matrix[row][column] = value
-            }
-        }
-        return matrix[lhsCharacters.count][rhsCharacters.count]
-    }
-
     private static let validationSource = SourceWallClock(
         year: 2001,
         month: 1,
@@ -290,23 +220,6 @@ public struct EnglishRepeatParser: Sendable {
         minute: 0,
         timeZoneIdentifier: "UTC"
     )
-
-    private static let knownWords: [String] = [
-        "every", "hour", "hours", "day", "days", "week", "weeks",
-        "month", "months", "year", "years", "weekday", "weekend",
-        "on", "the", "last", "first", "second", "third", "fourth", "fifth", "and", "of",
-        "monday", "mon", "tuesday", "tue", "wednesday", "wed", "thursday", "thu",
-        "friday", "fri", "saturday", "sat", "sunday", "sun",
-        "january", "jan", "february", "feb", "march", "mar", "april", "apr",
-        "may", "june", "jun", "july", "jul", "august", "aug", "september", "sep",
-        "october", "oct", "november", "nov", "december", "dec"
-    ]
-}
-
-extension RepeatCandidate {
-    fileprivate var requiresSourceResolution: Bool {
-        frequency == .weekly && weekdaySetKind == nil && weekdays.isEmpty
-    }
 }
 
 private enum SyntaxFailure: Error {
