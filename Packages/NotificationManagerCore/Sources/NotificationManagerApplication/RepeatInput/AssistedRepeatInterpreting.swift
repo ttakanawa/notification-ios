@@ -5,7 +5,6 @@ public enum AssistedRepeatUnavailableReason: Sendable, Equatable, CaseIterable {
     case deviceNotEligible
     case appleIntelligenceNotEnabled
     case modelNotReady
-    case japaneseLocaleUnsupported
 }
 
 public enum AssistedRepeatAvailability: Sendable, Equatable {
@@ -14,6 +13,7 @@ public enum AssistedRepeatAvailability: Sendable, Equatable {
 }
 
 public enum AssistedRepeatInterpretationError: Error, Sendable, Equatable {
+    case unsupportedLanguageOrLocale
     case safetyGuard
     case generation
 }

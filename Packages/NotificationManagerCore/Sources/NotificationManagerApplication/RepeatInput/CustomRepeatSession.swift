@@ -23,7 +23,7 @@ public struct CustomRepeatPreview: Sendable, Equatable {
 public enum CustomRepeatSessionState: Sendable, Equatable {
     case idle
     case failed(CustomRepeatResolutionError)
-    case awaitingSuggestion(String)
+    case awaitingSuggestions([String])
     case awaitingConfirmation(CustomRepeatPreview)
     case confirmed(CustomRepeatPreview)
 }
@@ -59,13 +59,16 @@ public actor CustomRepeatSession {
     }
 
     @discardableResult
-    public func submit(_ input: String) async throws -> CustomRepeatSubmissionOutcome {
+    public func submit(
+        _ input: String,
+        mode: CustomRepeatResolutionMode = .automatic
+    ) async throws -> CustomRepeatSubmissionOutcome {
         submissionGeneration += 1
         let generation = submissionGeneration
         clearPending()
         rawInput = input
 
-        let resolution = await resolver.resolve(input)
+        let resolution = await resolver.resolve(input, mode: mode)
         guard generation == submissionGeneration else {
             return .superseded
         }
@@ -73,8 +76,8 @@ public actor CustomRepeatSession {
         switch resolution {
         case .failed(let error):
             state = .failed(error)
-        case .suggested(let suggestion):
-            state = .awaitingSuggestion(suggestion)
+        case .suggested(let suggestions):
+            state = .awaitingSuggestions(suggestions)
         case .resolved(let resolved):
             do {
                 let nextNotifications = try NextNotificationProvider().nextPhysicalNotifications(

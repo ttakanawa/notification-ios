@@ -2,11 +2,17 @@ import NotificationManagerDomain
 
 public enum CustomRepeatResolutionRoute: Sendable, Equatable {
     case deterministicEnglish
-    case japaneseAssisted
+    case assisted
+}
+
+public enum CustomRepeatResolutionMode: Sendable, Equatable {
+    case automatic
+    case assistedOnly
 }
 
 public enum CustomRepeatResolutionError: Error, Sendable, Equatable {
     case assistanceUnavailable(AssistedRepeatUnavailableReason)
+    case unsupportedLanguageOrLocale
     case safetyGuard
     case generation
     case validation(RepeatCandidateValidationError)
@@ -33,7 +39,7 @@ public struct ResolvedCustomRepeat: Sendable, Equatable {
 
 public enum CustomRepeatResolution: Sendable, Equatable {
     case resolved(ResolvedCustomRepeat)
-    case suggested(String)
+    case suggested([String])
     case failed(CustomRepeatResolutionError)
 
     public var isValid: Bool {
@@ -46,7 +52,16 @@ public enum CustomRepeatResolution: Sendable, Equatable {
 }
 
 public protocol CustomRepeatInputResolving: Sendable {
-    func resolve(_ input: String) async -> CustomRepeatResolution
+    func resolve(
+        _ input: String,
+        mode: CustomRepeatResolutionMode
+    ) async -> CustomRepeatResolution
+}
+
+extension CustomRepeatInputResolving {
+    public func resolve(_ input: String) async -> CustomRepeatResolution {
+        await resolve(input, mode: .automatic)
+    }
 }
 
 public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
@@ -67,13 +82,19 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
         self.assistedInterpreter = assistedInterpreter
     }
 
-    public func resolve(_ input: String) async -> CustomRepeatResolution {
-        switch EnglishRepeatParser().parse(input) {
-        case .success(let candidate):
-            return validate(candidate, route: .deterministicEnglish)
-        case .failure:
-            if let suggestion = EnglishRepeatCandidateGenerator().suggestions(for: input).first {
-                return .suggested(suggestion)
+    public func resolve(
+        _ input: String,
+        mode: CustomRepeatResolutionMode
+    ) async -> CustomRepeatResolution {
+        if mode == .automatic {
+            switch EnglishRepeatParser().parse(input) {
+            case .success(let candidate):
+                return validate(candidate, route: .deterministicEnglish)
+            case .failure:
+                let suggestions = EnglishRepeatCandidateGenerator().suggestions(for: input)
+                if !suggestions.isEmpty {
+                    return .suggested(suggestions)
+                }
             }
         }
 
@@ -86,9 +107,10 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
 
         do {
             let candidate = try await assistedInterpreter.interpret(input)
-            return validate(candidate, route: .japaneseAssisted)
+            return validate(candidate, route: .assisted)
         } catch let error as AssistedRepeatInterpretationError {
             return switch error {
+            case .unsupportedLanguageOrLocale: .failed(.unsupportedLanguageOrLocale)
             case .safetyGuard: .failed(.safetyGuard)
             case .generation: .failed(.generation)
             }

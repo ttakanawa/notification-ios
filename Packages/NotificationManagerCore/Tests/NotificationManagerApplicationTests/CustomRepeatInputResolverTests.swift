@@ -37,7 +37,7 @@ struct CustomRepeatInputResolverTests {
 
         let resolution = await resolver.resolve("Every Tuseday")
 
-        #expect(resolution == .suggested("Every Tuesday"))
+        #expect(resolution == .suggested(["Every Tuesday"]))
         #expect(await assisted.events.isEmpty)
 
         let session = CustomRepeatSession(
@@ -49,8 +49,35 @@ struct CustomRepeatInputResolverTests {
 
         let outcome = try await session.submit("Every Tuseday")
 
-        #expect(outcome == .applied(.awaitingSuggestion("Every Tuesday")))
+        #expect(outcome == .applied(.awaitingSuggestions(["Every Tuesday"])))
         #expect(await session.confirm() == nil)
+    }
+
+    @Test func candidatesStopAutomaticResolutionBeforeAI() async {
+        let assisted = AssistedRepeatInterpreterSpy(availability: .available, candidate: .daily)
+        let resolution = await makeResolver(assisted: assisted)
+            .resolve("Every mont", mode: .automatic)
+        #expect(resolution == .suggested(["Every Monday", "Every month"]))
+        #expect(await assisted.events.isEmpty)
+    }
+
+    @Test func noCandidatesAutomaticallyUseAssistance() async {
+        let assisted = AssistedRepeatInterpreterSpy(
+            availability: .available,
+            candidate: .weeklyMonday
+        )
+        _ = await makeResolver(assisted: assisted)
+            .resolve("Remind me on alternate Mondays", mode: .automatic)
+        #expect(await assisted.events == [
+            .availability, .interpret("Remind me on alternate Mondays")
+        ])
+    }
+
+    @Test func assistedOnlyBypassesAValidDeterministicCandidate() async {
+        let assisted = AssistedRepeatInterpreterSpy(availability: .available, candidate: .daily)
+        _ = await makeResolver(assisted: assisted)
+            .resolve("Every mont", mode: .assistedOnly)
+        #expect(await assisted.events == [.availability, .interpret("Every mont")])
     }
 
     @Test func parserFailureChecksAvailabilityBeforeInterpretation() async {
@@ -64,7 +91,7 @@ struct CustomRepeatInputResolverTests {
             Issue.record("Expected assisted resolution, got \(resolution)")
             return
         }
-        #expect(value.route == .japaneseAssisted)
+        #expect(value.route == .assisted)
         #expect(
             value.rule
                 == .weekly(
@@ -79,8 +106,7 @@ struct CustomRepeatInputResolverTests {
         AssistedRepeatUnavailableReason.platformUnsupported,
         .deviceNotEligible,
         .appleIntelligenceNotEnabled,
-        .modelNotReady,
-        .japaneseLocaleUnsupported
+        .modelNotReady
     ])
     func eachUnavailableReasonIsPreservedAsAFieldError(
         reason: AssistedRepeatUnavailableReason
@@ -93,24 +119,6 @@ struct CustomRepeatInputResolverTests {
         let resolution = await makeResolver(assisted: assisted).resolve("毎週月曜日")
 
         #expect(resolution.error == .assistanceUnavailable(reason))
-        #expect(await assisted.events == [.availability])
-    }
-
-    @Test func japaneseAvailabilityDoesNotDependOnTheUILocale() async {
-        let assisted = AssistedRepeatInterpreterSpy(
-            availability: .unavailable(.japaneseLocaleUnsupported),
-            candidate: .weeklyMonday
-        )
-        let resolver = CustomRepeatInputResolver(
-            source: Self.source,
-            end: .never,
-            early: nil,
-            assistedInterpreter: assisted
-        )
-
-        let resolution = await resolver.resolve("毎週月曜日")
-
-        #expect(resolution.error == .assistanceUnavailable(.japaneseLocaleUnsupported))
         #expect(await assisted.events == [.availability])
     }
 
@@ -152,10 +160,22 @@ struct CustomRepeatInputResolverTests {
 
         let expected: CustomRepeatResolutionError =
             switch interpretationError {
+            case .unsupportedLanguageOrLocale: .unsupportedLanguageOrLocale
             case .safetyGuard: .safetyGuard
             case .generation: .generation
             }
         #expect(resolution.error == expected)
+    }
+
+    @Test func unsupportedLanguageOrLocaleIsNotMappedToGeneration() async {
+        let assisted = AssistedRepeatInterpreterSpy(
+            availability: .available,
+            error: AssistedRepeatInterpretationError.unsupportedLanguageOrLocale
+        )
+
+        let resolution = await makeResolver(assisted: assisted).resolve("毎日")
+
+        #expect(resolution.error == CustomRepeatResolutionError.unsupportedLanguageOrLocale)
     }
 
     @Test func unknownInterpreterFailureMapsToGenerationWithoutLeakingDetails() async {
@@ -188,7 +208,7 @@ struct CustomRepeatInputResolverTests {
             Issue.record("Expected a pending confirmation, got \(outcome)")
             return
         }
-        #expect(preview.route == .japaneseAssisted)
+        #expect(preview.route == .assisted)
         #expect(preview.rule == .daily(interval: 1))
         #expect(preview.canonicalEnglish == "Every day")
         #expect(preview.nextNotifications.notifications.count == 3)
@@ -249,6 +269,22 @@ struct CustomRepeatInputResolverTests {
             try await session.submit("A")
         }
         await resolver.waitUntilRequested("A")
+
+        #expect(await session.reset() == .idle)
+        await resolver.resume("A", with: Self.dailyResolution)
+
+        let staleOutcome = try await staleSubmission.value
+        #expect(staleOutcome == .superseded)
+        #expect(await session.confirm() == nil)
+    }
+
+    @Test func assistedOnlySubmissionResetDiscardsItsLaterResolution() async throws {
+        let resolver = ControlledCustomRepeatResolver()
+        let session = makeControlledSession(resolver: resolver)
+        let staleSubmission = Task {
+            try await session.submit("A", mode: .assistedOnly)
+        }
+        await resolver.waitUntilRequested("A", mode: .assistedOnly)
 
         #expect(await session.reset() == .idle)
         await resolver.resume("A", with: Self.dailyResolution)
@@ -349,7 +385,7 @@ struct CustomRepeatInputResolverTests {
 
     private static let dailyResolution = CustomRepeatResolution.resolved(
         ResolvedCustomRepeat(
-            route: .japaneseAssisted,
+            route: .assisted,
             candidate: .daily,
             schedule: dailySchedule
         )
@@ -368,7 +404,7 @@ struct CustomRepeatInputResolverTests {
 
     private static let weeklyMondayResolution = CustomRepeatResolution.resolved(
         ResolvedCustomRepeat(
-            route: .japaneseAssisted,
+            route: .assisted,
             candidate: .weeklyMonday,
             schedule: weeklyMondaySchedule
         )
@@ -376,8 +412,13 @@ struct CustomRepeatInputResolverTests {
 }
 
 private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
-    private var requestedInputs: Set<String> = []
-    private var requestWaiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+    private struct Request: Hashable, Sendable {
+        let input: String
+        let mode: CustomRepeatResolutionMode
+    }
+
+    private var requestedInputs: Set<Request> = []
+    private var requestWaiters: [Request: [CheckedContinuation<Void, Never>]] = [:]
     private var resolutionContinuations:
         [String: CheckedContinuation<CustomRepeatResolution, Never>] = [:]
     private let immediate: [String: CustomRepeatResolution]
@@ -386,9 +427,13 @@ private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
         self.immediate = immediate
     }
 
-    func resolve(_ input: String) async -> CustomRepeatResolution {
-        requestedInputs.insert(input)
-        for waiter in requestWaiters.removeValue(forKey: input) ?? [] {
+    func resolve(
+        _ input: String,
+        mode: CustomRepeatResolutionMode
+    ) async -> CustomRepeatResolution {
+        let request = Request(input: input, mode: mode)
+        requestedInputs.insert(request)
+        for waiter in requestWaiters.removeValue(forKey: request) ?? [] {
             waiter.resume()
         }
         if let resolution = immediate[input] {
@@ -399,10 +444,14 @@ private actor ControlledCustomRepeatResolver: CustomRepeatInputResolving {
         }
     }
 
-    func waitUntilRequested(_ input: String) async {
-        guard !requestedInputs.contains(input) else { return }
+    func waitUntilRequested(
+        _ input: String,
+        mode: CustomRepeatResolutionMode = .automatic
+    ) async {
+        let request = Request(input: input, mode: mode)
+        guard !requestedInputs.contains(request) else { return }
         await withCheckedContinuation { continuation in
-            requestWaiters[input, default: []].append(continuation)
+            requestWaiters[request, default: []].append(continuation)
         }
     }
 
