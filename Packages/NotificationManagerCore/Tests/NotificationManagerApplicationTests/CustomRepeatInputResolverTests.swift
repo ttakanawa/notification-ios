@@ -146,22 +146,44 @@ struct CustomRepeatInputResolverTests {
     }
 
     @Test(arguments: [
-        CustomRepeatResolutionMode.automatic,
-        .assistedOnly
+        AssistedExclusionScenario(
+            input: "Every Monday except first Monday",
+            mode: .automatic
+        ),
+        AssistedExclusionScenario(
+            input: "Every Monday except first Monday",
+            mode: .assistedOnly
+        ),
+        AssistedExclusionScenario(
+            input: "Every Monday except first Monday.",
+            mode: .automatic
+        ),
+        AssistedExclusionScenario(
+            input: "Every Monday except first Monday.",
+            mode: .assistedOnly
+        ),
+        AssistedExclusionScenario(
+            input: "毎週 except first Monday",
+            mode: .automatic
+        ),
+        AssistedExclusionScenario(
+            input: "毎週 except first Monday",
+            mode: .assistedOnly
+        )
     ])
-    func assistedExclusionCannotCreateASchedule(
-        mode: CustomRepeatResolutionMode
+    fileprivate func assistedExclusionCannotCreateASchedule(
+        scenario: AssistedExclusionScenario
     ) async {
-        let input = "Every Monday except first Monday"
         let assisted = AssistedRepeatInterpreterSpy(
             availability: .available,
             candidate: .weeklyMonday
         )
 
-        let resolution = await makeResolver(assisted: assisted).resolve(input, mode: mode)
+        let resolution = await makeResolver(assisted: assisted)
+            .resolve(scenario.input, mode: scenario.mode)
 
         #expect(resolution == .failed(.validation(.unsupported)))
-        #expect(await assisted.events == [.availability, .interpret(input)])
+        #expect(await assisted.events == [.availability, .interpret(scenario.input)])
     }
 
     @Test(arguments: [
@@ -514,6 +536,11 @@ private actor AssistedRepeatInterpreterSpy: AssistedRepeatInterpreting {
 }
 
 private struct UnknownInterpreterFailure: Error, Sendable {}
+
+private struct AssistedExclusionScenario: Sendable {
+    let input: String
+    let mode: CustomRepeatResolutionMode
+}
 
 extension RepeatCandidate {
     fileprivate static let daily = RepeatCandidate(frequency: .daily, interval: 1)
