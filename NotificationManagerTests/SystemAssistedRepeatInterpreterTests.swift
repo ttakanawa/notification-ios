@@ -28,7 +28,7 @@ struct SystemAssistedRepeatInterpreterTests {
         ]
 
         for (status, reason) in fixtures {
-            let runtime = FoundationModelsRuntimeSpy(status: status, supportsJapanese: true)
+            let runtime = FoundationModelsRuntimeSpy(status: status)
             let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
 
             #expect(await interpreter.availability() == .unavailable(reason))
@@ -36,25 +36,13 @@ struct SystemAssistedRepeatInterpreterTests {
         }
     }
 
-    @Test func availableModelChecksJapaneseSupportWithNoUILocaleInput() async {
+    @Test func availableModelNeedsNoInputLanguagePreflight() async {
         guard #available(iOS 26.0, *) else { return }
-        let runtime = FoundationModelsRuntimeSpy(status: .available, supportsJapanese: false)
-        let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
-
-        #expect(
-            await interpreter.availability()
-                == .unavailable(.japaneseLocaleUnsupported)
-        )
-        #expect(await runtime.events == [.status, .supportsLocale("ja")])
-    }
-
-    @Test func availableModelAndJapaneseLocaleReportAvailable() async {
-        guard #available(iOS 26.0, *) else { return }
-        let runtime = FoundationModelsRuntimeSpy(status: .available, supportsJapanese: true)
+        let runtime = FoundationModelsRuntimeSpy(status: .available)
         let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
 
         #expect(await interpreter.availability() == .available)
-        #expect(await runtime.events == [.status, .supportsLocale("ja")])
+        #expect(await runtime.events == [.status])
     }
 
     @Test func generatedAdapterMapsExplicitlyToLocaleNeutralCandidate() async throws {
@@ -74,7 +62,6 @@ struct SystemAssistedRepeatInterpreterTests {
         )
         let runtime = FoundationModelsRuntimeSpy(
             status: .available,
-            supportsJapanese: true,
             generated: generated
         )
         let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
@@ -135,7 +122,6 @@ struct SystemAssistedRepeatInterpreterTests {
         for failure in [FoundationModelsRuntimeFailure.guardrail, .refusal] {
             let runtime = FoundationModelsRuntimeSpy(
                 status: .available,
-                supportsJapanese: true,
                 failure: failure
             )
             let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
@@ -146,17 +132,25 @@ struct SystemAssistedRepeatInterpreterTests {
         }
     }
 
-    @Test func allNonSafetyFailuresMapToGeneration() async {
+    @Test func unsupportedLanguageOrLocaleKeepsItsIdentity() async {
+        guard #available(iOS 26.0, *) else { return }
+        let runtime = FoundationModelsRuntimeSpy(status: .available, failure: .unsupportedLocale)
+        let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
+
+        await #expect(throws: AssistedRepeatInterpretationError.unsupportedLanguageOrLocale) {
+            _ = try await interpreter.interpret("Remind me on alternate Mondays")
+        }
+    }
+
+    @Test func otherNonSafetyFailuresMapToGeneration() async {
         guard #available(iOS 26.0, *) else { return }
         let failures: [FoundationModelsRuntimeFailure] = [
             .assetsUnavailable,
-            .unsupportedLocale,
             .unknown
         ]
         for failure in failures {
             let runtime = FoundationModelsRuntimeSpy(
                 status: .available,
-                supportsJapanese: true,
                 failure: failure
             )
             let interpreter = SystemAssistedRepeatInterpreter(runtime: runtime)
@@ -178,24 +172,20 @@ struct SystemAssistedRepeatInterpreterTests {
 private actor FoundationModelsRuntimeSpy: FoundationModelsRuntime {
     enum Event: Sendable, Equatable {
         case status
-        case supportsLocale(String)
         case generate(String)
     }
 
     private(set) var events: [Event] = []
     private let statusResult: FoundationLanguageModelStatus
-    private let supportsJapanese: Bool
     private let generated: FoundationRepeatCandidate
     private let failure: FoundationModelsRuntimeFailure?
 
     init(
         status: FoundationLanguageModelStatus,
-        supportsJapanese: Bool,
         generated: FoundationRepeatCandidate = .daily,
         failure: FoundationModelsRuntimeFailure? = nil
     ) {
         statusResult = status
-        self.supportsJapanese = supportsJapanese
         self.generated = generated
         self.failure = failure
     }
@@ -203,11 +193,6 @@ private actor FoundationModelsRuntimeSpy: FoundationModelsRuntime {
     func modelStatus() async -> FoundationLanguageModelStatus {
         events.append(.status)
         return statusResult
-    }
-
-    func supportsLocale(_ locale: Locale) async -> Bool {
-        events.append(.supportsLocale(locale.identifier))
-        return supportsJapanese
     }
 
     func generateCandidate(from input: String) async throws -> FoundationRepeatCandidate {

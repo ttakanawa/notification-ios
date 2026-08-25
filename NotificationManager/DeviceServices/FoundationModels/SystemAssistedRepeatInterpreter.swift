@@ -15,7 +15,6 @@
     @available(iOS 26.0, *)
     protocol FoundationModelsRuntime: Sendable {
         func modelStatus() async -> FoundationLanguageModelStatus
-        func supportsLocale(_ locale: Locale) async -> Bool
         func generateCandidate(from input: String) async throws -> FoundationRepeatCandidate
     }
 
@@ -42,10 +41,6 @@
             case .unavailable:
                 .modelNotReady
             }
-        }
-
-        func supportsLocale(_ locale: Locale) async -> Bool {
-            model.supportsLocale(locale)
         }
 
         func generateCandidate(from input: String) async throws -> FoundationRepeatCandidate {
@@ -86,14 +81,8 @@
             case .modelNotReady:
                 return .unavailable(.modelNotReady)
             case .available:
-                break
+                return .available
             }
-
-            let japanese = Locale(identifier: "ja")
-            guard await runtime.supportsLocale(japanese) else {
-                return .unavailable(.japaneseLocaleUnsupported)
-            }
-            return .available
         }
 
         public func interpret(_ input: String) async throws -> RepeatCandidate {
@@ -101,6 +90,8 @@
                 return try await runtime.generateCandidate(from: input).repeatCandidate
             } catch let error as LanguageModelSession.GenerationError {
                 switch error {
+                case .unsupportedLanguageOrLocale:
+                    throw AssistedRepeatInterpretationError.unsupportedLanguageOrLocale
                 case .guardrailViolation, .refusal:
                     throw AssistedRepeatInterpretationError.safetyGuard
                 default:

@@ -38,7 +38,7 @@ struct CustomRepeatField: View {
                 Label(error.localizedResource, systemImage: "exclamationmark.triangle")
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.custom.error")
-            case .awaitingSuggestion(let suggestion):
+            case .awaitingSuggestions(let suggestions):
                 VStack(alignment: .leading, spacing: 6) {
                     Text(
                         LocalizedStringResource(
@@ -48,12 +48,25 @@ struct CustomRepeatField: View {
                     )
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                    Button {
-                        Task { await model.selectCustomRepeatSuggestion() }
-                    } label: {
-                        Text(verbatim: suggestion)
+                    ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
+                        Button {
+                            Task { await model.selectCustomRepeatSuggestion(suggestion) }
+                        } label: {
+                            Text(verbatim: suggestion)
+                        }
+                        .buttonStyle(.bordered)
+                        .accessibilityIdentifier("reminder-form.custom.suggestion-\(index)")
                     }
-                    .accessibilityIdentifier("reminder-form.custom.suggestion")
+                    Button(
+                        LocalizedStringResource(
+                            "reminder.form.custom.interpret-with-apple-intelligence",
+                            table: "ReminderForm"
+                        )
+                    ) {
+                        Task { await model.interpretCustomRepeatWithAppleIntelligence() }
+                    }
+                    .buttonStyle(.bordered)
+                    .accessibilityIdentifier("reminder-form.custom.assisted")
                 }
             case .awaitingConfirmation(let preview):
                 previewView(preview)
@@ -113,6 +126,11 @@ extension CustomRepeatResolutionError {
         case .assistanceUnavailable:
             LocalizedStringResource(
                 "reminder.custom.error.assistance-unavailable",
+                table: "ReminderForm"
+            )
+        case .unsupportedLanguageOrLocale:
+            LocalizedStringResource(
+                "reminder.custom.error.unsupported-language-or-locale",
                 table: "ReminderForm"
             )
         case .safetyGuard:

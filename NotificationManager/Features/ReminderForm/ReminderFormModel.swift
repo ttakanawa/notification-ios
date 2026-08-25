@@ -682,6 +682,14 @@ final class ReminderFormModel {
     }
 
     func submitCustomRepeat() async {
+        await submitCustomRepeat(mode: .automatic)
+    }
+
+    func interpretCustomRepeatWithAppleIntelligence() async {
+        await submitCustomRepeat(mode: .assistedOnly)
+    }
+
+    private func submitCustomRepeat(mode: CustomRepeatResolutionMode) async {
         guard isReplacingCustomRepeat,
             scheduleInputFieldsAreValid,
             !customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
@@ -706,7 +714,7 @@ final class ReminderFormModel {
         customRepeatSession = session
 
         do {
-            let outcome = try await session.submit(customRepeatText)
+            let outcome = try await session.submit(customRepeatText, mode: mode)
             guard generation == customSubmissionGeneration else { return }
             if case .applied(let state) = outcome {
                 customRepeatState = state
@@ -717,8 +725,10 @@ final class ReminderFormModel {
         }
     }
 
-    func selectCustomRepeatSuggestion() async {
-        guard case .awaitingSuggestion(let suggestion) = customRepeatState else {
+    func selectCustomRepeatSuggestion(_ suggestion: String) async {
+        guard case .awaitingSuggestions(let suggestions) = customRepeatState,
+            suggestions.contains(suggestion)
+        else {
             return
         }
         updateCustomRepeatText(suggestion)

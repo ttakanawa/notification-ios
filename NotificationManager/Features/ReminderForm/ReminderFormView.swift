@@ -204,6 +204,7 @@ extension CustomRepeatResolutionError {
     fileprivate var accessibilityIdentity: AccessibilityErrorIdentity {
         switch self {
         case .assistanceUnavailable: .reminderCustomAssistanceUnavailable
+        case .unsupportedLanguageOrLocale: .reminderCustomUnsupportedLanguageOrLocale
         case .safetyGuard: .reminderCustomSafety
         case .generation: .reminderCustomGeneration
         case .validation: .reminderCustomValidation

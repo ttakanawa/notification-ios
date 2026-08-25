@@ -558,7 +558,7 @@ struct ReminderFormModelTests {
         #expect(schedule.rule == expectedRule)
     }
 
-    @Test func customRepeatSuggestionRequiresSelectionAndConfirmationBeforeApplying() async {
+    @Test func customRepeatShowsMultipleSuggestionsWithoutChangingSchedule() async {
         let model = ReminderFormModel(
             snapshot: validSnapshot(),
             savedRepeatPresentation: .standard(localizedSummary: "Every week."),
@@ -567,22 +567,37 @@ struct ReminderFormModelTests {
         )
         let originalRule = model.repeatRule
         model.beginCustomReplacement()
-        model.updateCustomRepeatText("Every Tuseday")
+        model.updateCustomRepeatText("Every mont")
 
         await model.submitCustomRepeat()
 
-        #expect(model.customRepeatState == .awaitingSuggestion("Every Tuesday"))
-        #expect(model.customRepeatText == "Every Tuseday")
+        #expect(model.customRepeatState == .awaitingSuggestions([
+            "Every Monday", "Every month"
+        ]))
+        #expect(model.customRepeatText == "Every mont")
         #expect(model.repeatRule == originalRule)
+    }
 
-        await model.selectCustomRepeatSuggestion()
+    @Test func selectingACandidateUsesItsOwnCanonicalValue() async {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        let originalRule = model.repeatRule
+        model.beginCustomReplacement()
+        model.updateCustomRepeatText("Every mont")
 
-        #expect(model.customRepeatText == "Every Tuesday")
+        await model.submitCustomRepeat()
+        await model.selectCustomRepeatSuggestion("Every Monday")
+
+        #expect(model.customRepeatText == "Every Monday")
         guard case .awaitingConfirmation(let preview) = model.customRepeatState else {
             Issue.record("Expected the selected suggestion to produce a confirmation preview")
             return
         }
-        #expect(preview.canonicalEnglish == "Every Tuesday")
+        #expect(preview.canonicalEnglish == "Every Monday")
         #expect(model.repeatRule == originalRule)
 
         await model.confirmCustomRepeat()
@@ -592,8 +607,28 @@ struct ReminderFormModelTests {
                 == .weekly(
                     interval: 1,
                     weekdaySetKind: .explicit,
-                    weekdays: [.tuesday]
+                    weekdays: [.monday]
                 ))
+    }
+
+    @Test func explicitAssistanceUsesOriginalInputInsteadOfSelectedSuggestion() async {
+        let assisted = RecordingAssistedRepeatInterpreter(
+            candidate: RepeatCandidate(frequency: .daily, interval: 1)
+        )
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert,
+            assistedRepeatInterpreter: assisted
+        )
+        model.beginCustomReplacement()
+        model.updateCustomRepeatText("Every mont")
+
+        await model.submitCustomRepeat()
+        await model.interpretCustomRepeatWithAppleIntelligence()
+
+        #expect(await assisted.inputs == ["Every mont"])
     }
 
     @Test func readOnlyOpaqueScheduleRejectsProgrammaticScheduleMutations() {
@@ -1240,6 +1275,22 @@ private actor SaveActionRecorder {
     }
 
     func recordedCalls() -> [SaveActionCall] { calls }
+}
+
+private actor RecordingAssistedRepeatInterpreter: AssistedRepeatInterpreting {
+    private(set) var inputs: [String] = []
+    private let candidate: RepeatCandidate
+
+    init(candidate: RepeatCandidate) {
+        self.candidate = candidate
+    }
+
+    func availability() async -> AssistedRepeatAvailability { .available }
+
+    func interpret(_ input: String) async throws -> RepeatCandidate {
+        inputs.append(input)
+        return candidate
+    }
 }
 
 private actor SuspendedSaveAction {

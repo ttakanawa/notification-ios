@@ -8,13 +8,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Assisted interpretation is unavailable. Enter a supported English repeat rule or choose a preset."
+            "value": "Assisted interpretation is unavailable. Enter a repeat rule or choose a preset."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "入力支援を利用できません。対応する英語の繰り返しルールを入力するか、プリセットを選択してください。"
+            "value": "入力支援を利用できません。繰り返しルールを入力するか、プリセットを選択してください。"
           }
         }
       }
@@ -33,6 +33,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "繰り返しルールを解釈できませんでした。入力を修正してもう一度お試しください。"
+          }
+        }
+      }
+    },
+    "reminder.custom.error.unsupported-language-or-locale": {
+      "comment": "User-facing error text announced by VoiceOver and also shown visually.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence does not support the language or locale of this input."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence はこの入力の言語または地域に対応していません。"
           }
         }
       }
@@ -717,6 +735,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "次の内容ですか？"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.interpret-with-apple-intelligence": {
+      "comment": "Button title for explicitly interpreting the original custom repeat input with Apple Intelligence.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Interpret with Apple Intelligence"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence で解釈"
           }
         }
       }

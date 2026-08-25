@@ -368,31 +368,41 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testEnglishTypoSuggestionRequiresSelectionAndApply() {
+    func testEnglishSuggestionsOfferCandidatesAndExplicitAssistanceBeforeSelection() {
         let app = launch(scenario: "localized-custom-rule")
         app.buttons["reminder-row.bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"].tap()
         app.buttons["reminder-form.custom.replace"].tap()
 
         let input = app.textFields["reminder-form.custom.input"]
         input.tap()
-        input.typeText("Every Tuseday")
+        input.typeText("Every mont")
         app.buttons["reminder-form.custom.preview-button"].tap()
 
-        let suggestion = app.buttons["reminder-form.custom.suggestion"]
-        XCTAssertTrue(suggestion.waitForExistence(timeout: 1))
-        XCTAssertEqual(input.value as? String, "Every Tuseday")
+        let monday = app.buttons["reminder-form.custom.suggestion-0"]
+        let month = app.buttons["reminder-form.custom.suggestion-1"]
+        let assisted = app.buttons["reminder-form.custom.assisted"]
+        XCTAssertTrue(monday.waitForExistence(timeout: 1))
+        XCTAssertTrue(month.exists)
+        XCTAssertTrue(assisted.exists)
+        XCTAssertEqual(monday.label, "Every Monday")
+        XCTAssertEqual(month.label, "Every month")
+        XCTAssertEqual(input.value as? String, "Every mont")
         XCTAssertFalse(app.buttons["reminder-form.save"].isEnabled)
 
-        suggestion.tap()
+        monday.tap()
 
+        let preview = app.otherElements["reminder-form.custom.preview-result"]
+        let apply = app.buttons["reminder-form.custom.apply"]
+        XCTAssertTrue(apply.waitForExistence(timeout: 3))
+        scrollToHittable(preview, in: app)
         XCTAssertTrue(
-            app.otherElements["reminder-form.custom.preview-result"]
-                .waitForExistence(timeout: 1)
+            preview.waitForExistence(timeout: 1)
         )
-        XCTAssertEqual(input.value as? String, "Every Tuesday")
+        XCTAssertEqual(input.value as? String, "Every Monday")
         XCTAssertFalse(app.buttons["reminder-form.save"].isEnabled)
 
-        app.buttons["reminder-form.custom.apply"].tap()
+        scrollToHittable(apply, in: app)
+        apply.tap()
         XCTAssertTrue(app.buttons["reminder-form.save"].isEnabled)
     }
 

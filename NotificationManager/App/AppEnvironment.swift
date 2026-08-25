@@ -20,6 +20,7 @@ final class AppEnvironment {
 
     private let stateStore: DeviceSchedulingStateStore?
     private let formActions: ReminderFormActions
+    private let assistedRepeatInterpreter: any AssistedRepeatInterpreting
     private let notificationHandlingActivation: NotificationHandlingActivation
     private let presentationRefreshCoordinator:
         LatestPresentationRefreshCoordinator<
@@ -61,6 +62,7 @@ final class AppEnvironment {
             save: { draft, _, _ in .saved(draft.id) },
             delete: { _ in }
         )
+        assistedRepeatInterpreter = AssistedRepeatInterpreterFactory.make()
         self.notificationHandlingActivation = notificationHandlingActivation
         presentationRefreshCoordinator = nil
         schedulingStateObserver = nil
@@ -77,6 +79,7 @@ final class AppEnvironment {
         lifecycleCoordinator: AppLifecycleCoordinator,
         stateStore: DeviceSchedulingStateStore,
         formActions: ReminderFormActions,
+        assistedRepeatInterpreter: any AssistedRepeatInterpreting,
         notificationHandlingActivation: @escaping NotificationHandlingActivation,
         presentationRefreshCoordinator: LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
@@ -93,6 +96,7 @@ final class AppEnvironment {
         self.lifecycleCoordinator = lifecycleCoordinator
         self.stateStore = stateStore
         self.formActions = formActions
+        self.assistedRepeatInterpreter = assistedRepeatInterpreter
         self.notificationHandlingActivation = notificationHandlingActivation
         self.presentationRefreshCoordinator = presentationRefreshCoordinator
         schedulingStateObserver = nil
@@ -214,6 +218,7 @@ final class AppEnvironment {
                 await relay.refreshPresentation()
             }
         )
+        let assistedRepeatInterpreter = AssistedRepeatInterpreterFactory.make()
         let router = AppRouter(
             actions: actions,
             notificationSettingsModel: settingsModel,
@@ -223,7 +228,8 @@ final class AppEnvironment {
                     newReminderID: UUID(),
                     now: Date(),
                     actions: formActions,
-                    availableTags: listModel.availableTags
+                    availableTags: listModel.availableTags,
+                    assistedRepeatInterpreter: assistedRepeatInterpreter
                 )
             },
             reminderSaved: { _ in
@@ -280,6 +286,7 @@ final class AppEnvironment {
             lifecycleCoordinator: lifecycle,
             stateStore: stateStore,
             formActions: formActions,
+            assistedRepeatInterpreter: assistedRepeatInterpreter,
             notificationHandlingActivation: notificationHandlingActivation,
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
@@ -452,7 +459,8 @@ final class AppEnvironment {
                     savedRepeatPresentation: repeatSummary.map(SavedRepeatPresentation.standard),
                     now: now,
                     actions: formActions,
-                    availableTags: presentations
+                    availableTags: presentations,
+                    assistedRepeatInterpreter: assistedRepeatInterpreter
                 ))
         }
         return item

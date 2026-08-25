@@ -69,6 +69,10 @@ struct ReminderFormLocalizationTests {
                 .assistanceUnavailable(.platformUnsupported),
                 "reminder.custom.error.assistance-unavailable"
             ),
+            (
+                .unsupportedLanguageOrLocale,
+                "reminder.custom.error.unsupported-language-or-locale"
+            ),
             (.safetyGuard, "reminder.custom.error.safety"),
             (.generation, "reminder.custom.error.generation"),
             (.validation(.unsupported), "reminder.custom.error.validation")
@@ -77,6 +81,16 @@ struct ReminderFormLocalizationTests {
         for (error, key) in fixtures {
             expectReminderFormResource(error.localizedResource, key: key)
         }
+    }
+
+    @Test func explicitAssistanceActionUsesReminderFormResources() {
+        expectReminderFormResource(
+            LocalizedStringResource(
+                "reminder.form.custom.interpret-with-apple-intelligence",
+                table: "ReminderForm"
+            ),
+            key: "reminder.form.custom.interpret-with-apple-intelligence"
+        )
     }
 
     private func expectReminderFormResource(
