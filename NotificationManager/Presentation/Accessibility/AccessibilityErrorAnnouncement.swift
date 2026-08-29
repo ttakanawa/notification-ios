@@ -18,6 +18,7 @@ enum AccessibilityErrorIdentity: String, Sendable, Hashable {
     case reminderDeleteFailed = "reminder.form.delete-failed"
     case reminderEnabledChangeFailed = "reminder.action.enabled-change-failed"
     case settingsAuthorizationRequest = "settings.error.authorization-request"
+    case settingsAppIconChangeFailed = "settings.error.app-icon-change-failed"
     case settingsPendingCleanup = "settings.error.pending-cleanup"
     case tagEmptyName = "tags.error.empty-name"
     case tagNameTooLarge = "tags.error.name-too-large"

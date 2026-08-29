@@ -16,6 +16,21 @@ struct LocalizationCatalogResolutionTests {
                 "基準時刻：%1$@（%2$@）。"
             ),
             ("settings.title", "Settings", "設定"),
+            (
+                "settings.app-icon.title",
+                "App Icon",
+                "アプリアイコン"
+            ),
+            (
+                "settings.app-icon.option.ocean",
+                "Ocean",
+                "オーシャン"
+            ),
+            (
+                "settings.error.app-icon-change-failed",
+                "The app icon couldn’t be changed. Try again.",
+                "アプリアイコンを変更できませんでした。もう一度お試しください。"
+            ),
             ("tags.action.create", "Create Tag", "タグを作成"),
             (
                 "tags.picker.create-suggestion",

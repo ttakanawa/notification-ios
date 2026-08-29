@@ -10,6 +10,8 @@ project_file="$repository_root/NotificationManager.xcodeproj/project.pbxproj"
 asset_catalog="$repository_root/NotificationManager/Resources/Assets.xcassets"
 app_icon_set="$asset_catalog/AppIcon.appiconset"
 app_icon="$app_icon_set/AppIcon-1024.png"
+alternate_icon_names="AppIcon-Ocean AppIcon-Sunset"
+preview_names="AppIconPreview-Default AppIconPreview-Ocean AppIconPreview-Sunset"
 privacy_manifest="$repository_root/NotificationManager/Resources/PrivacyInfo.xcprivacy"
 
 fail() {
@@ -55,6 +57,15 @@ assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw
 assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw\.punctual\.uitests;')" "UI-test bundle setting count"
 assert_equal "2" "$(count_project_setting 'CLOUDKIT_CONTAINER_IDENTIFIER = iCloud\.org\.tknw\.punctual;')" "CloudKit build setting count"
 assert_equal "2" "$(count_project_setting 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;')" "AppIcon build setting count"
+assert_equal "2" \
+    "$(count_project_setting 'ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = \(')" \
+    "alternate AppIcon build setting count"
+assert_equal "2" \
+    "$(count_project_setting '"AppIcon-Ocean",')" \
+    "Ocean build setting entry count"
+assert_equal "2" \
+    "$(count_project_setting '"AppIcon-Sunset",')" \
+    "Sunset build setting entry count"
 
 # The file-system-synchronized app group automatically includes resources. Keep the
 # target Info.plist out of that membership: Xcode must process it only through
@@ -156,6 +167,48 @@ icon_metadata=$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$app_icon")
 printf '%s' "$icon_metadata" | rg 'pixelWidth: 1024' >/dev/null || fail "AppIcon width must be 1024"
 printf '%s' "$icon_metadata" | rg 'pixelHeight: 1024' >/dev/null || fail "AppIcon height must be 1024"
 printf '%s' "$icon_metadata" | rg 'hasAlpha: no' >/dev/null || fail "AppIcon must not have an alpha channel"
+
+for alternate_name in $alternate_icon_names; do
+    alternate_set="$asset_catalog/$alternate_name.appiconset"
+    alternate_image="$alternate_set/$alternate_name-1024.png"
+    [ -f "$alternate_set/Contents.json" ] \
+        || fail "$alternate_name Contents.json is missing"
+    [ -f "$alternate_image" ] \
+        || fail "$alternate_name 1024 image is missing"
+
+    alternate_json=$(plutil -convert json -o - "$alternate_set/Contents.json")
+    printf '%s' "$alternate_json" | jq -e --arg filename "$alternate_name-1024.png" \
+        '.images == [{"filename":$filename,"idiom":"universal","platform":"ios","size":"1024x1024"}]' \
+        >/dev/null || fail "$alternate_name Contents.json is invalid"
+
+    alternate_metadata=$(sips -g pixelWidth -g pixelHeight -g hasAlpha "$alternate_image")
+    printf '%s' "$alternate_metadata" | rg 'pixelWidth: 1024' >/dev/null \
+        || fail "$alternate_name width must be 1024"
+    printf '%s' "$alternate_metadata" | rg 'pixelHeight: 1024' >/dev/null \
+        || fail "$alternate_name height must be 1024"
+    printf '%s' "$alternate_metadata" | rg 'hasAlpha: no' >/dev/null \
+        || fail "$alternate_name must not have an alpha channel"
+done
+
+for preview_name in $preview_names; do
+    preview_set="$asset_catalog/$preview_name.imageset"
+    preview_image="$preview_set/$preview_name.png"
+    [ -f "$preview_set/Contents.json" ] \
+        || fail "$preview_name Contents.json is missing"
+    [ -f "$preview_image" ] \
+        || fail "$preview_name image is missing"
+
+    preview_json=$(plutil -convert json -o - "$preview_set/Contents.json")
+    printf '%s' "$preview_json" | jq -e --arg filename "$preview_name.png" \
+        '.images == [{"filename":$filename,"idiom":"universal","scale":"1x"}]' \
+        >/dev/null || fail "$preview_name Contents.json is invalid"
+
+    preview_metadata=$(sips -g pixelWidth -g pixelHeight "$preview_image")
+    printf '%s' "$preview_metadata" | rg 'pixelWidth: 256' >/dev/null \
+        || fail "$preview_name width must be 256"
+    printf '%s' "$preview_metadata" | rg 'pixelHeight: 256' >/dev/null \
+        || fail "$preview_name height must be 256"
+done
 
 [ -f "$privacy_manifest" ] || fail "PrivacyInfo.xcprivacy is missing"
 privacy_json=$(plutil -convert json -o - "$privacy_manifest")

@@ -11,6 +11,7 @@
         @State private var tagsSeeded = false
         private let settingsModel: NotificationSettingsModel
         private let tagModel: TagManagementModel
+        private let appIconModel: AppIconSelectionModel
         private let tagUseCase: TagManagementUseCase
         private let dataUnavailableActions: DataUnavailableActions
 
@@ -24,6 +25,13 @@
                 authorizationRequester: authorization,
                 pendingCleaner: cleaner,
                 reconciler: nil
+            )
+            let iconMode =
+                ProcessInfo.processInfo.argumentValue(
+                    following: "-ui-app-icon-mode"
+                ) ?? "normal"
+            appIconModel = AppIconSelectionModel(
+                service: Task15AppIconService(mode: iconMode)
             )
 
             let repository: SwiftDataReminderRepository
@@ -55,7 +63,11 @@
             case "settings":
                 NavigationStack {
                     if tagsSeeded {
-                        SettingsView(model: settingsModel, tagModel: tagModel)
+                        SettingsView(
+                            model: settingsModel,
+                            tagModel: tagModel,
+                            appIconModel: appIconModel
+                        )
                     } else {
                         ProgressView()
                             .task { await seedTags() }
@@ -112,5 +124,40 @@
 
     private actor Task15PendingCleaner: PendingAppNotificationCleaning {
         func removeAllPendingAppNotificationsReportingFailure() async throws {}
+    }
+
+    @MainActor
+    private final class Task15AppIconService: AppIconServicing {
+        let supportsAlternateIcons: Bool
+        private(set) var alternateIconName: String?
+        private let failsChanges: Bool
+
+        init(mode: String) {
+            supportsAlternateIcons = mode != "unsupported"
+            alternateIconName = nil
+            failsChanges = mode == "failure"
+        }
+
+        func setAlternateIconName(_ name: String?) async throws {
+            if failsChanges {
+                throw Task15AppIconError.changeFailed
+            }
+            alternateIconName = name
+        }
+    }
+
+    private enum Task15AppIconError: Error {
+        case changeFailed
+    }
+
+    extension ProcessInfo {
+        fileprivate func argumentValue(following flag: String) -> String? {
+            guard let index = arguments.firstIndex(of: flag),
+                arguments.indices.contains(index + 1)
+            else {
+                return nil
+            }
+            return arguments[index + 1]
+        }
     }
 #endif

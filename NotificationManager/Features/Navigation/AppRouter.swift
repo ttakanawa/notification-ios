@@ -19,6 +19,7 @@ final class AppRouter {
     let actions: ReminderActionCoordinator
     let notificationSettingsModel: NotificationSettingsModel?
     let tagManagementModel: TagManagementModel?
+    let appIconSelectionModel: AppIconSelectionModel?
     var compactPath: [AppRouterDestination] = []
     var regularDestination: AppRouterDestination?
     var selectedReminderID: UUID?
@@ -33,12 +34,14 @@ final class AppRouter {
         actions: ReminderActionCoordinator,
         notificationSettingsModel: NotificationSettingsModel? = nil,
         tagManagementModel: TagManagementModel? = nil,
+        appIconSelectionModel: AppIconSelectionModel? = nil,
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
         reminderSaved: @escaping @MainActor @Sendable (UUID) async -> Void = { _ in }
     ) {
         self.actions = actions
         self.notificationSettingsModel = notificationSettingsModel
         self.tagManagementModel = tagManagementModel
+        self.appIconSelectionModel = appIconSelectionModel
         self.createForm = createForm
         self.reminderSaved = reminderSaved
     }

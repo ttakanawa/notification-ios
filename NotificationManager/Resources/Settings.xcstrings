@@ -451,6 +451,168 @@
         }
       }
     },
+    "settings.app-icon": {
+      "comment": "User-facing text for the semantic key settings.app-icon.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Icon"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリアイコン"
+          }
+        }
+      }
+    },
+    "settings.app-icon.configuration-error": {
+      "comment": "User-facing text for the semantic key settings.app-icon.configuration-error.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The current app icon configuration is unavailable."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "現在のアプリアイコン設定を読み込めません。"
+          }
+        }
+      }
+    },
+    "settings.app-icon.option.ocean": {
+      "comment": "User-facing text for the semantic key settings.app-icon.option.ocean.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ocean"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "オーシャン"
+          }
+        }
+      }
+    },
+    "settings.app-icon.option.primary": {
+      "comment": "User-facing text for the semantic key settings.app-icon.option.primary.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Default"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "標準"
+          }
+        }
+      }
+    },
+    "settings.app-icon.option.sunset": {
+      "comment": "User-facing text for the semantic key settings.app-icon.option.sunset.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sunset"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サンセット"
+          }
+        }
+      }
+    },
+    "settings.app-icon.selected": {
+      "comment": "User-facing text for the semantic key settings.app-icon.selected.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Selected"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "選択中"
+          }
+        }
+      }
+    },
+    "settings.app-icon.title": {
+      "comment": "User-facing text for the semantic key settings.app-icon.title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App Icon"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリアイコン"
+          }
+        }
+      }
+    },
+    "settings.app-icon.unsupported": {
+      "comment": "User-facing text for the semantic key settings.app-icon.unsupported.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "App icon changes are not available on this device."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "この端末ではアプリアイコンを変更できません。"
+          }
+        }
+      }
+    },
+    "settings.error.app-icon-change-failed": {
+      "comment": "User-facing text for the semantic key settings.error.app-icon-change-failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The app icon couldn’t be changed. Try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "アプリアイコンを変更できませんでした。もう一度お試しください。"
+          }
+        }
+      }
+    },
     "settings.error.authorization-request": {
       "comment": "User-facing error text announced by VoiceOver and also shown visually.",
       "extractionState": "manual",
@@ -537,6 +699,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "通知設定を開く"
+          }
+        }
+      }
+    },
+    "settings.section.appearance": {
+      "comment": "User-facing text for the semantic key settings.section.appearance.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Appearance"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "外観"
           }
         }
       }

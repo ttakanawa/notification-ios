@@ -923,6 +923,11 @@ struct AccessibilityErrorAnnouncementTests {
                     .settings
                 ),
                 (
+                    .settingsAppIconChangeFailed,
+                    "settings.error.app-icon-change-failed",
+                    .settings
+                ),
+                (
                     .tagDuplicateName,
                     "tags.error.duplicate-name",
                     .tags

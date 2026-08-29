@@ -21,9 +21,14 @@ struct AppRouterDestinationView: View {
                 }
             case .settings:
                 if let settings = router.notificationSettingsModel,
-                    let tags = router.tagManagementModel
+                    let tags = router.tagManagementModel,
+                    let appIcons = router.appIconSelectionModel
                 {
-                    SettingsView(model: settings, tagModel: tags)
+                    SettingsView(
+                        model: settings,
+                        tagModel: tags,
+                        appIconModel: appIcons
+                    )
                 } else {
                     unavailable
                 }

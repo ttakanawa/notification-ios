@@ -4,6 +4,7 @@ import UIKit
 struct SettingsView: View {
     @Bindable var model: NotificationSettingsModel
     @Bindable var tagModel: TagManagementModel
+    @Bindable var appIconModel: AppIconSelectionModel
 
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
@@ -75,6 +76,26 @@ struct SettingsView: View {
                         "settings.section.notifications",
                         table: "Settings"
                     ))
+            }
+
+            Section(
+                LocalizedStringResource(
+                    "settings.section.appearance",
+                    table: "Settings"
+                )
+            ) {
+                NavigationLink {
+                    AppIconPickerView(model: appIconModel)
+                } label: {
+                    Label(
+                        LocalizedStringResource(
+                            "settings.app-icon",
+                            table: "Settings"
+                        ),
+                        systemImage: "app"
+                    )
+                }
+                .accessibilityIdentifier("settings.app-icon")
             }
 
             Section(

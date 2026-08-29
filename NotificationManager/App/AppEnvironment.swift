@@ -16,6 +16,7 @@ final class AppEnvironment {
     let router: AppRouter
     let notificationSettingsModel: NotificationSettingsModel?
     let tagManagementModel: TagManagementModel?
+    let appIconSelectionModel: AppIconSelectionModel?
     let lifecycleCoordinator: AppLifecycleCoordinator?
 
     private let stateStore: DeviceSchedulingStateStore?
@@ -56,6 +57,7 @@ final class AppEnvironment {
         router = AppRouter(actions: actions)
         notificationSettingsModel = nil
         tagManagementModel = nil
+        appIconSelectionModel = nil
         lifecycleCoordinator = nil
         stateStore = nil
         formActions = ReminderFormActions(
@@ -76,6 +78,7 @@ final class AppEnvironment {
         router: AppRouter,
         notificationSettingsModel: NotificationSettingsModel,
         tagManagementModel: TagManagementModel,
+        appIconSelectionModel: AppIconSelectionModel,
         lifecycleCoordinator: AppLifecycleCoordinator,
         stateStore: DeviceSchedulingStateStore,
         formActions: ReminderFormActions,
@@ -93,6 +96,7 @@ final class AppEnvironment {
         self.router = router
         self.notificationSettingsModel = notificationSettingsModel
         self.tagManagementModel = tagManagementModel
+        self.appIconSelectionModel = appIconSelectionModel
         self.lifecycleCoordinator = lifecycleCoordinator
         self.stateStore = stateStore
         self.formActions = formActions
@@ -211,6 +215,9 @@ final class AppEnvironment {
             pendingCleaner: cleanupService,
             reconciler: worker
         )
+        let appIconModel = AppIconSelectionModel(
+            service: UIApplicationAppIconService()
+        )
         let tagModel = TagManagementModel(
             repository: repository,
             useCase: tagUseCase,
@@ -223,6 +230,7 @@ final class AppEnvironment {
             actions: actions,
             notificationSettingsModel: settingsModel,
             tagManagementModel: tagModel,
+            appIconSelectionModel: appIconModel,
             createForm: {
                 ReminderFormModel(
                     newReminderID: UUID(),
@@ -283,6 +291,7 @@ final class AppEnvironment {
             router: router,
             notificationSettingsModel: settingsModel,
             tagManagementModel: tagModel,
+            appIconSelectionModel: appIconModel,
             lifecycleCoordinator: lifecycle,
             stateStore: stateStore,
             formActions: formActions,

@@ -10,6 +10,13 @@ final class LocalizationAccessibilityUITests: XCTestCase {
 
         XCTAssertTrue(app.navigationBars["設定"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.buttons["通知設定を開く"].exists)
+        let appIconRow = app.buttons["settings.app-icon"]
+        XCTAssertTrue(appIconRow.exists)
+        XCTAssertEqual(appIconRow.label, "アプリアイコン")
+        appIconRow.tap()
+        XCTAssertTrue(app.navigationBars["アプリアイコン"].waitForExistence(timeout: 1))
+        XCTAssertTrue(app.buttons["オーシャン"].exists)
+        app.navigationBars["アプリアイコン"].buttons.firstMatch.tap()
         app.buttons["settings.about-privacy"].tap()
         XCTAssertTrue(app.navigationBars["このアプリとプライバシー"].waitForExistence(timeout: 1))
         XCTAssertTrue(

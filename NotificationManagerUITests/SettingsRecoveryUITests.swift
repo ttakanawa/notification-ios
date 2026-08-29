@@ -17,6 +17,67 @@ final class SettingsRecoveryUITests: XCTestCase {
     }
 
     @MainActor
+    func testAppIconPickerChangesDeterministicSelection() {
+        let app = launch(scenario: "settings")
+        let row = app.buttons["settings.app-icon"]
+        XCTAssertTrue(row.waitForExistence(timeout: 2))
+        row.tap()
+
+        let root = app.otherElements["settings.app-icon.root"]
+        XCTAssertTrue(root.waitForExistence(timeout: 1))
+        let optionButtons = app.buttons.matching(
+            NSPredicate(
+                format: "identifier BEGINSWITH %@",
+                "settings.app-icon.option."
+            )
+        )
+        XCTAssertEqual(optionButtons.count, 3)
+        XCTAssertTrue(app.buttons["settings.app-icon.option.primary"].exists)
+        XCTAssertTrue(app.buttons["settings.app-icon.option.ocean"].exists)
+        XCTAssertTrue(app.buttons["settings.app-icon.option.sunset"].exists)
+        XCTAssertEqual(root.value as? String, "primary")
+        XCTAssertTrue(app.buttons["settings.app-icon.option.primary"].isSelected)
+
+        app.buttons["settings.app-icon.option.ocean"].tap()
+
+        XCTAssertEqual(root.value as? String, "ocean")
+        XCTAssertTrue(app.buttons["settings.app-icon.option.ocean"].isSelected)
+    }
+
+    @MainActor
+    func testAppIconPickerExplainsUnsupportedDevice() {
+        let app = launch(
+            scenario: "settings",
+            extraArguments: ["-ui-app-icon-mode", "unsupported"]
+        )
+        app.buttons["settings.app-icon"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["settings.app-icon.unsupported"]
+                .waitForExistence(timeout: 1)
+        )
+        XCTAssertFalse(app.buttons["settings.app-icon.option.ocean"].isEnabled)
+    }
+
+    @MainActor
+    func testAppIconPickerPreservesSelectionAfterFailure() {
+        let app = launch(
+            scenario: "settings",
+            extraArguments: ["-ui-app-icon-mode", "failure"]
+        )
+        app.buttons["settings.app-icon"].tap()
+        app.buttons["settings.app-icon.option.sunset"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts["settings.app-icon.error"].waitForExistence(timeout: 1)
+        )
+        XCTAssertEqual(
+            app.otherElements["settings.app-icon.root"].value as? String,
+            "primary"
+        )
+    }
+
+    @MainActor
     func testTagCreateKeepsUserNameVerbatimAndDeleteExplainsRelationshipBehavior() {
         let app = launch(scenario: "settings")
         let tagsButton = app.buttons["settings.tags"]
@@ -69,9 +130,13 @@ final class SettingsRecoveryUITests: XCTestCase {
     }
 
     @MainActor
-    private func launch(scenario: String) -> XCUIApplication {
+    private func launch(
+        scenario: String,
+        extraArguments: [String] = []
+    ) -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments += ["-ui-testing", "-ui-scenario", scenario]
+        app.launchArguments += extraArguments
         app.launch()
         return app
     }
