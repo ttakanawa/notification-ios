@@ -56,13 +56,15 @@ final class ReminderFlowUITests: XCTestCase {
         let search = app.textFields["reminder-form.time-zone-search"]
         XCTAssertTrue(search.waitForExistence(timeout: 1))
         search.tap()
-        search.typeText("Tokyo")
+        search.typeText("New York")
 
-        let tokyo = app.buttons["reminder-form.time-zone-option.Asia/Tokyo"]
-        XCTAssertTrue(tokyo.waitForExistence(timeout: 1))
-        tokyo.tap()
+        let newYork = app.buttons["reminder-form.time-zone-option.America/New_York"]
+        XCTAssertTrue(newYork.waitForExistence(timeout: 1))
+        XCTAssertTrue(newYork.label.contains("New York, United States"))
+        XCTAssertTrue(newYork.label.contains("Eastern Time ("))
+        newYork.tap()
         XCTAssertTrue(timeZone.waitForExistence(timeout: 1))
-        XCTAssertTrue(timeZone.label.contains("Asia/Tokyo"))
+        XCTAssertTrue(timeZone.label.contains("America/New_York"))
         XCTAssertFalse(app.buttons["reminder-form.save"].isEnabled)
 
         for identifier in [

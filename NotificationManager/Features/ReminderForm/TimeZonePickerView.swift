@@ -3,17 +3,72 @@ import SwiftUI
 
 struct TimeZoneChoice: Identifiable, Sendable, Equatable {
     let identifier: String
+    let locationName: String
     let localizedName: String?
+    let abbreviation: String?
 
     var id: String { identifier }
 
-    static func all(locale: Locale) -> [TimeZoneChoice] {
-        TimeZone.knownTimeZoneIdentifiers.compactMap { identifier in
+    var detailName: String? {
+        switch (localizedName, abbreviation) {
+        case (let localizedName?, let abbreviation?)
+        where localizedName.compare(
+            abbreviation,
+            options: [.caseInsensitive, .diacriticInsensitive]
+        ) != .orderedSame:
+            return "\(localizedName) (\(abbreviation))"
+        case (let localizedName?, _):
+            return localizedName
+        case (_, let abbreviation?):
+            return abbreviation
+        case (nil, nil):
+            return nil
+        }
+    }
+
+    static func all(
+        locale: Locale,
+        at date: Date = .now,
+        preservingIdentifier: String? = nil
+    ) -> [TimeZoneChoice] {
+        var identifiers = Set(TimeZone.knownTimeZoneIdentifiers)
+        if let preservingIdentifier,
+            TimeZone(identifier: preservingIdentifier) != nil
+        {
+            identifiers.insert(preservingIdentifier)
+        }
+
+        let choices: [TimeZoneChoice] = identifiers.compactMap { identifier in
             guard let timeZone = TimeZone(identifier: identifier) else { return nil }
             return TimeZoneChoice(
                 identifier: identifier,
-                localizedName: timeZone.localizedName(for: .generic, locale: locale)
+                locationName: locationName(
+                    for: timeZone,
+                    at: date,
+                    locale: locale
+                ),
+                localizedName: timeZone.localizedName(for: .generic, locale: locale),
+                abbreviation: timeZone.abbreviation(for: date)
             )
+        }
+        .filter {
+            !TimeZoneRegionCatalog.isAlias($0.identifier)
+                || $0.identifier == preservingIdentifier
+        }
+        .sorted {
+            if $0.identifier == preservingIdentifier { return true }
+            if $1.identifier == preservingIdentifier { return false }
+            return $0.identifier < $1.identifier
+        }
+
+        var seenPresentations = Set<Presentation>()
+        return choices.filter { choice in
+            seenPresentations.insert(
+                Presentation(
+                    locationName: choice.locationName,
+                    detailName: choice.detailName
+                )
+            ).inserted
         }
         .sorted { $0.identifier < $1.identifier }
     }
@@ -21,7 +76,73 @@ struct TimeZoneChoice: Identifiable, Sendable, Equatable {
     func matches(query: String) -> Bool {
         query.isEmpty
             || identifier.localizedCaseInsensitiveContains(query)
+            || identifier
+                .replacingOccurrences(of: "/", with: " ")
+                .replacingOccurrences(of: "_", with: " ")
+                .localizedCaseInsensitiveContains(query)
+            || locationName.localizedCaseInsensitiveContains(query)
             || localizedName?.localizedCaseInsensitiveContains(query) == true
+            || abbreviation?.localizedCaseInsensitiveContains(query) == true
+            || detailName?.localizedCaseInsensitiveContains(query) == true
+    }
+
+    private static func locationName(
+        for timeZone: TimeZone,
+        at date: Date,
+        locale: Locale
+    ) -> String {
+        let formatStyle = Date.FormatStyle(locale: locale, timeZone: timeZone)
+        let city = date.formatted(formatStyle.timeZone(.exemplarLocation))
+
+        if let regionCode = TimeZoneRegionCatalog.regionCode(for: timeZone.identifier),
+            let country = locale.localizedString(forRegionCode: regionCode)
+        {
+            return [city, country].formatted(
+                .list(type: .and, width: .narrow).locale(locale)
+            )
+        }
+
+        return date.formatted(formatStyle.timeZone(.genericLocation))
+    }
+
+    private struct Presentation: Hashable {
+        let locationName: String
+        let detailName: String?
+    }
+}
+
+actor TimeZoneChoiceLoader {
+    static let shared = TimeZoneChoiceLoader()
+
+    private var cachedChoices: [CacheKey: [TimeZoneChoice]] = [:]
+
+    func choices(
+        locale: Locale,
+        at date: Date = .now,
+        preservingIdentifier: String?
+    ) -> [TimeZoneChoice] {
+        let key = CacheKey(
+            localeIdentifier: locale.identifier,
+            minute: Int(date.timeIntervalSinceReferenceDate / 60),
+            preservingIdentifier: preservingIdentifier
+        )
+        if let cached = cachedChoices[key] {
+            return cached
+        }
+
+        let choices = TimeZoneChoice.all(
+            locale: locale,
+            at: date,
+            preservingIdentifier: preservingIdentifier
+        )
+        cachedChoices = [key: choices]
+        return choices
+    }
+
+    private struct CacheKey: Hashable {
+        let localeIdentifier: String
+        let minute: Int
+        let preservingIdentifier: String?
     }
 }
 
@@ -72,8 +193,14 @@ struct TimeZonePickerView: View {
                 ))
         }
         .accessibilityIdentifier("reminder-form.time-zone-picker")
-        .onChange(of: locale.identifier, initial: true) {
-            choices = TimeZoneChoice.all(locale: locale)
+        .task(id: locale.identifier) {
+            choices = nil
+            let loadedChoices = await TimeZoneChoiceLoader.shared.choices(
+                locale: locale,
+                preservingIdentifier: selectedIdentifier
+            )
+            guard !Task.isCancelled else { return }
+            choices = loadedChoices
         }
     }
 
@@ -95,9 +222,9 @@ struct TimeZonePickerView: View {
                 } label: {
                     HStack {
                         VStack(alignment: .leading) {
-                            Text(choice.identifier)
-                            if let localizedName = choice.localizedName {
-                                Text(localizedName)
+                            Text(choice.locationName)
+                            if let detailName = choice.detailName {
+                                Text(detailName)
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
