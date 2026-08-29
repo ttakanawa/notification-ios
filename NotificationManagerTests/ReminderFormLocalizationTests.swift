@@ -93,6 +93,33 @@ struct ReminderFormLocalizationTests {
         )
     }
 
+    @Test func customRepeatAppleIntelligenceStatusesUseReminderFormResources() {
+        let fixtures: [(CustomRepeatAppleIntelligenceStatus, String)] = [
+            (.checking, "reminder.form.custom.apple-intelligence.checking"),
+            (.available, "reminder.form.custom.apple-intelligence.available"),
+            (
+                .unavailable(.platformUnsupported),
+                "reminder.form.custom.apple-intelligence.platform-unsupported"
+            ),
+            (
+                .unavailable(.deviceNotEligible),
+                "reminder.form.custom.apple-intelligence.device-not-eligible"
+            ),
+            (
+                .unavailable(.appleIntelligenceNotEnabled),
+                "reminder.form.custom.apple-intelligence.not-enabled"
+            ),
+            (
+                .unavailable(.modelNotReady),
+                "reminder.form.custom.apple-intelligence.model-not-ready"
+            )
+        ]
+
+        for (status, key) in fixtures {
+            expectReminderFormResource(status.localizedResource, key: key)
+        }
+    }
+
     private func expectReminderFormResource(
         _ resource: LocalizedStringResource,
         key: String,

@@ -56,4 +56,21 @@ struct LocalizationCatalogResolutionTests {
         #expect(message.contains("up to 60 notifications"))
         #expect(message.hasSuffix("Save anyway?"))
     }
+
+    @Test func customRepeatPlaceholderSuggestsARuleUnavailableFromPresets() {
+        let provider = LocalizedTextProvider.live
+
+        #expect(
+            provider.value(
+                for: "reminder.form.custom.placeholder",
+                locale: Locale(identifier: "en_US")
+            ) == "For example, Every month on the last Friday"
+        )
+        #expect(
+            provider.value(
+                for: "reminder.form.custom.placeholder",
+                locale: Locale(identifier: "ja_JP")
+            ) == "例：Every month on the last Friday"
+        )
+    }
 }

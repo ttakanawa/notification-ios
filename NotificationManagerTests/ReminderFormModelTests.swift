@@ -580,6 +580,103 @@ struct ReminderFormModelTests {
         #expect(model.repeatRule == originalRule)
     }
 
+    @Test func customRepeatAppleIntelligenceStatusBecomesAvailableAfterRefresh() async {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert,
+            assistedRepeatInterpreter: RecordingAssistedRepeatInterpreter(
+                candidate: RepeatCandidate(frequency: .daily, interval: 1)
+            )
+        )
+
+        #expect(model.customRepeatAppleIntelligenceStatus == .checking)
+
+        await model.refreshCustomRepeatAppleIntelligenceStatus()
+
+        #expect(model.customRepeatAppleIntelligenceStatus == .available)
+    }
+
+    @Test func customRepeatAppleIntelligenceStatusPreservesUnavailableReason() async {
+        for reason in AssistedRepeatUnavailableReason.allCases {
+            let model = ReminderFormModel(
+                snapshot: validSnapshot(),
+                savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+                now: date("2040-08-01T00:00:00Z"),
+                actions: .inert,
+                assistedRepeatInterpreter: RecordingAssistedRepeatInterpreter(
+                    candidate: RepeatCandidate(frequency: .daily, interval: 1),
+                    availability: .unavailable(reason)
+                )
+            )
+
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+
+            #expect(model.customRepeatAppleIntelligenceStatus == .unavailable(reason))
+        }
+    }
+
+    @Test func latestAppleIntelligenceRefreshOwnsTheStatus() async {
+        let assisted = SuspendedAvailabilityAssistedRepeatInterpreter()
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert,
+            assistedRepeatInterpreter: assisted
+        )
+
+        let initialRefresh = Task {
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+        }
+        await assisted.waitForRequest(count: 1)
+        await assisted.resume(request: 1, with: .available)
+        await initialRefresh.value
+        #expect(model.customRepeatAppleIntelligenceStatus == .available)
+
+        let staleRefresh = Task {
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+        }
+        await assisted.waitForRequest(count: 2)
+        #expect(model.customRepeatAppleIntelligenceStatus == .checking)
+
+        let latestRefresh = Task {
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+        }
+        await assisted.waitForRequest(count: 3)
+        await assisted.resume(request: 3, with: .available)
+        await latestRefresh.value
+        await assisted.resume(
+            request: 2,
+            with: .unavailable(.appleIntelligenceNotEnabled)
+        )
+        await staleRefresh.value
+
+        #expect(model.customRepeatAppleIntelligenceStatus == .available)
+    }
+
+    @Test func cancelledAppleIntelligenceRefreshDoesNotPublishItsResult() async {
+        let assisted = SuspendedAvailabilityAssistedRepeatInterpreter()
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(),
+            savedRepeatPresentation: .standard(localizedSummary: "Every week."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert,
+            assistedRepeatInterpreter: assisted
+        )
+        let refresh = Task {
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+        }
+        await assisted.waitForRequest(count: 1)
+
+        refresh.cancel()
+        await assisted.resume(request: 1, with: .available)
+        await refresh.value
+
+        #expect(model.customRepeatAppleIntelligenceStatus == .checking)
+    }
+
     @Test func selectingACandidateUsesItsOwnCanonicalValue() async {
         let model = ReminderFormModel(
             snapshot: validSnapshot(),
@@ -1282,16 +1379,57 @@ private actor SaveActionRecorder {
 private actor RecordingAssistedRepeatInterpreter: AssistedRepeatInterpreting {
     private(set) var inputs: [String] = []
     private let candidate: RepeatCandidate
+    private let availabilityResult: AssistedRepeatAvailability
 
-    init(candidate: RepeatCandidate) {
+    init(
+        candidate: RepeatCandidate,
+        availability: AssistedRepeatAvailability = .available
+    ) {
         self.candidate = candidate
+        availabilityResult = availability
     }
 
-    func availability() async -> AssistedRepeatAvailability { .available }
+    func availability() async -> AssistedRepeatAvailability { availabilityResult }
 
     func interpret(_ input: String) async throws -> RepeatCandidate {
         inputs.append(input)
         return candidate
+    }
+}
+
+private actor SuspendedAvailabilityAssistedRepeatInterpreter: AssistedRepeatInterpreting {
+    private var requestCount = 0
+    private var requestWaiters: [(count: Int, continuation: CheckedContinuation<Void, Never>)] =
+        []
+    private var resultContinuations: [Int: CheckedContinuation<AssistedRepeatAvailability, Never>] =
+        [:]
+
+    func availability() async -> AssistedRepeatAvailability {
+        requestCount += 1
+        let request = requestCount
+        let readyWaiters = requestWaiters.filter { $0.count <= requestCount }
+        requestWaiters.removeAll { $0.count <= requestCount }
+        for waiter in readyWaiters {
+            waiter.continuation.resume()
+        }
+        return await withCheckedContinuation { continuation in
+            resultContinuations[request] = continuation
+        }
+    }
+
+    func interpret(_ input: String) async throws -> RepeatCandidate {
+        throw AssistedRepeatInterpretationError.generation
+    }
+
+    func waitForRequest(count: Int) async {
+        guard requestCount < count else { return }
+        await withCheckedContinuation { continuation in
+            requestWaiters.append((count, continuation))
+        }
+    }
+
+    func resume(request: Int, with availability: AssistedRepeatAvailability) {
+        resultContinuations.removeValue(forKey: request)?.resume(returning: availability)
     }
 }
 

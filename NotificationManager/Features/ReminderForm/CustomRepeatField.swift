@@ -2,6 +2,7 @@ import NotificationManagerApplication
 import SwiftUI
 
 struct CustomRepeatField: View {
+    @Environment(\.scenePhase) private var scenePhase
     @Bindable var model: ReminderFormModel
 
     var body: some View {
@@ -17,6 +18,21 @@ struct CustomRepeatField: View {
             .textInputAutocapitalization(.never)
             .autocorrectionDisabled()
             .accessibilityIdentifier("reminder-form.custom.input")
+
+            Label {
+                Text(model.customRepeatAppleIntelligenceStatus.localizedResource)
+                    .accessibilityIdentifier(
+                        "reminder-form.custom.apple-intelligence-status"
+                    )
+            } icon: {
+                Image(systemName: "apple.intelligence")
+                    .accessibilityIdentifier(
+                        "reminder-form.custom.apple-intelligence-icon"
+                    )
+            }
+            .font(.caption)
+            .foregroundStyle(appleIntelligenceStatusColor)
+            .fixedSize(horizontal: false, vertical: true)
 
             Button(
                 LocalizedStringResource(
@@ -90,6 +106,16 @@ struct CustomRepeatField: View {
                     .font(.caption)
             }
         }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            await model.refreshCustomRepeatAppleIntelligenceStatus()
+        }
+    }
+
+    private var appleIntelligenceStatusColor: Color {
+        model.customRepeatAppleIntelligenceStatus == .available
+            ? .accentColor
+            : .secondary
     }
 
     private var customTextBinding: Binding<String> {
@@ -117,6 +143,43 @@ struct CustomRepeatField: View {
             }
         }
         .accessibilityIdentifier("reminder-form.custom.preview-result")
+    }
+}
+
+extension CustomRepeatAppleIntelligenceStatus {
+    var localizedResource: LocalizedStringResource {
+        switch self {
+        case .checking:
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.checking",
+                table: "ReminderForm"
+            )
+        case .available:
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.available",
+                table: "ReminderForm"
+            )
+        case .unavailable(.platformUnsupported):
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.platform-unsupported",
+                table: "ReminderForm"
+            )
+        case .unavailable(.deviceNotEligible):
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.device-not-eligible",
+                table: "ReminderForm"
+            )
+        case .unavailable(.appleIntelligenceNotEnabled):
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.not-enabled",
+                table: "ReminderForm"
+            )
+        case .unavailable(.modelNotReady):
+            LocalizedStringResource(
+                "reminder.form.custom.apple-intelligence.model-not-ready",
+                table: "ReminderForm"
+            )
+        }
     }
 }
 

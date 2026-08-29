@@ -703,6 +703,114 @@
         }
       }
     },
+    "reminder.form.custom.apple-intelligence.available": {
+      "comment": "Status shown when Apple Intelligence can interpret a custom repeat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence is available."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence は利用可能です。"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apple-intelligence.checking": {
+      "comment": "Status shown while checking whether Apple Intelligence can interpret a custom repeat.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking Apple Intelligence…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence を確認中…"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apple-intelligence.device-not-eligible": {
+      "comment": "Status shown when the device does not support Apple Intelligence.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This device doesn’t support Apple Intelligence."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスは Apple Intelligence に対応していません。"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apple-intelligence.model-not-ready": {
+      "comment": "Status shown while the Apple Intelligence model is not ready.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence is getting ready."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence を準備中です。"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apple-intelligence.not-enabled": {
+      "comment": "Status shown when Apple Intelligence is turned off in Settings.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence is turned off in Settings."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定で Apple Intelligence が無効になっています。"
+          }
+        }
+      }
+    },
+    "reminder.form.custom.apple-intelligence.platform-unsupported": {
+      "comment": "Status shown when the operating system cannot provide Apple Intelligence to the app.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apple Intelligence is unavailable on this system."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このシステムでは Apple Intelligence を利用できません。"
+          }
+        }
+      }
+    },
     "reminder.form.custom.canonical-disclosure": {
       "comment": "User-facing text for the semantic key reminder.form.custom.canonical-disclosure.",
       "extractionState": "manual",
@@ -764,13 +872,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "For example, Every Monday"
+            "value": "For example, Every month on the last Friday"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "例：Every Monday"
+            "value": "例：Every month on the last Friday"
           }
         }
       }

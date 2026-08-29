@@ -112,6 +112,12 @@ enum ReminderFormSaveState: Sendable, Equatable {
     case failed(ReminderFormFailure)
 }
 
+enum CustomRepeatAppleIntelligenceStatus: Sendable, Equatable {
+    case checking
+    case available
+    case unavailable(AssistedRepeatUnavailableReason)
+}
+
 @MainActor
 @Observable
 final class ReminderFormModel {
@@ -129,6 +135,8 @@ final class ReminderFormModel {
     private(set) var customRepeatText = ""
     private(set) var isReplacingCustomRepeat = false
     private(set) var customRepeatState: CustomRepeatSessionState = .idle
+    private(set) var customRepeatAppleIntelligenceStatus: CustomRepeatAppleIntelligenceStatus =
+        .checking
     private(set) var previewNotifications: [PhysicalNotification] = []
     private(set) var showsPastEarlyWarning = false
     private(set) var isDeleteConfirmationPresented = false
@@ -142,6 +150,7 @@ final class ReminderFormModel {
     @ObservationIgnored private let pickerFallbackTimeZone: TimeZone
     @ObservationIgnored private var customRepeatSession: CustomRepeatSession?
     @ObservationIgnored private var customSubmissionGeneration: UInt64 = 0
+    @ObservationIgnored private var appleIntelligenceStatusRefreshGeneration: UInt64 = 0
     @ObservationIgnored private var editRevision: UInt64 = 0
     @ObservationIgnored private var saveOperationGeneration: UInt64 = 0
     @ObservationIgnored private var capacityConsent: CapacityConsent = .notProvided
@@ -687,6 +696,23 @@ final class ReminderFormModel {
 
     func interpretCustomRepeatWithAppleIntelligence() async {
         await submitCustomRepeat(mode: .assistedOnly)
+    }
+
+    func refreshCustomRepeatAppleIntelligenceStatus() async {
+        appleIntelligenceStatusRefreshGeneration &+= 1
+        let generation = appleIntelligenceStatusRefreshGeneration
+        customRepeatAppleIntelligenceStatus = .checking
+        let availability = await assistedRepeatInterpreter.availability()
+        guard !Task.isCancelled,
+            generation == appleIntelligenceStatusRefreshGeneration
+        else { return }
+
+        switch availability {
+        case .available:
+            customRepeatAppleIntelligenceStatus = .available
+        case .unavailable(let reason):
+            customRepeatAppleIntelligenceStatus = .unavailable(reason)
+        }
     }
 
     private func submitCustomRepeat(mode: CustomRepeatResolutionMode) async {

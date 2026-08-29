@@ -370,6 +370,23 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testCustomRepeatAlwaysShowsAppleIntelligenceStatus() {
+        let app = launch(
+            scenario: "localized-custom-rule",
+            extraArguments: deterministicEnglish24HourArguments
+        )
+        app.buttons["reminder-row.bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"].tap()
+        app.buttons["reminder-form.custom.replace"].tap()
+
+        let icon = app.images["reminder-form.custom.apple-intelligence-icon"]
+        let status = app.staticTexts["reminder-form.custom.apple-intelligence-status"]
+
+        XCTAssertTrue(icon.waitForExistence(timeout: 2))
+        XCTAssertTrue(status.waitForExistence(timeout: 2))
+        XCTAssertEqual(status.label, "Apple Intelligence is unavailable on this system.")
+    }
+
+    @MainActor
     func testEnglishSuggestionsOfferCandidatesAndExplicitAssistanceBeforeSelection() {
         let app = launch(scenario: "localized-custom-rule")
         app.buttons["reminder-row.bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"].tap()
