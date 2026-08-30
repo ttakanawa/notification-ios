@@ -91,15 +91,6 @@ assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw
 assert_equal "2" "$(count_project_setting 'PRODUCT_BUNDLE_IDENTIFIER = org\.tknw\.punctual\.uitests;')" "UI-test bundle setting count"
 assert_equal "2" "$(count_project_setting 'CLOUDKIT_CONTAINER_IDENTIFIER = iCloud\.org\.tknw\.punctual;')" "CloudKit build setting count"
 assert_equal "2" "$(count_project_setting 'ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;')" "AppIcon build setting count"
-assert_equal "2" \
-    "$(count_project_setting 'ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = \(')" \
-    "alternate AppIcon build setting count"
-assert_equal "2" \
-    "$(count_project_setting '"AppIcon-Ocean",')" \
-    "Ocean build setting entry count"
-assert_equal "2" \
-    "$(count_project_setting '"AppIcon-Sunset",')" \
-    "Sunset build setting entry count"
 
 app_target_count=$(printf '%s' "$project_json" | jq -r '
     . as $project
@@ -136,6 +127,22 @@ app_target_id=$(printf '%s' "$project_json" | jq -r '
     | if length == 1 then .[0] else empty end
 ')
 [ -n "$app_target_id" ] || fail "project must contain one NotificationManager app target"
+
+printf '%s' "$project_json" | jq -e \
+    --arg app_target_id "$app_target_id" \
+    --arg expected_alternate_icon_names "$alternate_icon_names" '
+    .objects as $objects
+    | $objects[$app_target_id].buildConfigurationList as $configuration_list_id
+    | $objects[$configuration_list_id].buildConfigurations as $configuration_ids
+    | ($configuration_ids | length) == 2
+    and all(
+        $configuration_ids[];
+        (
+            $objects[.].buildSettings.ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES
+            | if type == "string" then split(" ") elif type == "array" then . else [] end
+        ) == ($expected_alternate_icon_names | split(" "))
+    )
+' >/dev/null || fail "app Debug and Release alternate AppIcon build settings must be exact"
 
 widget_target_id=$(printf '%s' "$project_json" | jq -r '
     . as $project
