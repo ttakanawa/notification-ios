@@ -10,7 +10,9 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
             let lexed = try? EnglishRepeatLexer().lex(input),
             !EnglishRepeatLexicalSafety().containsUnsupportedSemanticOperator(in: lexed)
         else { return [] }
-        return repairedVariants(from: lexed)
+        let variants = structuralVariants(from: lexed) + repairedVariants(from: lexed)
+        return
+            variants
             .compactMap(validatedSuggestion)
             .reduce(into: [String: RepairRank]()) { result, value in
                 result[value.canonical] = min(result[value.canonical] ?? value.rank, value.rank)
@@ -20,6 +22,43 @@ public struct EnglishRepeatCandidateGenerator: Sendable {
             }
             .prefix(Self.maxDisplayedCandidates)
             .map(\.key)
+    }
+
+    private func structuralVariants(from lexed: EnglishRepeatLexer.Lexed) -> [RepairedVariant] {
+        let tokens = lexed.tokens
+        let rank = RepairRank(totalCost: 1, operationCount: 1)
+
+        if tokens.count == 3,
+            case .word("every") = tokens[0].kind,
+            case .ordinal(number: "1", suffix: "st") = tokens[1].kind,
+            case .word(let weekdayWord) = tokens[2].kind,
+            let weekday = Self.weekdays[weekdayWord]
+        {
+            return [
+                RepairedVariant(
+                    rendered: "Every \(Self.weekdayName(weekday))",
+                    rank: rank
+                )
+            ]
+        }
+
+        if tokens.count == 4,
+            case .word("every") = tokens[0].kind,
+            case .word("month") = tokens[1].kind,
+            case .ordinal(let number, let suffix) = tokens[2].kind,
+            case .word(let weekdayWord) = tokens[3].kind,
+            let weekday = Self.weekdays[weekdayWord]
+        {
+            return [
+                RepairedVariant(
+                    rendered:
+                        "Every month on the \(number)\(suffix) \(Self.weekdayName(weekday))",
+                    rank: rank
+                )
+            ]
+        }
+
+        return []
     }
 
     private func repairedVariants(from lexed: EnglishRepeatLexer.Lexed) -> [RepairedVariant] {

@@ -39,6 +39,17 @@ struct EnglishRepeatCandidateGeneratorTests {
             ])
     }
 
+    @Test func interpretsBareFirstWeekdayAsTheMatchingWeeklyCandidate() {
+        #expect(generator.suggestions(for: "Every 1st Friday") == ["Every Friday"])
+    }
+
+    @Test func insertsTheMissingMonthlySelectorPreposition() {
+        #expect(
+            generator.suggestions(for: "Every month 1st Friday") == [
+                "Every month on the 1st Friday"
+            ])
+    }
+
     @Test func rejectsOverBudgetUnsafeAndDuplicateRepairs() {
         #expect(generator.suggestions(for: "Evrey Tuseday adn Wednesday").isEmpty)
         #expect(generator.suggestions(for: "Every Monday except first Monday").isEmpty)

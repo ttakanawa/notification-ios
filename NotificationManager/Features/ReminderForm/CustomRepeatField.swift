@@ -140,15 +140,6 @@ struct CustomRepeatField: View {
             Text(verbatim: preview.canonicalEnglish)
                 .font(.subheadline.weight(.semibold))
                 .accessibilityIdentifier("reminder-form.custom.canonical-preview")
-            ForEach(
-                Array(preview.nextNotifications.notifications.prefix(3).enumerated()),
-                id: \.offset
-            ) { _, notification in
-                PhysicalNotificationPreviewView(
-                    notification: notification,
-                    sourceTimeZoneIdentifier: model.timeZoneIdentifier
-                )
-            }
         }
         .accessibilityIdentifier("reminder-form.custom.preview-result")
     }

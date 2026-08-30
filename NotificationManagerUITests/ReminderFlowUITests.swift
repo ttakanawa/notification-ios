@@ -410,7 +410,9 @@ final class ReminderFlowUITests: XCTestCase {
 
         monday.tap()
 
-        let preview = app.otherElements["reminder-form.custom.preview-result"]
+        let preview = app.descendants(matching: .any)
+            .matching(identifier: "reminder-form.custom.preview-result")
+            .firstMatch
         let apply = app.buttons["reminder-form.custom.apply"]
         XCTAssertTrue(apply.waitForExistence(timeout: 3))
         scrollToHittable(preview, in: app)
@@ -423,6 +425,25 @@ final class ReminderFlowUITests: XCTestCase {
         scrollToHittable(apply, in: app)
         apply.tap()
         XCTAssertTrue(app.buttons["reminder-form.save"].isEnabled)
+    }
+
+    @MainActor
+    func testCustomRepeatPreviewShowsOnlyTheCanonicalSentence() {
+        let app = launch(scenario: "localized-custom-rule")
+        app.buttons["reminder-row.bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"].tap()
+        app.buttons["reminder-form.custom.replace"].tap()
+
+        let input = app.textFields["reminder-form.custom.input"]
+        input.tap()
+        input.typeText("Every month on the first fri")
+        app.buttons["reminder-form.custom.preview-button"].tap()
+
+        let preview = app.descendants(matching: .any)
+            .matching(identifier: "reminder-form.custom.preview-result")
+            .firstMatch
+        XCTAssertTrue(preview.waitForExistence(timeout: 3))
+        XCTAssertEqual(preview.label, "Every month on the 1st Friday")
+        XCTAssertFalse(app.staticTexts["reminder-form.preview.primary-reason"].exists)
     }
 
     @MainActor

@@ -61,6 +61,21 @@ struct CustomRepeatInputResolverTests {
         #expect(await assisted.events.isEmpty)
     }
 
+    @Test func structuralShorthandCandidatesStopAutomaticResolutionBeforeAI() async {
+        let assisted = AssistedRepeatInterpreterSpy(availability: .available, candidate: .daily)
+        let resolver = makeResolver(assisted: assisted)
+
+        let bareOrdinal = await resolver.resolve("Every 1st Friday", mode: .automatic)
+        let missingPreposition = await resolver.resolve(
+            "Every month 1st Friday",
+            mode: .automatic
+        )
+
+        #expect(bareOrdinal == .suggested(["Every Friday"]))
+        #expect(missingPreposition == .suggested(["Every month on the 1st Friday"]))
+        #expect(await assisted.events.isEmpty)
+    }
+
     @Test func noCandidatesAutomaticallyUseAssistance() async {
         let assisted = AssistedRepeatInterpreterSpy(
             availability: .available,
