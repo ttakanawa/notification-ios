@@ -7,7 +7,11 @@ let package = Package(
     products: [
         .library(name: "NotificationManagerDomain", targets: ["NotificationManagerDomain"]),
         .library(name: "NotificationManagerApplication", targets: ["NotificationManagerApplication"]),
-        .library(name: "NotificationManagerPersistence", targets: ["NotificationManagerPersistence"])
+        .library(name: "NotificationManagerPersistence", targets: ["NotificationManagerPersistence"]),
+        .library(
+            name: "NotificationManagerWidgetSupport",
+            targets: ["NotificationManagerWidgetSupport"]
+        )
     ],
     targets: [
         .target(name: "NotificationManagerDomain"),
@@ -16,6 +20,7 @@ let package = Package(
             name: "NotificationManagerPersistence",
             dependencies: ["NotificationManagerDomain", "NotificationManagerApplication"]
         ),
+        .target(name: "NotificationManagerWidgetSupport"),
         .testTarget(
             name: "NotificationManagerDomainTests",
             dependencies: ["NotificationManagerDomain"]
@@ -28,6 +33,10 @@ let package = Package(
         .testTarget(
             name: "NotificationManagerApplicationTests",
             dependencies: ["NotificationManagerApplication"]
+        ),
+        .testTarget(
+            name: "NotificationManagerWidgetSupportTests",
+            dependencies: ["NotificationManagerWidgetSupport"]
         )
     ]
 )

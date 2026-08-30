@@ -59,8 +59,21 @@ final class AppRouter {
         register(form: form)
     }
 
+    func refreshFormIfClean(_ form: ReminderFormModel) {
+        if let existing = formsByID[form.detachedDraft.id], existing.hasChanges {
+            return
+        }
+        register(form: form)
+    }
+
     func formModel(for reminderID: UUID) -> ReminderFormModel? {
         formsByID[reminderID]
+    }
+
+    func showList() {
+        compactPath = []
+        regularDestination = nil
+        selectedReminderID = nil
     }
 
     func showReminder(_ reminderID: UUID) {

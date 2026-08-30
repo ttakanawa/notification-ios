@@ -28,6 +28,7 @@ private enum CatalogTable: String, CaseIterable {
     case settings = "Settings"
     case tags = "Tags"
     case recovery = "Recovery"
+    case widget = "Widget"
 
     init?(url: URL) {
         self.init(rawValue: url.deletingPathExtension().lastPathComponent)
@@ -58,7 +59,13 @@ private enum CatalogTable: String, CaseIterable {
             key.hasPrefix("data_unavailable.")
                 || key.hasPrefix("notification_unavailable.")
                 || key.hasPrefix("recovery.")
+        case .widget:
+            key.hasPrefix("widget.")
         }
+    }
+
+    var isRequired: Bool {
+        self != .widget
     }
 }
 
@@ -213,15 +220,13 @@ private struct LocalizationValidator {
             urlsByTable[table] = url
         }
 
-        for table in CatalogTable.allCases where urlsByTable[table] == nil {
+        for table in CatalogTable.allCases where table.isRequired && urlsByTable[table] == nil {
             failures.append("Missing required catalog table \(table.rawValue).")
         }
         guard failures.isEmpty else { throw LintFailure(messages: failures) }
 
-        return try CatalogTable.allCases.map { table in
-            guard let url = urlsByTable[table] else {
-                throw LintFailure(messages: ["Missing required catalog table \(table.rawValue)."])
-            }
+        return try CatalogTable.allCases.compactMap { table in
+            guard let url = urlsByTable[table] else { return nil }
             let data: Data
             do {
                 data = try Data(contentsOf: url)
@@ -412,40 +417,68 @@ private struct LocalizationValidator {
             )
         }
 
-        let sourceDirectory = sourceRoot.appendingPathComponent("NotificationManager")
-        guard
-            let enumerator = FileManager.default.enumerator(
-                at: sourceDirectory,
-                includingPropertiesForKeys: [.isRegularFileKey]
-            )
-        else {
-            failures.append("Unable to enumerate app sources at \(sourceDirectory.path).")
-            return
-        }
-
         var references: Set<String> = []
         var explicitTableReferences: Set<ExplicitTableReference> = []
         var interpolatedSemanticKeys: Set<String> = []
         var implicitSemanticLookups: Set<ImplicitSemanticLookup> = []
-        for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
-            guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else { continue }
-            let filteredSource = Self.excludingAccessibilityIdentifierCalls(
-                from: Self.excludingComments(from: source)
-            )
-            let executableSource = Self.excludingTripleQuotedStringContents(
-                from: filteredSource
-            )
-            let referenceSource = Self.excludingTextVerbatimCalls(
-                from: executableSource
-            )
-            references.formUnion(Self.semanticReferences(in: referenceSource))
-            explicitTableReferences.formUnion(Self.explicitTableReferences(in: executableSource))
-            interpolatedSemanticKeys.formUnion(
-                Self.interpolatedSemanticKeys(in: executableSource)
-            )
-            implicitSemanticLookups.formUnion(
-                Self.implicitSemanticLookups(in: executableSource)
-            )
+        let appSourceDirectory = sourceRoot.appendingPathComponent("NotificationManager")
+        var isAppSourceDirectory: ObjCBool = false
+        guard
+            FileManager.default.fileExists(
+                atPath: appSourceDirectory.path,
+                isDirectory: &isAppSourceDirectory
+            ),
+            isAppSourceDirectory.boolValue
+        else {
+            failures.append("Unable to enumerate app sources at \(appSourceDirectory.path).")
+            return
+        }
+
+        let widgetSourceDirectory = sourceRoot.appendingPathComponent(
+            "NotificationManagerWidget"
+        )
+        var isWidgetSourceDirectory: ObjCBool = false
+        let sourceDirectories =
+            FileManager.default.fileExists(
+                atPath: widgetSourceDirectory.path,
+                isDirectory: &isWidgetSourceDirectory
+            ) && isWidgetSourceDirectory.boolValue
+            ? [appSourceDirectory, widgetSourceDirectory]
+            : [appSourceDirectory]
+        for sourceDirectory in sourceDirectories {
+            guard
+                let enumerator = FileManager.default.enumerator(
+                    at: sourceDirectory,
+                    includingPropertiesForKeys: [.isRegularFileKey]
+                )
+            else {
+                failures.append("Unable to enumerate app sources at \(sourceDirectory.path).")
+                continue
+            }
+            for case let fileURL as URL in enumerator where fileURL.pathExtension == "swift" {
+                guard let source = try? String(contentsOf: fileURL, encoding: .utf8) else {
+                    continue
+                }
+                let filteredSource = Self.excludingAccessibilityIdentifierCalls(
+                    from: Self.excludingComments(from: source)
+                )
+                let executableSource = Self.excludingTripleQuotedStringContents(
+                    from: filteredSource
+                )
+                let referenceSource = Self.excludingTextVerbatimCalls(
+                    from: executableSource
+                )
+                references.formUnion(Self.semanticReferences(in: referenceSource))
+                explicitTableReferences.formUnion(
+                    Self.explicitTableReferences(in: executableSource)
+                )
+                interpolatedSemanticKeys.formUnion(
+                    Self.interpolatedSemanticKeys(in: executableSource)
+                )
+                implicitSemanticLookups.formUnion(
+                    Self.implicitSemanticLookups(in: executableSource)
+                )
+            }
         }
         for missing in references.subtracting(owners.keys).sorted() {
             failures.append("\(missing): referenced by app source but missing from the catalog.")
@@ -780,7 +813,7 @@ private struct LocalizationValidator {
 
     private static func semanticReferences(in source: String) -> Set<String> {
         let pattern =
-            #"\"((?:reminder|settings|tags|common|data_unavailable|notification_unavailable|privacy|recovery|localization)(?:\.[a-z0-9_-]+)+)\""#
+            #"\"((?:reminder|settings|tags|common|data_unavailable|notification_unavailable|privacy|recovery|localization|widget)(?:\.[a-z0-9_-]+)+)\""#
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
         return Set(
@@ -795,7 +828,7 @@ private struct LocalizationValidator {
     ) -> Set<ExplicitTableReference> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization)"
+            + "notification_unavailable|privacy|recovery|localization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let pattern =
             "(?:LocalizedStringResource\\s*\\(\\s*|"
@@ -985,7 +1018,7 @@ private struct LocalizationValidator {
     private static func interpolatedSemanticKeys(in source: String) -> Set<String> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization)"
+            + "notification_unavailable|privacy|recovery|localization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
         let modifierKinds = regularExpressionAlternation(for: localizedModifierKinds)
@@ -1041,7 +1074,7 @@ private struct LocalizationValidator {
     private static func interpolatedSemanticKey(in value: String) -> String? {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization)"
+            + "notification_unavailable|privacy|recovery|localization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let pattern = "^(\(semanticKey))\\s*\\\\\\("
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
@@ -1059,7 +1092,7 @@ private struct LocalizationValidator {
     ) -> Set<ImplicitSemanticLookup> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization)"
+            + "notification_unavailable|privacy|recovery|localization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
         let viewPattern =

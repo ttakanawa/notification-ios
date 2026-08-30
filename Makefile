@@ -8,6 +8,7 @@ SIMULATOR_DESTINATION := platform=iOS Simulator,name=$(SIMULATOR_NAME),OS=$(SIMU
 
 SWIFT_PATHS := \
 	NotificationManager \
+	NotificationManagerWidget \
 	NotificationManagerTests \
 	NotificationManagerIntegrationTests \
 	NotificationManagerUITests \
@@ -22,7 +23,8 @@ LOCALIZATION_CATALOGS := \
 	NotificationManager/Resources/NotificationText.xcstrings \
 	NotificationManager/Resources/Settings.xcstrings \
 	NotificationManager/Resources/Tags.xcstrings \
-	NotificationManager/Resources/Recovery.xcstrings
+	NotificationManager/Resources/Recovery.xcstrings \
+	NotificationManagerWidget/Resources/Widget.xcstrings
 
 .PHONY: help format lint test-unit test-integration test-ui build-release \
 	validate-localizations test-localization-validator validate-testflight

@@ -78,6 +78,7 @@ write_fixture_catalogs() {
     write_catalog "$catalog_root/Settings.xcstrings" settings.title Settings
     write_tags_catalog "$catalog_root/Tags.xcstrings"
     write_catalog "$catalog_root/Recovery.xcstrings" recovery.error.data-unavailable Unavailable
+    write_catalog "$catalog_root/Widget.xcstrings" widget.state.no-upcoming "No upcoming reminders"
 }
 
 run_validator() {
@@ -91,6 +92,32 @@ run_validator() {
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
         --source-root "$source_root"
+}
+
+run_validator_with_widget() {
+    source_root=$1
+    swift "$validator" \
+        "$catalog_root/Common.xcstrings" \
+        "$catalog_root/ReminderForm.xcstrings" \
+        "$catalog_root/Reminder.xcstrings" \
+        "$catalog_root/NotificationText.xcstrings" \
+        "$catalog_root/Settings.xcstrings" \
+        "$catalog_root/Tags.xcstrings" \
+        "$catalog_root/Recovery.xcstrings" \
+        "$catalog_root/Widget.xcstrings" \
+        --source-root "$source_root"
+}
+
+run_validator_without_table() {
+    omitted_table=$1
+    source_root=$2
+    shift 2
+    for table in Common ReminderForm Reminder NotificationText Settings Tags Recovery; do
+        if [ "$table" != "$omitted_table" ]; then
+            set -- "$@" "$catalog_root/$table.xcstrings"
+        fi
+    done
+    swift "$validator" "$@" --source-root "$source_root"
 }
 
 expect_failure_containing() {
@@ -125,6 +152,22 @@ case "$success_output" in
         ;;
 esac
 
+widget_success_output=$(run_validator_with_widget "$valid_source_root")
+case "$widget_success_output" in
+    *"Validated 9 localization keys across 8 catalogs for English and Japanese."*) ;;
+    *)
+        echo "Optional Widget-catalog success summary was not emitted." >&2
+        echo "$widget_success_output" >&2
+        exit 1
+        ;;
+esac
+
+missing_app_source_root="$temporary_directory/missing-app-source"
+mkdir -p "$missing_app_source_root"
+expect_failure_containing \
+    "Unable to enumerate app sources at $missing_app_source_root/NotificationManager." \
+    run_validator "$missing_app_source_root"
+
 expect_failure_containing \
     "settings.same-line-missing: referenced by app source but missing from the catalog." \
     run_validator "$fixtures/LocalizationSourceCoverage/missing"
@@ -138,16 +181,37 @@ case "$failure_output" in
         ;;
 esac
 
+for required_table in Common ReminderForm Reminder NotificationText Settings Tags Recovery; do
+    expect_failure_containing \
+        "Missing required catalog table $required_table." \
+        run_validator_without_table "$required_table" "$valid_source_root"
+done
+
+jq 'del(.strings["widget.state.no-upcoming"].localizations.ja)' \
+    "$catalog_root/Widget.xcstrings" > "$catalog_root/Widget.updated.xcstrings"
+mv "$catalog_root/Widget.updated.xcstrings" "$catalog_root/Widget.xcstrings"
 expect_failure_containing \
-    "Missing required catalog table Recovery." \
-    swift "$validator" \
-        "$catalog_root/Common.xcstrings" \
-        "$catalog_root/ReminderForm.xcstrings" \
-        "$catalog_root/Reminder.xcstrings" \
-        "$catalog_root/NotificationText.xcstrings" \
-        "$catalog_root/Settings.xcstrings" \
-        "$catalog_root/Tags.xcstrings" \
-        --source-root "$valid_source_root"
+    "widget.state.no-upcoming: ja localization is missing." \
+    run_validator_with_widget "$valid_source_root"
+write_catalog "$catalog_root/Widget.xcstrings" widget.state.no-upcoming "No upcoming reminders"
+
+widget_source_root="$temporary_directory/widget-source"
+mkdir -p "$widget_source_root/NotificationManager" "$widget_source_root/NotificationManagerWidget"
+cp "$valid_source_root/NotificationManager/Fixture.swift" \
+    "$widget_source_root/NotificationManager/Fixture.swift"
+printf '%s\n' \
+    'import SwiftUI' \
+    'let state = LocalizedStringResource("widget.state.no-upcoming", table: "Widget")' \
+    > "$widget_source_root/NotificationManagerWidget/Fixture.swift"
+run_validator_with_widget "$widget_source_root" >/dev/null
+
+printf '%s\n' \
+    'import SwiftUI' \
+    'let state = LocalizedStringResource("widget.state.missing", table: "Widget")' \
+    > "$widget_source_root/NotificationManagerWidget/Fixture.swift"
+expect_failure_containing \
+    "widget.state.missing: referenced by app source but missing from the catalog." \
+    run_validator_with_widget "$widget_source_root"
 
 expect_failure_containing \
     "Unknown catalog table Unknown." \

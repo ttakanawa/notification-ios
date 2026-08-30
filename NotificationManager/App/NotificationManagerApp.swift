@@ -68,6 +68,9 @@ private struct AppBootstrapRoot: View {
             }
         }
         .task { await bootstrapper.start() }
+        .onOpenURL { url in
+            Task { await bootstrapper.openURL(url) }
+        }
     }
 }
 

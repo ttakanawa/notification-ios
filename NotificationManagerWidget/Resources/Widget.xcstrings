@@ -1,0 +1,114 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "widget.gallery.description": {
+      "comment": "Description shown for the upcoming reminders widget in the widget gallery.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "See the notifications that will fire next."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "次に届く通知を確認できます。"
+          }
+        }
+      }
+    },
+    "widget.gallery.title": {
+      "comment": "Title shown for the upcoming reminders widget in the widget gallery.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Upcoming Reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今後のリマインダー"
+          }
+        }
+      }
+    },
+    "widget.header": {
+      "comment": "Compact app-name header shown above reminder content in the widget.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punctual"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punctual"
+          }
+        }
+      }
+    },
+    "widget.state.no-upcoming": {
+      "comment": "Message shown when no future reminder notification is available.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No upcoming reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今後のリマインダーはありません"
+          }
+        }
+      }
+    },
+    "widget.state.refresh-required": {
+      "comment": "Message shown when the bounded widget snapshot is exhausted and the app must refresh it.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open Punctual to refresh"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Punctual を開いて更新してください"
+          }
+        }
+      }
+    },
+    "widget.state.unavailable": {
+      "comment": "Message shown when the shared widget data cannot be read safely.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reminders are temporarily unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーを一時的に表示できません"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

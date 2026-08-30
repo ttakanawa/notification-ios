@@ -1,7 +1,10 @@
+import Foundation
+import NotificationManagerWidgetSupport
 import Observation
 
 #if canImport(UIKit)
     import NotificationManagerPersistence
+    import WidgetKit
 #endif
 
 enum AppBootstrapState {
@@ -24,9 +27,12 @@ final class AppBootstrapper {
     @ObservationIgnored private let notificationDelegate: NotificationApplicationDelegate
     @ObservationIgnored private let openEnvironment: EnvironmentOpener
     @ObservationIgnored private let makeDataUnavailableActions: FailureActionsFactory
+    @ObservationIgnored private let deepLinkCodec = PunctualDeepLinkCodec()
     @ObservationIgnored private var hasStarted = false
     @ObservationIgnored private var attemptGeneration: UInt64 = 0
     @ObservationIgnored private var attemptTask: Task<AttemptResult, Never>?
+    @ObservationIgnored private var pendingDeepLink: PunctualDeepLink?
+    @ObservationIgnored private var isOpeningDeepLink = false
 
     init(
         notificationDelegate: NotificationApplicationDelegate,
@@ -48,6 +54,22 @@ final class AppBootstrapper {
             let cleanupService = NotificationCleanupService(
                 notificationCenter: notificationCenter
             )
+            let widgetSnapshotPublication: AppEnvironment.WidgetSnapshotPublication
+            if let store = WidgetSnapshotFileStore.live() {
+                let publisher = WidgetSnapshotPublisher(
+                    store: store,
+                    reload: {
+                        WidgetCenter.shared.reloadTimelines(
+                            ofKind: WidgetSnapshotConstants.widgetKind
+                        )
+                    }
+                )
+                widgetSnapshotPublication = { snapshot, generation in
+                    await publisher.publish(snapshot, generation: generation)
+                }
+            } else {
+                widgetSnapshotPublication = { _, _ in }
+            }
             let compositionRoot = PersistenceCompositionRoot(
                 makeEnvironment: { container in
                     AppEnvironment.production(
@@ -56,7 +78,8 @@ final class AppBootstrapper {
                         preferenceStore: preferenceStore,
                         authorizationService: authorizationService,
                         notificationCenter: notificationCenter,
-                        cleanupService: cleanupService
+                        cleanupService: cleanupService,
+                        widgetSnapshotPublication: widgetSnapshotPublication
                     )
                 }
             )
@@ -94,6 +117,12 @@ final class AppBootstrapper {
         }
     }
 
+    func openURL(_ url: URL) async {
+        guard let deepLink = deepLinkCodec.parse(url) else { return }
+        pendingDeepLink = deepLink
+        await openPendingDeepLinksIfReady()
+    }
+
     private func beginAttempt() async {
         attemptGeneration &+= 1
         let generation = attemptGeneration
@@ -115,11 +144,23 @@ final class AppBootstrapper {
         case .success(let environment):
             environment.activateNotificationHandling()
             state = .ready(environment)
+            await openPendingDeepLinksIfReady()
         case .failure:
             state = .dataUnavailable(
                 makeDataUnavailableActions { [weak self] in
                     await self?.retry()
                 })
+        }
+    }
+
+    private func openPendingDeepLinksIfReady() async {
+        guard !isOpeningDeepLink, case .ready(let environment) = state else { return }
+        isOpeningDeepLink = true
+        defer { isOpeningDeepLink = false }
+
+        while let deepLink = pendingDeepLink {
+            pendingDeepLink = nil
+            await environment.openDeepLink(deepLink)
         }
     }
 }

@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
+import NotificationManagerWidgetSupport
 import Testing
 import UserNotifications
 
@@ -256,6 +257,123 @@ struct AppBootstrapperTests {
     }
 
     @MainActor
+    @Test func loadingURLRoutesAfterEnvironmentBecomesReady() async {
+        let gate = BootstrapAttemptGate()
+        let routes = BootstrapDeepLinkRouteRecorder()
+        let environment = AppEnvironment(
+            deepLinkReminderPreparation: { reminderID in
+                routes.record(.reminder(reminderID))
+                return nil
+            }
+        )
+        let bootstrapper = makeBootstrapper {
+            let attempt = await gate.begin()
+            try await gate.wait(attempt)
+            return environment
+        }
+
+        let start = Task { @MainActor in await bootstrapper.start() }
+        await gate.waitForAttempts(1)
+        await bootstrapper.openURL(Self.reminderURL)
+        await gate.resolve(1)
+        await start.value
+
+        #expect(routes.values == [.reminder(Self.reminderID)])
+    }
+
+    @MainActor
+    @Test func latestValidLoadingURLWins() async {
+        let gate = BootstrapAttemptGate()
+        let routes = BootstrapDeepLinkRouteRecorder()
+        let environment = AppEnvironment(
+            deepLinkReminderPreparation: { reminderID in
+                routes.record(.reminder(reminderID))
+                return nil
+            }
+        )
+        let bootstrapper = makeBootstrapper {
+            let attempt = await gate.begin()
+            try await gate.wait(attempt)
+            return environment
+        }
+
+        let start = Task { @MainActor in await bootstrapper.start() }
+        await gate.waitForAttempts(1)
+        await bootstrapper.openURL(Self.reminderURL)
+        await bootstrapper.openURL(Self.otherReminderURL)
+        await gate.resolve(1)
+        await start.value
+
+        #expect(routes.values == [.reminder(Self.otherReminderID)])
+    }
+
+    @MainActor
+    @Test func failedBootstrapRetainsURLThroughRetry() async {
+        let gate = BootstrapAttemptGate()
+        let routes = BootstrapDeepLinkRouteRecorder()
+        let environment = AppEnvironment(
+            deepLinkReminderPreparation: { reminderID in
+                routes.record(.reminder(reminderID))
+                return nil
+            }
+        )
+        let bootstrapper = makeBootstrapper {
+            let attempt = await gate.begin()
+            try await gate.wait(attempt)
+            return environment
+        }
+
+        let start = Task { @MainActor in await bootstrapper.start() }
+        await gate.waitForAttempts(1)
+        await bootstrapper.openURL(Self.reminderURL)
+        await gate.reject(1)
+        await start.value
+
+        let retry = Task { @MainActor in await bootstrapper.retry() }
+        await gate.waitForAttempts(2)
+        await gate.resolve(2)
+        await retry.value
+
+        #expect(routes.values == [.reminder(Self.reminderID)])
+    }
+
+    @MainActor
+    @Test func readyEnvironmentHandlesURLImmediately() async {
+        let routes = BootstrapDeepLinkRouteRecorder()
+        let environment = AppEnvironment(
+            deepLinkReminderPreparation: { reminderID in
+                routes.record(.reminder(reminderID))
+                return nil
+            }
+        )
+        let bootstrapper = makeBootstrapper { environment }
+        await bootstrapper.start()
+
+        await bootstrapper.openURL(Self.reminderURL)
+
+        #expect(routes.values == [.reminder(Self.reminderID)])
+    }
+
+    @MainActor
+    @Test func invalidURLLeavesReadyNavigationUnchanged() async {
+        let routes = BootstrapDeepLinkRouteRecorder()
+        let environment = AppEnvironment(
+            deepLinkReminderPreparation: { reminderID in
+                routes.record(.reminder(reminderID))
+                return nil
+            }
+        )
+        environment.router.compactPath = [.settings]
+        let bootstrapper = makeBootstrapper { environment }
+        await bootstrapper.start()
+
+        await bootstrapper.openURL(URL(string: "https://example.com/reminders")!)
+
+        #expect(environment.router.compactPath == [.settings])
+        #expect(routes.values.isEmpty)
+    }
+
+    @MainActor
     private func makeBootstrapper(
         openEnvironment: @escaping AppBootstrapper.EnvironmentOpener
     ) -> AppBootstrapper {
@@ -279,6 +397,15 @@ struct AppBootstrapperTests {
 
     private static let reminderID = UUID(
         uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )!
+    private static let otherReminderID = UUID(
+        uuidString: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+    )!
+    private static let reminderURL = URL(
+        string: "punctual://reminders/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+    )!
+    private static let otherReminderURL = URL(
+        string: "punctual://reminders/bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     )!
 
     @MainActor
@@ -360,6 +487,15 @@ private final class BootstrapNotificationRouteRecorder {
         while destinations.count < count {
             await Task.yield()
         }
+    }
+}
+
+@MainActor
+private final class BootstrapDeepLinkRouteRecorder {
+    private(set) var values: [PunctualDeepLink] = []
+
+    func record(_ value: PunctualDeepLink) {
+        values.append(value)
     }
 }
 

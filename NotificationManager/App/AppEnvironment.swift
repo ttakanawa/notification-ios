@@ -2,12 +2,23 @@ import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
 import NotificationManagerPersistence
+import NotificationManagerWidgetSupport
+import OSLog
 import SwiftData
 import UIKit
 
 @MainActor
 final class AppEnvironment {
     typealias NotificationHandlingActivation = @MainActor @Sendable () -> Void
+    typealias DeepLinkReminderPreparation =
+        @MainActor @Sendable (UUID) async -> ReminderSnapshot?
+    typealias WidgetSnapshotPublication =
+        @Sendable (WidgetSnapshot, UInt64) async -> Void
+
+    private static let widgetSnapshotLogger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "org.tknw.punctual",
+        category: "WidgetSnapshotPublication"
+    )
 
     let container: ModelContainer?
     let repository: SwiftDataReminderRepository?
@@ -23,6 +34,9 @@ final class AppEnvironment {
     private let formActions: ReminderFormActions
     private let assistedRepeatInterpreter: any AssistedRepeatInterpreting
     private let notificationHandlingActivation: NotificationHandlingActivation
+    private let deepLinkReminderPreparation: DeepLinkReminderPreparation
+    private let widgetSnapshotProjector: WidgetSnapshotProjector
+    private let widgetSnapshotPublication: WidgetSnapshotPublication
     private let presentationRefreshCoordinator:
         LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
@@ -35,7 +49,9 @@ final class AppEnvironment {
 
     /// Identity-only environment used by bootstrap state-machine tests.
     init(
-        notificationHandlingActivation: @escaping NotificationHandlingActivation = {}
+        notificationHandlingActivation: @escaping NotificationHandlingActivation = {},
+        deepLinkReminderPreparation: @escaping DeepLinkReminderPreparation = { _ in nil },
+        widgetSnapshotPublication: @escaping WidgetSnapshotPublication = { _, _ in }
     ) {
         let actions = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -66,6 +82,9 @@ final class AppEnvironment {
         )
         assistedRepeatInterpreter = AssistedRepeatInterpreterFactory.make()
         self.notificationHandlingActivation = notificationHandlingActivation
+        self.deepLinkReminderPreparation = deepLinkReminderPreparation
+        widgetSnapshotProjector = WidgetSnapshotProjector()
+        self.widgetSnapshotPublication = widgetSnapshotPublication
         presentationRefreshCoordinator = nil
         schedulingStateObserver = nil
     }
@@ -84,6 +103,8 @@ final class AppEnvironment {
         formActions: ReminderFormActions,
         assistedRepeatInterpreter: any AssistedRepeatInterpreting,
         notificationHandlingActivation: @escaping NotificationHandlingActivation,
+        deepLinkReminderPreparation: @escaping DeepLinkReminderPreparation,
+        widgetSnapshotPublication: @escaping WidgetSnapshotPublication,
         presentationRefreshCoordinator: LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
             DeviceSchedulingStateSnapshot
@@ -102,6 +123,9 @@ final class AppEnvironment {
         self.formActions = formActions
         self.assistedRepeatInterpreter = assistedRepeatInterpreter
         self.notificationHandlingActivation = notificationHandlingActivation
+        self.deepLinkReminderPreparation = deepLinkReminderPreparation
+        widgetSnapshotProjector = WidgetSnapshotProjector()
+        self.widgetSnapshotPublication = widgetSnapshotPublication
         self.presentationRefreshCoordinator = presentationRefreshCoordinator
         schedulingStateObserver = nil
     }
@@ -112,7 +136,8 @@ final class AppEnvironment {
         preferenceStore: UserDefaultsNotificationPreferenceStore,
         authorizationService: NotificationAuthorizationService,
         notificationCenter: SystemNotificationCenterClient,
-        cleanupService: NotificationCleanupService
+        cleanupService: NotificationCleanupService,
+        widgetSnapshotPublication: @escaping WidgetSnapshotPublication
     ) -> AppEnvironment {
         let repository = SwiftDataReminderRepository(container: container)
         let eligibilityIndexStore = notificationDelegate.eligibilityIndex
@@ -283,6 +308,9 @@ final class AppEnvironment {
                 }
             )
         }
+        let deepLinkReminderPreparation: DeepLinkReminderPreparation = { reminderID in
+            await responseSnapshotPreparer.prepare(reminderID: reminderID)
+        }
         let environment = AppEnvironment(
             container: container,
             repository: repository,
@@ -297,6 +325,8 @@ final class AppEnvironment {
             formActions: formActions,
             assistedRepeatInterpreter: assistedRepeatInterpreter,
             notificationHandlingActivation: notificationHandlingActivation,
+            deepLinkReminderPreparation: deepLinkReminderPreparation,
+            widgetSnapshotPublication: widgetSnapshotPublication,
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
         relay.environment = environment
@@ -313,6 +343,31 @@ final class AppEnvironment {
         guard !notificationHandlingIsActive else { return }
         notificationHandlingIsActive = true
         notificationHandlingActivation()
+    }
+
+    func openDeepLink(_ deepLink: PunctualDeepLink) async {
+        switch deepLink {
+        case .list:
+            router.showList()
+        case .reminder(let reminderID):
+            guard let reminder = await deepLinkReminderPreparation(reminderID) else {
+                router.showNotificationUnavailable()
+                return
+            }
+            let repeatSummary = Self.repeatSummary(for: reminder)
+            let selectedTags = Self.selectedTagPresentations(
+                for: reminder,
+                from: listModel.availableTags
+            )
+            router.refreshFormIfClean(
+                makeReminderForm(
+                    reminder,
+                    savedRepeatSummary: repeatSummary,
+                    availableTags: selectedTags,
+                    now: Date()
+                ))
+            router.showReminder(reminderID)
+        }
     }
 
     func start() async {
@@ -363,7 +418,7 @@ final class AppEnvironment {
         await presentationRefreshCoordinator?.refresh(state: deviceState)
     }
 
-    fileprivate func publish(
+    func publish(
         _ snapshot: CompleteReminderSnapshot,
         deviceState: DeviceSchedulingStateSnapshot
     ) {
@@ -375,12 +430,30 @@ final class AppEnvironment {
             register($0, tags: snapshot.tags, deviceState: deviceState, now: now)
         }
         snapshotGeneration &+= 1
+        let generation = snapshotGeneration
         listModel.publish(
             ReminderListSnapshot(
-                generation: snapshotGeneration,
+                generation: generation,
                 items: items,
                 availableTags: snapshot.tags.map(Self.tagPresentation)
             ))
+
+        do {
+            let widgetSnapshot = try widgetSnapshotProjector.project(
+                reminders: snapshot.reminders,
+                items: items,
+                deviceState: deviceState,
+                generatedAt: now
+            )
+            let widgetSnapshotPublication = self.widgetSnapshotPublication
+            Task {
+                await widgetSnapshotPublication(widgetSnapshot, generation)
+            }
+        } catch {
+            Self.widgetSnapshotLogger.error(
+                "Widget snapshot projection failed: \(String(describing: error), privacy: .public)"
+            )
+        }
     }
 
     @discardableResult
@@ -390,9 +463,10 @@ final class AppEnvironment {
         deviceState: DeviceSchedulingStateSnapshot,
         now: Date
     ) -> ReminderListItemPresentation {
-        let tagByID = Dictionary(uniqueKeysWithValues: tags.map { ($0.id, $0) })
-        let presentations = reminder.tagIDs.compactMap { tagByID[$0] }
-            .map(Self.tagPresentation)
+        let presentations = Self.selectedTagPresentations(
+            for: reminder,
+            from: tags.map(Self.tagPresentation)
+        )
         let status =
             (try? ReminderStatusCalculator().status(
                 schedule: reminder.schedule,
@@ -418,9 +492,7 @@ final class AppEnvironment {
                 deviceLocalTime: $0.alertInstant
             )
         }
-        let repeatSummary = schedule.map {
-            LocalizedRepeatFormatter().summary(for: $0, locale: .current)
-        }
+        let repeatSummary = Self.repeatSummary(for: reminder)
         let groupValues = deviceState.outcomes
             .filter { $0.key.reminderID == reminder.id }
             .sorted { $0.key.baseOccurrenceInstant < $1.key.baseOccurrenceInstant }
@@ -463,16 +535,30 @@ final class AppEnvironment {
         )
         if router.formModel(for: reminder.id) == nil {
             router.registerFormIfAbsent(
-                ReminderFormModel(
-                    snapshot: reminder,
-                    savedRepeatPresentation: repeatSummary.map(SavedRepeatPresentation.standard),
-                    now: now,
-                    actions: formActions,
+                makeReminderForm(
+                    reminder,
+                    savedRepeatSummary: repeatSummary,
                     availableTags: presentations,
-                    assistedRepeatInterpreter: assistedRepeatInterpreter
+                    now: now
                 ))
         }
         return item
+    }
+
+    private func makeReminderForm(
+        _ reminder: ReminderSnapshot,
+        savedRepeatSummary: String?,
+        availableTags: [ReminderTagPresentation],
+        now: Date
+    ) -> ReminderFormModel {
+        ReminderFormModel(
+            snapshot: reminder,
+            savedRepeatPresentation: savedRepeatSummary.map(SavedRepeatPresentation.standard),
+            now: now,
+            actions: formActions,
+            availableTags: availableTags,
+            assistedRepeatInterpreter: assistedRepeatInterpreter
+        )
     }
 
     private static func tagPresentation(_ tag: TagSnapshot) -> ReminderTagPresentation {
@@ -481,6 +567,20 @@ final class AppEnvironment {
             name: tag.name,
             normalizedName: tag.normalizedName
         )
+    }
+
+    private static func selectedTagPresentations(
+        for reminder: ReminderSnapshot,
+        from availableTags: [ReminderTagPresentation]
+    ) -> [ReminderTagPresentation] {
+        let tagByID = Dictionary(uniqueKeysWithValues: availableTags.map { ($0.id, $0) })
+        return reminder.tagIDs.compactMap { tagByID[$0] }
+    }
+
+    private static func repeatSummary(for reminder: ReminderSnapshot) -> String? {
+        reminder.validSchedule.map {
+            LocalizedRepeatFormatter().summary(for: $0, locale: .current)
+        }
     }
 }
 
