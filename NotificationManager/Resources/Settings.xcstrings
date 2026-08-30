@@ -649,6 +649,240 @@
         }
       }
     },
+    "settings.icloud.account.available": {
+      "comment": "iCloud account access is available on this device; this does not claim that synchronization is complete.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Available"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "利用可能"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.checking": {
+      "comment": "The app is checking whether this device can access the user's iCloud account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Checking…"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認中…"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.could-not-determine": {
+      "comment": "CloudKit could not determine whether this device can access the user's iCloud account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Couldn’t determine"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "確認できません"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.no-account": {
+      "comment": "This device is not signed in to an iCloud account that CloudKit can use.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not signed in"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未サインイン"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.restricted": {
+      "comment": "System restrictions prevent CloudKit from accessing the user's iCloud account.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restricted"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "制限されています"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.temporarily-unavailable": {
+      "comment": "The user's iCloud account is temporarily unavailable to CloudKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Temporarily unavailable"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一時的に利用できません"
+          }
+        }
+      }
+    },
+    "settings.icloud.account.title": {
+      "comment": "Label for the current iCloud account availability on this device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud Account"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud アカウント"
+          }
+        }
+      }
+    },
+    "settings.icloud.activity.failed": {
+      "comment": "The latest observed CloudKit setup, import, or export operation failed; this does not describe global sync completion.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last operation failed"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直近の処理に失敗"
+          }
+        }
+      }
+    },
+    "settings.icloud.activity.in-progress": {
+      "comment": "At least one observed CloudKit setup, import, or export operation is running.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In progress"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "処理中"
+          }
+        }
+      }
+    },
+    "settings.icloud.activity.not-observed": {
+      "comment": "No CloudKit setup, import, or export operation has been observed since this app session began.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not observed yet"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "未確認"
+          }
+        }
+      }
+    },
+    "settings.icloud.activity.succeeded": {
+      "comment": "The latest observed CloudKit setup, import, or export operation succeeded; this does not claim global sync completion.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Last operation succeeded"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "直近の処理に成功"
+          }
+        }
+      }
+    },
+    "settings.icloud.activity.title": {
+      "comment": "Label for bounded CloudKit setup, import, and export activity observed on this device.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sync Activity"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "同期アクティビティ"
+          }
+        }
+      }
+    },
+    "settings.icloud.explanation": {
+      "comment": "Clarifies that the displayed iCloud status is limited to activity observed on this device and is not a global completion guarantee.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Shows iCloud activity observed on this device. It does not guarantee that every device is up to date."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このデバイスで観測した iCloud の処理状況です。すべてのデバイスへの反映完了を保証するものではありません。"
+          }
+        }
+      }
+    },
     "settings.notifications.explanation": {
       "comment": "User-facing text for the semantic key settings.notifications.explanation.",
       "extractionState": "manual",
@@ -717,6 +951,24 @@
           "stringUnit": {
             "state": "translated",
             "value": "外観"
+          }
+        }
+      }
+    },
+    "settings.section.icloud": {
+      "comment": "Settings section title for iCloud account availability and observed synchronization activity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
           }
         }
       }

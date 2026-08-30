@@ -240,6 +240,7 @@ final class AppEnvironment {
             pendingCleaner: cleanupService,
             reconciler: worker
         )
+        let iCloudSyncStatusModel = ICloudSyncStatusModel()
         let appIconModel = AppIconSelectionModel(
             service: UIApplicationAppIconService()
         )
@@ -254,6 +255,7 @@ final class AppEnvironment {
         let router = AppRouter(
             actions: actions,
             notificationSettingsModel: settingsModel,
+            iCloudSyncStatusModel: iCloudSyncStatusModel,
             tagManagementModel: tagModel,
             appIconSelectionModel: appIconModel,
             createForm: {
@@ -373,6 +375,7 @@ final class AppEnvironment {
     func start() async {
         guard !hasStarted, let lifecycleCoordinator else { return }
         hasStarted = true
+        router.iCloudSyncStatusModel?.start()
         lifecycleCoordinator.startObservingSystemChanges()
         await AppEnvironmentStartSequence.run(
             startSchedulingStateObservation: { [weak self] in

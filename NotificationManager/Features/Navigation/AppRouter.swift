@@ -18,6 +18,7 @@ enum AppRouterDestination: Sendable, Hashable {
 final class AppRouter {
     let actions: ReminderActionCoordinator
     let notificationSettingsModel: NotificationSettingsModel?
+    let iCloudSyncStatusModel: ICloudSyncStatusModel?
     let tagManagementModel: TagManagementModel?
     let appIconSelectionModel: AppIconSelectionModel?
     var compactPath: [AppRouterDestination] = []
@@ -33,6 +34,7 @@ final class AppRouter {
     init(
         actions: ReminderActionCoordinator,
         notificationSettingsModel: NotificationSettingsModel? = nil,
+        iCloudSyncStatusModel: ICloudSyncStatusModel? = nil,
         tagManagementModel: TagManagementModel? = nil,
         appIconSelectionModel: AppIconSelectionModel? = nil,
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
@@ -40,6 +42,7 @@ final class AppRouter {
     ) {
         self.actions = actions
         self.notificationSettingsModel = notificationSettingsModel
+        self.iCloudSyncStatusModel = iCloudSyncStatusModel
         self.tagManagementModel = tagManagementModel
         self.appIconSelectionModel = appIconSelectionModel
         self.createForm = createForm

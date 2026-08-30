@@ -10,6 +10,7 @@
 
         @State private var tagsSeeded = false
         private let settingsModel: NotificationSettingsModel
+        private let iCloudSyncModel: ICloudSyncStatusModel
         private let tagModel: TagManagementModel
         private let appIconModel: AppIconSelectionModel
         private let tagUseCase: TagManagementUseCase
@@ -25,6 +26,12 @@
                 authorizationRequester: authorization,
                 pendingCleaner: cleaner,
                 reconciler: nil
+            )
+            iCloudSyncModel = ICloudSyncStatusModel(
+                accountAvailability: .available,
+                syncActivity: .succeeded,
+                notificationCenter: NotificationCenter(),
+                accountStatus: { .available }
             )
             let iconMode =
                 ProcessInfo.processInfo.argumentValue(
@@ -65,6 +72,7 @@
                     if tagsSeeded {
                         SettingsView(
                             model: settingsModel,
+                            iCloudModel: iCloudSyncModel,
                             tagModel: tagModel,
                             appIconModel: appIconModel
                         )

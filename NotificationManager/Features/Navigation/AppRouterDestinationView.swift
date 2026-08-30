@@ -21,11 +21,13 @@ struct AppRouterDestinationView: View {
                 }
             case .settings:
                 if let settings = router.notificationSettingsModel,
+                    let iCloud = router.iCloudSyncStatusModel,
                     let tags = router.tagManagementModel,
                     let appIcons = router.appIconSelectionModel
                 {
                     SettingsView(
                         model: settings,
+                        iCloudModel: iCloud,
                         tagModel: tags,
                         appIconModel: appIcons
                     )

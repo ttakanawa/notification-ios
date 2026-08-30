@@ -3,6 +3,7 @@ import UIKit
 
 struct SettingsView: View {
     @Bindable var model: NotificationSettingsModel
+    @Bindable var iCloudModel: ICloudSyncStatusModel
     @Bindable var tagModel: TagManagementModel
     @Bindable var appIconModel: AppIconSelectionModel
 
@@ -130,6 +131,52 @@ struct SettingsView: View {
                 }
                 .accessibilityIdentifier("settings.about-privacy")
             }
+
+            Section {
+                LabeledContent {
+                    accountStatusValue
+                } label: {
+                    Label(
+                        LocalizedStringResource(
+                            "settings.icloud.account.title",
+                            table: "Settings"
+                        ),
+                        systemImage: "person.crop.circle"
+                    )
+                }
+
+                LabeledContent {
+                    syncActivityValue
+                } label: {
+                    Label(
+                        LocalizedStringResource(
+                            "settings.icloud.activity.title",
+                            table: "Settings"
+                        ),
+                        systemImage: "arrow.triangle.2.circlepath"
+                    )
+                }
+
+                Text(
+                    LocalizedStringResource(
+                        "settings.icloud.explanation",
+                        table: "Settings"
+                    )
+                )
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("settings.icloud.explanation")
+            } header: {
+                Text(
+                    LocalizedStringResource(
+                        "settings.section.icloud",
+                        table: "Settings"
+                    ))
+            }
+            .background {
+                AccessibilityIdentifierContainer(identifier: "settings.icloud.section")
+            }
         }
         .navigationTitle(
             LocalizedStringResource(
@@ -137,10 +184,39 @@ struct SettingsView: View {
                 table: "Settings"
             )
         )
-        .task { await model.load() }
+        .task {
+            await model.load()
+            await iCloudModel.refreshAccountAvailability()
+        }
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {
             AccessibilityIdentifierContainer(identifier: "settings.root")
+        }
+    }
+
+    private var accountStatusValue: some View {
+        HStack(spacing: 8) {
+            if iCloudModel.accountAvailability == .checking {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityHidden(true)
+            }
+            Text(iCloudModel.accountAvailability.localizedResource)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings.icloud.account-status")
+        }
+    }
+
+    private var syncActivityValue: some View {
+        HStack(spacing: 8) {
+            if iCloudModel.syncActivity == .inProgress {
+                ProgressView()
+                    .controlSize(.small)
+                    .accessibilityHidden(true)
+            }
+            Text(iCloudModel.syncActivity.localizedResource)
+                .foregroundStyle(.secondary)
+                .accessibilityIdentifier("settings.icloud.activity-status")
         }
     }
 
@@ -178,6 +254,36 @@ struct SettingsView: View {
         }
         openURL(url)
     }
+}
+
+extension ICloudAccountAvailability {
+    var localizedResource: LocalizedStringResource {
+        let key: String.LocalizationValue =
+            switch self {
+            case .checking: "settings.icloud.account.checking"
+            case .available: "settings.icloud.account.available"
+            case .noAccount: "settings.icloud.account.no-account"
+            case .restricted: "settings.icloud.account.restricted"
+            case .temporarilyUnavailable: "settings.icloud.account.temporarily-unavailable"
+            case .couldNotDetermine: "settings.icloud.account.could-not-determine"
+            }
+        return LocalizedStringResource(key, table: "Settings")
+    }
+
+}
+
+extension ICloudSyncActivity {
+    var localizedResource: LocalizedStringResource {
+        let key: String.LocalizationValue =
+            switch self {
+            case .notObserved: "settings.icloud.activity.not-observed"
+            case .inProgress: "settings.icloud.activity.in-progress"
+            case .succeeded: "settings.icloud.activity.succeeded"
+            case .failed: "settings.icloud.activity.failed"
+            }
+        return LocalizedStringResource(key, table: "Settings")
+    }
+
 }
 
 extension NotificationAuthorizationRawStatus {

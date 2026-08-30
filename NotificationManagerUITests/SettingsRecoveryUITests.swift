@@ -17,6 +17,29 @@ final class SettingsRecoveryUITests: XCTestCase {
     }
 
     @MainActor
+    func testSettingsShowsBoundedICloudAccountAndSyncActivityStatus() {
+        let app = launch(scenario: "settings")
+        let section = app.otherElements["settings.icloud.section"]
+        let activityStatus = app.staticTexts["settings.icloud.activity-status"]
+        var remainingScrolls = 3
+        while !activityStatus.isHittable, remainingScrolls > 0 {
+            app.swipeUp()
+            remainingScrolls -= 1
+        }
+
+        XCTAssertTrue(section.waitForExistence(timeout: 2))
+        XCTAssertEqual(
+            app.staticTexts["settings.icloud.account-status"].label,
+            "Available"
+        )
+        XCTAssertEqual(
+            activityStatus.label,
+            "Last operation succeeded"
+        )
+        XCTAssertTrue(app.staticTexts["settings.icloud.explanation"].exists)
+    }
+
+    @MainActor
     func testAppIconPickerChangesDeterministicSelection() {
         let app = launch(scenario: "settings")
         let row = app.buttons["settings.app-icon"]
