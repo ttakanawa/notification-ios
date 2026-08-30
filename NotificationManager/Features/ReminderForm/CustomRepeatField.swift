@@ -25,10 +25,16 @@ struct CustomRepeatField: View {
                         "reminder-form.custom.apple-intelligence-status"
                     )
             } icon: {
-                Image(systemName: "apple.intelligence")
-                    .accessibilityIdentifier(
-                        "reminder-form.custom.apple-intelligence-icon"
-                    )
+                if model.isInterpretingWithAppleIntelligence {
+                    ProgressView()
+                        .controlSize(.small)
+                        .accessibilityIdentifier("reminder-form.custom.apple-intelligence-progress")
+                } else {
+                    Image(systemName: "apple.intelligence")
+                        .accessibilityIdentifier(
+                            "reminder-form.custom.apple-intelligence-icon"
+                        )
+                }
             }
             .font(.caption)
             .foregroundStyle(appleIntelligenceStatusColor)
@@ -44,6 +50,7 @@ struct CustomRepeatField: View {
             }
             .disabled(
                 model.customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    || model.isInterpretingWithAppleIntelligence
             )
             .accessibilityIdentifier("reminder-form.custom.preview-button")
 
@@ -83,6 +90,7 @@ struct CustomRepeatField: View {
                     }
                     .buttonStyle(.bordered)
                     .accessibilityIdentifier("reminder-form.custom.assisted")
+                    .disabled(model.isInterpretingWithAppleIntelligence)
                 }
             case .awaitingConfirmation(let preview):
                 previewView(preview)

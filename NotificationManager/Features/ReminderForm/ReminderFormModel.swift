@@ -137,6 +137,7 @@ final class ReminderFormModel {
     private(set) var customRepeatState: CustomRepeatSessionState = .idle
     private(set) var customRepeatAppleIntelligenceStatus: CustomRepeatAppleIntelligenceStatus =
         .checking
+    private(set) var isInterpretingWithAppleIntelligence = false
     private(set) var previewNotifications: [PhysicalNotification] = []
     private(set) var showsPastEarlyWarning = false
     private(set) var isDeleteConfirmationPresented = false
@@ -150,6 +151,7 @@ final class ReminderFormModel {
     @ObservationIgnored private let pickerFallbackTimeZone: TimeZone
     @ObservationIgnored private var customRepeatSession: CustomRepeatSession?
     @ObservationIgnored private var customSubmissionGeneration: UInt64 = 0
+    @ObservationIgnored private var activeAppleIntelligenceRequests = 0
     @ObservationIgnored private var appleIntelligenceStatusRefreshGeneration: UInt64 = 0
     @ObservationIgnored private var editRevision: UInt64 = 0
     @ObservationIgnored private var saveOperationGeneration: UInt64 = 0
@@ -695,6 +697,13 @@ final class ReminderFormModel {
     }
 
     func interpretCustomRepeatWithAppleIntelligence() async {
+        activeAppleIntelligenceRequests += 1
+        isInterpretingWithAppleIntelligence = true
+        defer {
+            activeAppleIntelligenceRequests -= 1
+            isInterpretingWithAppleIntelligence =
+                activeAppleIntelligenceRequests > 0
+        }
         await submitCustomRepeat(mode: .assistedOnly)
     }
 
