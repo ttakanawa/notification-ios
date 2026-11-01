@@ -55,7 +55,7 @@ struct ReminderListView: View {
             )
         )
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
+            ToolbarItemGroup(placement: .topBarLeading) {
                 Button {
                     router.showSettings()
                 } label: {
@@ -65,6 +65,12 @@ struct ReminderListView: View {
                     )
                 }
                 .accessibilityIdentifier("reminder-list.settings")
+
+                if let iCloudModel = router.iCloudSyncStatusModel {
+                    ICloudSyncStatusButton(model: iCloudModel) {
+                        router.showSettings()
+                    }
+                }
             }
             ToolbarItem(placement: .primaryAction) {
                 Button {

@@ -2,6 +2,23 @@ import XCTest
 
 final class SettingsRecoveryUITests: XCTestCase {
     @MainActor
+    func testListShowsICloudStatusBesideSettingsAndOpensSettings() {
+        let app = launch(scenario: "icloud-status")
+        let status = app.buttons["reminder-list.icloud-status"]
+        let settings = app.buttons["reminder-list.settings"]
+
+        XCTAssertTrue(status.waitForExistence(timeout: 2))
+        XCTAssertEqual(status.label, "iCloud")
+        XCTAssertEqual(status.value as? String, "Last operation succeeded")
+        XCTAssertGreaterThan(status.frame.minX, settings.frame.maxX)
+        XCTAssertEqual(status.frame.midY, settings.frame.midY, accuracy: 2)
+
+        status.tap()
+
+        XCTAssertTrue(app.otherElements["settings.root"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
     func testSettingsExposeDevicePreferenceAuthorizationTagsAndPrivacy() {
         let app = launch(scenario: "settings")
 
