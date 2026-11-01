@@ -14,27 +14,43 @@
         @Guide(description: "A positive repeat interval", .range(1...9_999))
         var interval: Int
 
-        @Guide(description: "The meaning of the weekday collection")
+        @Guide(description: "The meaning of the weekday collection for weekly rules only")
         var weekdaySetKind: FoundationWeekdaySetKind
 
-        @Guide(description: "Zero to seven distinct weekdays", .count(0...7))
+        @Guide(
+            description: "Zero to seven distinct weekdays for weekly rules only",
+            .count(0...7)
+        )
         var weekdays: [FoundationWeekday]
 
-        @Guide(description: "The month for a yearly rule, or none")
+        @Guide(description: "The month for yearly rules only, or none")
         var month: FoundationMonth
 
-        @Guide(description: "The monthly or yearly selector, or none")
+        @Guide(description: "The selector for monthly or yearly rules only, or none")
         var selector: FoundationRepeatSelector
 
         var repeatCandidate: RepeatCandidate {
-            RepeatCandidate(
+            var mappedWeekdaySetKind = weekdaySetKind.weekdaySetKind
+            var mappedWeekdays = weekdays.map(\.weekday)
+            let mappedSelector = selector.repeatCandidateSelector
+
+            if frequency == .monthly,
+                case .some(.ordinalWeekday(_, let selectedWeekday)) = mappedSelector,
+                mappedWeekdaySetKind == nil || mappedWeekdaySetKind == .explicit,
+                mappedWeekdays == [selectedWeekday]
+            {
+                mappedWeekdaySetKind = nil
+                mappedWeekdays = []
+            }
+
+            return RepeatCandidate(
                 isSupported: isSupported,
                 frequency: frequency.repeatCandidateFrequency,
                 interval: interval,
-                weekdaySetKind: weekdaySetKind.weekdaySetKind,
-                weekdays: weekdays.map(\.weekday),
+                weekdaySetKind: mappedWeekdaySetKind,
+                weekdays: mappedWeekdays,
                 month: month.number,
-                selector: selector.repeatCandidateSelector
+                selector: mappedSelector
             )
         }
     }
