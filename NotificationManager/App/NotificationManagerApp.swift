@@ -13,7 +13,7 @@ struct NotificationManagerApp: App {
             #if DEBUG
                 if ProcessInfo.processInfo.arguments.contains("-ui-testing") {
                     let scenario = Self.uiScenario
-                    if ["settings", "data-unavailable", "notification-unavailable"]
+                    if ["settings", "icloud-status", "data-unavailable", "notification-unavailable"]
                         .contains(scenario)
                     {
                         Task15UITestFixtureRoot(scenario: scenario)
