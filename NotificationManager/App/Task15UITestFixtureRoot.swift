@@ -15,31 +15,36 @@
         private let appIconModel: AppIconSelectionModel
         private let tagUseCase: TagManagementUseCase
         private let dataUnavailableActions: DataUnavailableActions
+        private let router: AppRouter
+        private let listModel: ReminderListModel
 
         init(scenario: String) {
             self.scenario = scenario
             let authorization = Task15AuthorizationController(rawValue: 1)
             let cleaner = Task15PendingCleaner()
-            settingsModel = NotificationSettingsModel(
+            let settingsModel = NotificationSettingsModel(
                 preferenceStore: Task15PreferenceStore(enabled: false),
                 authorizationProvider: authorization,
                 authorizationRequester: authorization,
                 pendingCleaner: cleaner,
                 reconciler: nil
             )
-            iCloudSyncModel = ICloudSyncStatusModel(
+            self.settingsModel = settingsModel
+            let iCloudSyncModel = ICloudSyncStatusModel(
                 accountAvailability: .available,
                 syncActivity: .succeeded,
                 notificationCenter: NotificationCenter(),
                 accountStatus: { .available }
             )
+            self.iCloudSyncModel = iCloudSyncModel
             let iconMode =
                 ProcessInfo.processInfo.argumentValue(
                     following: "-ui-app-icon-mode"
                 ) ?? "normal"
-            appIconModel = AppIconSelectionModel(
+            let appIconModel = AppIconSelectionModel(
                 service: Task15AppIconService(mode: iconMode)
             )
+            self.appIconModel = appIconModel
 
             let repository: SwiftDataReminderRepository
             do {
@@ -53,7 +58,26 @@
                 now: { Date(timeIntervalSince1970: 1_786_003_200) }
             )
             tagUseCase = useCase
-            tagModel = TagManagementModel(repository: repository, useCase: useCase)
+            let tagModel = TagManagementModel(repository: repository, useCase: useCase)
+            self.tagModel = tagModel
+
+            let actions = ReminderActionCoordinator(
+                handlers: ReminderActionHandlers(
+                    setEnabled: { .saved($0.reminderID) },
+                    delete: { _ in }
+                )
+            )
+            listModel = ReminderListModel(
+                snapshot: ReminderListSnapshot(generation: 1, items: [], availableTags: []),
+                actions: actions
+            )
+            router = AppRouter(
+                actions: actions,
+                notificationSettingsModel: settingsModel,
+                iCloudSyncStatusModel: iCloudSyncModel,
+                tagManagementModel: tagModel,
+                appIconSelectionModel: appIconModel
+            )
 
             let unavailableAuthorization = Task15AuthorizationController(rawValue: 2)
             dataUnavailableActions = DataUnavailableActions(
@@ -67,6 +91,8 @@
 
         var body: some View {
             switch scenario {
+            case "icloud-status":
+                AdaptiveRootView(router: router, listModel: listModel)
             case "settings":
                 NavigationStack {
                     if tagsSeeded {
