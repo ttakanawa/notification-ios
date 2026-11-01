@@ -22,19 +22,6 @@ struct RepeatSection: View {
                         identifier: "reminder-form.custom.current-summary"
                     )
                 }
-
-                if let disclosure = model.canonicalEnglishDisclosure {
-                    DisclosureGroup {
-                        Text(verbatim: disclosure)
-                            .textSelection(.enabled)
-                    } label: {
-                        Text(
-                            LocalizedStringResource(
-                                "reminder.form.custom.canonical-disclosure",
-                                table: "ReminderForm"
-                            ))
-                    }
-                }
             }
 
             Picker(selection: repeatPresetBinding) {

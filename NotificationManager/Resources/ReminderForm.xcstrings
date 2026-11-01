@@ -811,24 +811,6 @@
         }
       }
     },
-    "reminder.form.custom.canonical-disclosure": {
-      "comment": "User-facing text for the semantic key reminder.form.custom.canonical-disclosure.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Compatibility Details"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "互換性の詳細"
-          }
-        }
-      }
-    },
     "reminder.form.custom.did-you-mean": {
       "comment": "User-facing text for the semantic key reminder.form.custom.did-you-mean.",
       "extractionState": "manual",

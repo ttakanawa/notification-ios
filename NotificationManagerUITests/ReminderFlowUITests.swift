@@ -355,6 +355,10 @@ final class ReminderFlowUITests: XCTestCase {
         let app = launch(scenario: "localized-custom-rule")
         app.buttons["reminder-row.bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"].tap()
 
+        let compatibilityDetails = app.descendants(matching: .any).matching(
+            NSPredicate(format: "label == %@", "Compatibility Details")
+        ).firstMatch
+        XCTAssertFalse(compatibilityDetails.exists)
         XCTAssertTrue(app.otherElements["reminder-form.custom.current-summary"].exists)
         XCTAssertFalse(app.textFields["reminder-form.custom.input"].exists)
         XCTAssertFalse(app.buttons["reminder-form.save"].exists)
