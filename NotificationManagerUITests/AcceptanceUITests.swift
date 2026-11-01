@@ -31,6 +31,10 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertEqual(recurrence.label, "Repeat")
         XCTAssertEqual(recurrence.value as? String, "Every week")
         XCTAssertTrue(app.buttons["reminder.tag-filter.all"].exists)
+        let timeZoneFilter = app.buttons["reminder.time-zone-filter.menu"]
+        XCTAssertTrue(timeZoneFilter.exists)
+        XCTAssertEqual(timeZoneFilter.label, "Filter by Time Zone")
+        XCTAssertEqual(timeZoneFilter.value as? String, "All Time Zones")
         XCTAssertFalse(row.label.localizedCaseInsensitiveContains("Travel"), row.label)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.device-status"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.group-outcome"].exists)
@@ -64,6 +68,46 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["reminder-row.times"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.recurrence"].exists)
         XCTAssertFalse(row.label.localizedCaseInsensitiveContains("One time"), row.label)
+    }
+
+    @MainActor
+    func testTimeZoneFilterShowsOnlyMatchingConfiguredReminder() {
+        let app = launchAcceptanceFixture(
+            scenario: "time-zone-filter",
+            arguments: englishManilaArguments
+        )
+        let newYork = app.buttons[
+            "reminder-row.aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+        ]
+        let manila = app.buttons[
+            "reminder-row.12121212-1212-1212-1212-121212121212"
+        ]
+
+        XCTAssertTrue(newYork.waitForExistence(timeout: 2))
+        XCTAssertTrue(manila.waitForExistence(timeout: 2))
+
+        let timeZoneFilter = app.buttons["reminder.time-zone-filter.menu"]
+        XCTAssertEqual(timeZoneFilter.label, "Filter by Time Zone")
+        XCTAssertEqual(timeZoneFilter.value as? String, "All Time Zones")
+
+        timeZoneFilter.tap()
+        let manilaOption = app.buttons["reminder.time-zone-filter.Asia/Manila"]
+        XCTAssertTrue(manilaOption.waitForExistence(timeout: 1))
+        manilaOption.tap()
+
+        XCTAssertTrue(manila.waitForExistence(timeout: 1))
+        XCTAssertTrue(newYork.waitForNonExistence(timeout: 1))
+        XCTAssertEqual(timeZoneFilter.label, "Filter by Time Zone")
+        XCTAssertEqual(timeZoneFilter.value as? String, "Asia/Manila")
+
+        timeZoneFilter.tap()
+        let allTimeZones = app.buttons["reminder.time-zone-filter.all"]
+        XCTAssertTrue(allTimeZones.waitForExistence(timeout: 1))
+        allTimeZones.tap()
+
+        XCTAssertTrue(newYork.waitForExistence(timeout: 1))
+        XCTAssertTrue(manila.waitForExistence(timeout: 1))
+        XCTAssertEqual(timeZoneFilter.value as? String, "All Time Zones")
     }
 
     @MainActor

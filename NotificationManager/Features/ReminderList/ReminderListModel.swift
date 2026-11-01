@@ -301,6 +301,7 @@ struct ReminderListSnapshot: Sendable, Equatable {
 final class ReminderListModel {
     private(set) var snapshot: ReminderListSnapshot
     var selectedTagID: UUID?
+    var selectedTimeZoneIdentifier: String?
 
     @ObservationIgnored private let actions: ReminderActionCoordinator
 
@@ -320,7 +321,11 @@ final class ReminderListModel {
     var availableTags: [ReminderTagPresentation] { snapshot.availableTags }
 
     var sections: ReminderListSections {
-        ReminderListProjection.make(from: items, selectedTagID: selectedTagID)
+        ReminderListProjection.make(
+            from: items,
+            selectedTagID: selectedTagID,
+            selectedTimeZoneIdentifier: selectedTimeZoneIdentifier
+        )
     }
 
     var tagFilterChoices: [ReminderTagPresentation] {
@@ -333,6 +338,10 @@ final class ReminderListModel {
         }
     }
 
+    var timeZoneFilterChoices: [String] {
+        Set(items.compactMap { $0.sourceWallClock?.timeZoneIdentifier }).sorted()
+    }
+
     func publish(_ snapshot: ReminderListSnapshot) {
         guard snapshot.generation > self.snapshot.generation else { return }
         self.snapshot = snapshot
@@ -341,6 +350,11 @@ final class ReminderListModel {
             !snapshot.availableTags.contains(where: { $0.id == selectedTagID })
         {
             self.selectedTagID = nil
+        }
+        if let selectedTimeZoneIdentifier,
+            !timeZoneFilterChoices.contains(selectedTimeZoneIdentifier)
+        {
+            self.selectedTimeZoneIdentifier = nil
         }
     }
 }

@@ -109,6 +109,8 @@
                 return oneTimeFixture()
             case "tag-filter":
                 return tagFilterFixture()
+            case "time-zone-filter":
+                return timeZoneFilterFixture()
             case "capacity-and-expired-confirmations":
                 return editableFixture(
                     id: uuid("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -193,6 +195,34 @@
             return Task14ScenarioFixture(
                 items: [item],
                 forms: [form]
+            )
+        }
+
+        private static func timeZoneFilterFixture() -> Task14ScenarioFixture {
+            let newYork = makeListItem(
+                id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"),
+                title: "New York reminder",
+                lifecycleStatus: .active,
+                sourceWallClock: schedule.source,
+                localizedRepeatSummary: nil
+            )
+            let manila = makeListItem(
+                id: uuid("12121212-1212-1212-1212-121212121212"),
+                title: "Manila reminder",
+                lifecycleStatus: .active,
+                sourceWallClock: SourceWallClock(
+                    year: 2040,
+                    month: 9,
+                    day: 1,
+                    hour: 9,
+                    minute: 30,
+                    timeZoneIdentifier: "Asia/Manila"
+                ),
+                localizedRepeatSummary: nil
+            )
+            return Task14ScenarioFixture(
+                items: [newYork, manila],
+                forms: []
             )
         }
 

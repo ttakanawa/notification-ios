@@ -149,11 +149,19 @@ struct ReminderListSections: Sendable, Equatable {
 enum ReminderListProjection {
     static func make(
         from items: [ReminderListItemPresentation],
-        selectedTagID: UUID?
+        selectedTagID: UUID?,
+        selectedTimeZoneIdentifier: String? = nil
     ) -> ReminderListSections {
         let filtered = items.filter { item in
-            guard let selectedTagID else { return true }
-            return item.tags.contains { $0.id == selectedTagID }
+            let matchesTag =
+                selectedTagID.map { selectedTagID in
+                    item.tags.contains { $0.id == selectedTagID }
+                } ?? true
+            let matchesTimeZone =
+                selectedTimeZoneIdentifier.map { identifier in
+                    item.sourceWallClock?.timeZoneIdentifier == identifier
+                } ?? true
+            return matchesTag && matchesTimeZone
         }
 
         return ReminderListSections(

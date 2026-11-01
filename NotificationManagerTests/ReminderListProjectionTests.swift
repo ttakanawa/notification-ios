@@ -199,6 +199,46 @@ struct ReminderListProjectionTests {
         #expect(sections.inactive.map(\.id) == [disabled.id])
     }
 
+    @Test func timeZoneFilterNarrowsTagFilteredResults() {
+        let work = ReminderTagPresentation(
+            id: UUID(uuidString: "10000000-0000-0000-0000-000000000000")!,
+            name: "Work",
+            normalizedName: "work"
+        )
+        let tokyoWork = ReminderListItemPresentation.fixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            lifecycleStatus: .active,
+            tags: [work],
+            timeZoneIdentifier: "Asia/Tokyo"
+        )
+        let newYorkWork = ReminderListItemPresentation.fixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            lifecycleStatus: .active,
+            tags: [work],
+            timeZoneIdentifier: "America/New_York"
+        )
+        let untaggedTokyo = ReminderListItemPresentation.fixture(
+            id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "Asia/Tokyo"
+        )
+        let unknownTimeZone = ReminderListItemPresentation.fixture(
+            id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            lifecycleStatus: .active,
+            tags: [work]
+        )
+
+        let sections = ReminderListProjection.make(
+            from: [newYorkWork, unknownTimeZone, untaggedTokyo, tokyoWork],
+            selectedTagID: work.id,
+            selectedTimeZoneIdentifier: "Asia/Tokyo"
+        )
+
+        #expect(sections.upcoming.map(\.id) == [tokyoWork.id])
+        #expect(sections.needsAttention.isEmpty)
+        #expect(sections.inactive.isEmpty)
+    }
+
     @Test func directOrderingUsesAuthoritativeOSFireRatherThanFoundationPreview() {
         let direct = ReminderListItemPresentation(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -274,6 +314,113 @@ struct ReminderListProjectionTests {
         #expect(model.sections.upcoming.map(\.id) == [tagged.id])
         model.selectedTagID = lowerA.id
         #expect(model.sections.upcoming.isEmpty)
+    }
+
+    @MainActor
+    @Test func listModelOffersDistinctConfiguredTimeZonesInStableOrder() {
+        let manila = ReminderListItemPresentation.fixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let newYork = ReminderListItemPresentation.fixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "America/New_York"
+        )
+        let duplicateManila = ReminderListItemPresentation.fixture(
+            id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
+            lifecycleStatus: .disabled,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let unknown = ReminderListItemPresentation.fixture(
+            id: "dddddddd-dddd-dddd-dddd-dddddddddddd",
+            lifecycleStatus: .invalidSchedule
+        )
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [manila, unknown, duplicateManila, newYork],
+                availableTags: []
+            ),
+            actions: actions
+        )
+
+        #expect(model.timeZoneFilterChoices == ["America/New_York", "Asia/Manila"])
+    }
+
+    @MainActor
+    @Test func listModelAppliesSelectedTimeZone() {
+        let manila = ReminderListItemPresentation.fixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let newYork = ReminderListItemPresentation.fixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "America/New_York"
+        )
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [manila, newYork],
+                availableTags: []
+            ),
+            actions: actions
+        )
+
+        model.selectedTimeZoneIdentifier = "Asia/Manila"
+
+        #expect(model.sections.upcoming.map(\.id) == [manila.id])
+    }
+
+    @MainActor
+    @Test func publicationClearsUnavailableSelectedTimeZone() {
+        let manila = ReminderListItemPresentation.fixture(
+            id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "Asia/Manila"
+        )
+        let newYork = ReminderListItemPresentation.fixture(
+            id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+            lifecycleStatus: .active,
+            timeZoneIdentifier: "America/New_York"
+        )
+        let actions = ReminderActionCoordinator(
+            handlers: ReminderActionHandlers(
+                setEnabled: { command in .saved(command.reminderID) },
+                delete: { _ in }
+            ))
+        let model = ReminderListModel(
+            snapshot: ReminderListSnapshot(
+                generation: 1,
+                items: [manila, newYork],
+                availableTags: []
+            ),
+            actions: actions
+        )
+        model.selectedTimeZoneIdentifier = "Asia/Manila"
+
+        model.publish(
+            ReminderListSnapshot(
+                generation: 2,
+                items: [newYork],
+                availableTags: []
+            ))
+
+        #expect(model.selectedTimeZoneIdentifier == nil)
+        #expect(model.sections.upcoming.map(\.id) == [newYork.id])
     }
 
     @MainActor
@@ -1415,7 +1562,8 @@ extension ReminderListItemPresentation {
         nextAlertInstant: Date? = nil,
         updatedAt: Date = .distantPast,
         tags: [ReminderTagPresentation] = [],
-        enabled: Bool = true
+        enabled: Bool = true,
+        timeZoneIdentifier: String? = nil
     ) -> Self {
         guard let reminderID = UUID(uuidString: id) else {
             preconditionFailure("Invalid reminder UUID fixture: \(id)")
@@ -1427,6 +1575,16 @@ extension ReminderListItemPresentation {
             deviceSchedulingStatus: lifecycleStatus == .active ? .scheduled : .notApplicable,
             nextPresentation: nextAlertInstant.map {
                 .rolling(PhysicalNotificationPresentation.fixture(alertInstant: $0))
+            },
+            sourceWallClock: timeZoneIdentifier.map {
+                SourceWallClock(
+                    year: 2040,
+                    month: 8,
+                    day: 31,
+                    hour: 9,
+                    minute: 30,
+                    timeZoneIdentifier: $0
+                )
             },
             tags: tags,
             enabled: enabled,

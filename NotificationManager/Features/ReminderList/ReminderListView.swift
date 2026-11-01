@@ -17,6 +17,10 @@ struct ReminderListView: View {
                 tags: model.tagFilterChoices,
                 selectedTagID: $model.selectedTagID
             )
+            TimeZoneFilterView(
+                identifiers: model.timeZoneFilterChoices,
+                selectedIdentifier: $model.selectedTimeZoneIdentifier
+            )
 
             reminderSection(
                 LocalizedStringResource(
