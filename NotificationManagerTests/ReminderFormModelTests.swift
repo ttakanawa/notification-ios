@@ -1325,6 +1325,202 @@ struct ReminderFormModelTests {
         #expect(!model.canSave)
     }
 
+}
+
+extension ReminderFormModelTests {
+    @Test func rangeIsOptionalAndDefaultsToOneHourWhenEnabled() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        #expect(!model.rangeEnabled)
+        #expect(model.detachedDraft.durationSeconds == nil)
+
+        model.setRangeEnabled(true)
+
+        #expect(model.rangeEnabled)
+        #expect(model.rangeEndDate == SourceDate(year: 2040, month: 8, day: 31))
+        #expect(model.rangeEndTime == SourceTime(hour: 10, minute: 30))
+        #expect(model.detachedDraft.durationSeconds == 3_600)
+        #expect(model.canSave)
+    }
+
+    @Test func endPickersUseSourceTimeZoneAcrossMidnight() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.sourceTime = SourceTime(hour: 23, minute: 30)
+        model.setRangeEnabled(true)
+
+        #expect(model.rangeEndDate == SourceDate(year: 2040, month: 9, day: 1))
+        #expect(model.rangeEndTime == SourceTime(hour: 0, minute: 30))
+        #expect(model.rangeEndDatePickerValue == date("2040-09-01T16:00:00Z"))
+        #expect(model.rangeEndTimePickerValue == date("2001-01-01T05:30:00Z"))
+
+        model.updateRangeEndDate(from: date("2040-09-02T16:00:00Z"))
+        model.updateRangeEndTime(from: date("2001-01-01T06:00:00Z"))
+
+        #expect(model.rangeEndDate == SourceDate(year: 2040, month: 9, day: 2))
+        #expect(model.rangeEndTime == SourceTime(hour: 1, minute: 0))
+        #expect(model.detachedDraft.durationSeconds == 91_800)
+        #expect(model.canSave)
+    }
+
+    @Test func endMustBeAfterStartAndStartEditsRecomputeDuration() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.setRangeEnabled(true)
+        model.updateRangeEndTime(from: date("2001-01-01T14:30:00Z"))
+
+        #expect(model.rangeEndFieldIssue == .rangeEndBeforeStart)
+        #expect(!model.canSave)
+        #expect(model.previewNotifications.isEmpty)
+
+        model.updateRangeEndTime(from: date("2001-01-01T15:30:00Z"))
+        model.sourceTime = SourceTime(hour: 10, minute: 0)
+
+        #expect(model.detachedDraft.durationSeconds == 1_800)
+        #expect(model.rangeEndFieldIssue == nil)
+        #expect(model.canSave)
+
+        model.sourceTime = SourceTime(hour: 11, minute: 0)
+        #expect(model.rangeEndFieldIssue == .rangeEndBeforeStart)
+        #expect(!model.canSave)
+    }
+
+    @Test func disablingRangeClearsEndAndRestoresSingleTimeSchedule() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.setRangeEnabled(true)
+        model.sourceTime = SourceTime(hour: 12, minute: 0)
+        #expect(!model.canSave)
+
+        model.setRangeEnabled(false)
+
+        #expect(model.rangeEndDate == nil)
+        #expect(model.rangeEndTime == nil)
+        #expect(model.detachedDraft.durationSeconds == nil)
+        #expect(model.rangeEndFieldIssue == nil)
+        #expect(model.canSave)
+        guard case .replace(let schedule) = model.detachedDraft.scheduleChange else {
+            Issue.record("Expected a replacement schedule")
+            return
+        }
+        #expect(schedule.durationSeconds == nil)
+    }
+
+    @Test func existingRangeLoadsAndDiscardRestoresTheOriginalEnd() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(durationSeconds: 5_400),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.rangeEnabled)
+        #expect(model.rangeEndTime == SourceTime(hour: 11, minute: 0))
+        #expect(!model.hasChanges)
+        #expect(model.canSaveWithoutReplacingSchedule)
+
+        model.setRangeEnabled(false)
+        #expect(model.hasChanges)
+        model.discardChanges()
+
+        #expect(model.rangeEnabled)
+        #expect(model.rangeEndTime == SourceTime(hour: 11, minute: 0))
+        #expect(model.detachedDraft.durationSeconds == 5_400)
+        #expect(!model.hasChanges)
+    }
+
+    @Test func changingRepeatAndEarlyReminderPreservesRangeOnSave() async {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(durationSeconds: 5_400),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in
+                    #expect(draft.durationSeconds == 5_400)
+                    guard case .replace(let schedule) = draft.scheduleChange else {
+                        Issue.record("Expected the edited schedule")
+                        return .saved(draft.id)
+                    }
+                    #expect(schedule.durationSeconds == 5_400)
+                    #expect(schedule.rule == .daily(interval: 1))
+                    return .saved(draft.id)
+                },
+                delete: { _ in }
+            )
+        )
+        model.repeatRule = .daily(interval: 1)
+        model.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
+
+        #expect(await model.save())
+    }
+
+    @Test func rangeDurationUsesElapsedTimeAcrossDaylightSavingTransition() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.sourceDate = SourceDate(year: 2040, month: 3, day: 11)
+        model.sourceTime = SourceTime(hour: 1, minute: 30)
+        model.setRangeEnabled(true)
+
+        #expect(model.rangeEndTime == SourceTime(hour: 3, minute: 30))
+        #expect(model.detachedDraft.durationSeconds == 3_600)
+        #expect(model.canSave)
+    }
+
+    @Test func readOnlyScheduleDoesNotAllowRangeEdits() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .unsupportedFuture(version: 4, originalData: Data([1]))
+            ),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        model.setRangeEnabled(true)
+        #expect(!model.rangeEnabled)
+        #expect(!model.hasChanges)
+        #expect(model.canSaveWithoutReplacingSchedule)
+    }
+
+    @Test func unrelatedScheduleEditsPreserveRangeEndingInTheSecondRepeatedHour() {
+        let schedule = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2040, month: 11, day: 4, hour: 1, minute: 45,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 2_700
+        )
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .valid(schedule, sourceVersion: 3, originalData: Data([1]))
+            ),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        #expect(model.rangeEndTime == SourceTime(hour: 1, minute: 30))
+        #expect(model.rangeEndFieldIssue == nil)
+        #expect(model.canSaveWithoutReplacingSchedule)
+
+        model.repeatRule = .daily(interval: 1)
+        model.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
+
+        #expect(model.detachedDraft.durationSeconds == 2_700)
+        #expect(model.rangeEndFieldIssue == nil)
+        #expect(model.canSave)
+    }
+
+    @Test func enablingRangeDuringTheRepeatedHourKeepsTheDefaultElapsedHour() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.sourceDate = SourceDate(year: 2040, month: 11, day: 4)
+        model.sourceTime = SourceTime(hour: 1, minute: 45)
+
+        model.setRangeEnabled(true)
+
+        #expect(model.rangeEndDate == model.sourceDate)
+        #expect(model.rangeEndTime == model.sourceTime)
+        #expect(model.detachedDraft.durationSeconds == 3_600)
+        #expect(model.rangeEndFieldIssue == nil)
+        #expect(model.canSave)
+    }
+
     private func configuredNewModel(recorder: SaveActionRecorder) -> ReminderFormModel {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -1369,6 +1565,7 @@ struct ReminderFormModelTests {
             weekdays: [.monday]
         ),
         early: EarlyReminder? = nil,
+        durationSeconds: Int? = nil,
         tagIDs: Set<UUID> = []
     ) -> ReminderSnapshot {
         let definition = ScheduleDefinition(
@@ -1382,7 +1579,8 @@ struct ReminderFormModelTests {
             ),
             rule: rule,
             end: .never,
-            early: early
+            early: early,
+            durationSeconds: durationSeconds
         )
         return ReminderSnapshot(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -1411,7 +1609,7 @@ enum OpaqueScheduleFixture: Sendable, CaseIterable {
 
     func schedule(raw: Data) -> ScheduleReadState {
         switch self {
-        case .unsupported: .unsupportedFuture(version: 3, originalData: raw)
+        case .unsupported: .unsupportedFuture(version: 4, originalData: raw)
         case .corrupt: .corrupt(originalData: raw)
         }
     }

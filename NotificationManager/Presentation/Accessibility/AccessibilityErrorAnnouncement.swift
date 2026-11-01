@@ -8,6 +8,8 @@ enum AccessibilityErrorIdentity: String, Sendable, Hashable {
     case reminderTimeZoneInvalid = "reminder.form.error.time-zone-invalid"
     case reminderRepeatEndInvalid = "reminder.form.error.invalid-repeat-end-date"
     case reminderRepeatEndBeforeStart = "reminder.form.error.repeat-end-before-start"
+    case reminderRangeEndInvalid = "reminder.form.error.range-end-invalid"
+    case reminderRangeEndBeforeStart = "reminder.form.error.range-end-before-start"
     case reminderCustomAssistanceUnavailable = "reminder.custom.error.assistance-unavailable"
     case reminderCustomUnsupportedLanguageLocale =
         "reminder.custom.error.unsupported-language-or-locale"

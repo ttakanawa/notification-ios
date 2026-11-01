@@ -103,7 +103,8 @@ public struct ReminderAggregateValidator: Sendable {
                     source: source,
                     rule: draft.rule,
                     end: draft.end,
-                    early: draft.early
+                    early: draft.early,
+                    durationSeconds: draft.durationSeconds
                 ) == schedule
             else {
                 throw ReminderValidationIssue.scheduleFieldsDoNotMatchReplacement
@@ -156,6 +157,9 @@ public struct ReminderAggregateValidator: Sendable {
 
         if let early = schedule.early, !(1...9_999).contains(early.value) {
             issues.append(.earlyValueOutOfRange)
+        }
+        if let duration = schedule.durationSeconds, duration < 60 || duration % 60 != 0 {
+            issues.append(.invalidDuration)
         }
         return issues
     }

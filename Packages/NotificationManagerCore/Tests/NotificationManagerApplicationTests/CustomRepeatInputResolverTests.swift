@@ -6,6 +6,28 @@ import Testing
 
 @Suite("CustomRepeatInputResolver")
 struct CustomRepeatInputResolverTests {
+    @Test func confirmingCustomRepeatPreservesConfiguredRangeDuration() async throws {
+        let assisted = AssistedRepeatInterpreterSpy(availability: .available, candidate: .daily)
+        let resolver = CustomRepeatInputResolver(
+            source: Self.source,
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600,
+            assistedInterpreter: assisted
+        )
+        let session = CustomRepeatSession(
+            resolver: resolver,
+            reminderID: UUID(),
+            now: { Self.previewNow },
+            recurrenceEnvironment: FoundationRecurrenceEnvironment()
+        )
+        _ = try await session.submit("Every day")
+        let confirmed = try #require(await session.confirm())
+
+        #expect(confirmed.rule == .daily(interval: 1))
+        #expect(confirmed.durationSeconds == 3_600)
+    }
+
     @Test func deterministicEnglishSuccessBypassesAssistedAvailabilityAndInterpretation() async {
         let assisted = AssistedRepeatInterpreterSpy(
             availability: .unavailable(.deviceNotEligible),

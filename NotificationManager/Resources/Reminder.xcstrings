@@ -1,6 +1,14 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "reminder.live-activity.started": {
+      "comment": "Scheduled Live Activity start alert. Placeholder 1 is the reminder title string, displayed verbatim.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%@" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "%@" } }
+      }
+    },
     "reminder.action.add": {
       "comment": "User-facing text for the semantic key reminder.action.add.",
       "extractionState": "manual",

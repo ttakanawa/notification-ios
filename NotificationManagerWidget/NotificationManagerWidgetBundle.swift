@@ -5,5 +5,6 @@ import WidgetKit
 struct NotificationManagerWidgetBundle: WidgetBundle {
     var body: some Widget {
         UpcomingRemindersWidget()
+        ReminderLiveActivityWidget()
     }
 }

@@ -1,6 +1,42 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "widget.live-activity.ended": {
+      "comment": "Shown after the reminder range or the eight-hour Live Activity display limit ends.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ended"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示終了"
+          }
+        }
+      }
+    },
+    "widget.live-activity.remaining": {
+      "comment": "VoiceOver label for the reminder range countdown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Time remaining"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り時間"
+          }
+        }
+      }
+    },
     "widget.gallery.description": {
       "comment": "Description shown for the upcoming reminders widget in the widget gallery.",
       "extractionState": "manual",

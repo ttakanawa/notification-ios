@@ -73,6 +73,78 @@ struct ReminderStatusTests {
         #expect(state.secondary.isEmpty)
     }
 
+    @Test(arguments: [0.0, 1.0, 3_599.0, 3_599.75])
+    func oneShotRangeStaysActiveFromStartUntilExclusiveEnd(_ elapsed: TimeInterval) throws {
+        let schedule = rangedSchedule()
+        let start = Date(timeIntervalSince1970: 1_786_066_200)
+        let state = try calculator.status(
+            schedule: .valid(schedule, sourceVersion: 3, originalData: Data()),
+            enabled: true,
+            after: start.addingTimeInterval(elapsed),
+            environment: .foundation
+        )
+
+        #expect(state.primary == .active)
+        #expect(state.secondary.isEmpty)
+    }
+
+    @Test func oneShotRangeExpiresExactlyAtEnd() throws {
+        let start = Date(timeIntervalSince1970: 1_786_066_200)
+        let state = try calculator.status(
+            schedule: .valid(rangedSchedule(), sourceVersion: 3, originalData: Data()),
+            enabled: true,
+            after: start.addingTimeInterval(3_600),
+            environment: .foundation
+        )
+
+        #expect(state.primary == .expired)
+    }
+
+    @Test func finalRecurringRangeRemainsActiveAfterRepeatCutoff() throws {
+        let finalStart = Date(timeIntervalSince1970: 1_786_066_200)
+        let schedule = rangedSchedule(
+            rule: .daily(interval: 1),
+            end: .onDate(SourceDate(year: 2026, month: 8, day: 7))
+        )
+        let state = try calculator.status(
+            schedule: .valid(schedule, sourceVersion: 3, originalData: Data()),
+            enabled: true,
+            after: finalStart.addingTimeInterval(1_800),
+            environment: .foundation
+        )
+
+        #expect(state.primary == .active)
+        #expect(
+            try !calculator.hasOngoingRange(
+                schedule: schedule,
+                at: finalStart.addingTimeInterval(3_600),
+                environment: .foundation
+            ))
+    }
+
+    @Test func disabledOngoingRangeIsDisabledWithoutExpiredSecondary() throws {
+        let state = try calculator.status(
+            schedule: .valid(rangedSchedule(), sourceVersion: 3, originalData: Data()),
+            enabled: false,
+            after: Date(timeIntervalSince1970: 1_786_066_200),
+            environment: .foundation
+        )
+
+        #expect(state.primary == .disabled)
+        #expect(state.secondary.isEmpty)
+    }
+
+    @Test func malformedRangeRemainsInvalidInsteadOfBecomingActive() throws {
+        let state = try calculator.status(
+            schedule: .valid(
+                rangedSchedule(duration: -60), sourceVersion: 3, originalData: Data()),
+            enabled: true,
+            after: Date(timeIntervalSince1970: 1_786_066_200),
+            environment: .foundation
+        )
+        #expect(state.primary == .invalidSchedule)
+    }
+
     @Test func validScheduleEnvironmentFailurePropagatesWithoutBecomingInvalid() {
         #expect(throws: SourceWallClockResolutionError.unknownTimeZone) {
             try calculator.status(
@@ -93,6 +165,20 @@ struct ReminderStatusTests {
 
     private var validPastSchedule: ScheduleReadState {
         validSchedule(year: 2026, month: 8, day: 4)
+    }
+
+    private func rangedSchedule(
+        rule: RepeatRule = .none,
+        end: RepeatEnd = .never,
+        duration: Int = 3_600
+    ) -> ScheduleDefinition {
+        ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2026, month: 8, day: 7, hour: 9, minute: 30,
+                timeZoneIdentifier: "Asia/Manila"
+            ),
+            rule: rule, end: end, early: nil, durationSeconds: duration
+        )
     }
 
     private func validSchedule(year: Int, month: Int, day: Int) -> ScheduleReadState {

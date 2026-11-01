@@ -66,6 +66,26 @@ struct DateTimeSection: View {
                 )
             }
 
+            if model.scheduleFieldsAreEditable {
+                Toggle(
+                    isOn: Binding(
+                        get: { model.rangeEnabled },
+                        set: { model.setRangeEnabled($0) }
+                    )
+                ) {
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.range-enabled",
+                            table: "ReminderForm"
+                        ))
+                }
+                .accessibilityIdentifier("reminder-form.range-enabled")
+
+                if model.rangeEnabled {
+                    rangeEndControls
+                }
+            }
+
             if case .readOnly = model.scheduleAccess {
                 unavailableValue(
                     title: LocalizedStringResource(
@@ -138,6 +158,58 @@ struct DateTimeSection: View {
             }
         }
         .accessibilityElement(children: .contain)
+    }
+
+    private var rangeEndControls: some View {
+        Group {
+            ScheduleDatePickerRow(
+                title: LocalizedStringResource(
+                    "reminder.field.range-end-date",
+                    table: "ReminderForm"
+                ),
+                selection: model.rangeEndDatePickerValue,
+                fallbackSelection: model.missingPickerDefaultValue,
+                displayedComponents: .date,
+                timeZone: model.pickerTimeZone,
+                accessibilityIdentifier: "reminder-form.range-end-date",
+                accessibilityValue: model.rangeEndDate.map {
+                    String(format: "%04d-%02d-%02d", $0.year, $0.month, $0.day)
+                },
+                onSelect: model.updateRangeEndDate(from:)
+            )
+            ScheduleDatePickerRow(
+                title: LocalizedStringResource(
+                    "reminder.field.range-end-time",
+                    table: "ReminderForm"
+                ),
+                selection: model.rangeEndTimePickerValue,
+                fallbackSelection: model.missingPickerDefaultValue,
+                displayedComponents: .hourAndMinute,
+                timeZone: model.pickerTimeZone,
+                accessibilityIdentifier: "reminder-form.range-end-time",
+                accessibilityValue: model.rangeEndTime.map {
+                    String(format: "%02d:%02d", $0.hour, $0.minute)
+                },
+                onSelect: model.updateRangeEndTime(from:)
+            )
+
+            if let issue = model.rangeEndFieldIssue {
+                Label(issue.localizedResource, systemImage: "exclamationmark.triangle")
+                    .foregroundStyle(.red)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("reminder-form.range-end-error")
+            }
+
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.range.live-activity-help",
+                    table: "ReminderForm"
+                )
+            )
+            .font(.caption)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
+        }
     }
 
     private func unavailableValue(

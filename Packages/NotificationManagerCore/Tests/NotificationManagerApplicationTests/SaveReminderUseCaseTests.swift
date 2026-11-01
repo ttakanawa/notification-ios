@@ -229,6 +229,53 @@ struct SaveReminderUseCaseTests {
         #expect(await repository.savedMutations.isEmpty)
     }
 
+    @Test func ongoingRangeSavesWithoutExpiredScheduleConsent() async throws {
+        let repository = InMemoryReminderRepository()
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([
+                testDate("2026-08-06T12:30:00Z"),
+                testDate("2026-08-06T12:30:01Z")
+            ]),
+            deviceEnabled: false
+        )
+        let schedule = ScheduleDefinition(
+            source: oneShotSchedule("2026-08-06T12:00:00Z").source,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        let draft = replacementDraft(id: TestApplicationValues.reminderID, schedule: schedule)
+
+        #expect(try await useCase.execute(draft: draft) == .saved(draft.id))
+        #expect(await repository.savedMutations.count == 1)
+    }
+
+    @Test func rangeThatEndsDuringSaveRequiresFreshExpiredConsent() async throws {
+        let repository = InMemoryReminderRepository()
+        let end = testDate("2026-08-06T13:00:00Z")
+        let useCase = makeSaveUseCase(
+            repository: repository,
+            clock: SequenceDateSource([end.addingTimeInterval(-1), end]),
+            deviceEnabled: false
+        )
+        let schedule = ScheduleDefinition(
+            source: oneShotSchedule("2026-08-06T12:00:00Z").source,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        let draft = replacementDraft(id: TestApplicationValues.reminderID, schedule: schedule)
+
+        #expect(
+            try await useCase.execute(draft: draft)
+                == .requiresExpiredScheduleConfirmation(
+                    ExpiredScheduleWarning(reminderID: draft.id, evaluationNow: end)))
+        #expect(await repository.savedMutations.isEmpty)
+    }
+
     @Test func existingScheduleReplacementCanBeSavedExhaustedOnlyWithConsent() async throws {
         let raw = Data("old-schedule".utf8)
         let schedule = oneShotSchedule("2026-08-05T12:00:00Z")
