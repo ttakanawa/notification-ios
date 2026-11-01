@@ -141,6 +141,21 @@ struct ReminderFormModelTests {
         #expect(model.canSaveWithoutReplacingSchedule)
     }
 
+    @Test func retiredLongIntervalPresetLoadsAsCustomWithoutChangingRule() {
+        let rule = RepeatRule.monthly(interval: 3, selector: .anchorDay)
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(rule: rule),
+            savedRepeatPresentation: .standard(localizedSummary: "Every 3 months."),
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.currentRepeatWasCustom)
+        #expect(model.currentLocalizedRepeatSummary == "Every 3 months.")
+        #expect(model.repeatRule == rule)
+        #expect(model.canSaveWithoutReplacingSchedule)
+    }
+
     @Test func existingReminderTracksSemanticChangesAndReturnsCleanAtBaseline() {
         let model = ReminderFormModel(
             snapshot: validSnapshot(rule: .daily(interval: 1)),
@@ -1249,8 +1264,6 @@ struct ReminderFormModelTests {
                     weekdaySetKind: .explicit,
                     weekdays: [.saturday]
                 ))
-        #expect(model.applyRepeatPreset(.every6Months))
-        #expect(model.repeatRule == .monthly(interval: 6, selector: .anchorDay))
     }
 
     @Test func repeatEndPickerStoresSourceZoneDate() {

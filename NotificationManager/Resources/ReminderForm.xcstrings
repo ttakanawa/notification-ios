@@ -1639,42 +1639,6 @@
         }
       }
     },
-    "reminder.repeat.every-3-months": {
-      "comment": "User-facing text for the semantic key reminder.repeat.every-3-months.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every 3 Months"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "3か月ごと"
-          }
-        }
-      }
-    },
-    "reminder.repeat.every-6-months": {
-      "comment": "User-facing text for the semantic key reminder.repeat.every-6-months.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Every 6 Months"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "6か月ごと"
-          }
-        }
-      }
-    },
     "reminder.repeat.hourly": {
       "comment": "User-facing text for the semantic key reminder.repeat.hourly.",
       "extractionState": "manual",
@@ -1779,24 +1743,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "毎週"
-          }
-        }
-      }
-    },
-    "reminder.repeat.yearly": {
-      "comment": "User-facing text for the semantic key reminder.repeat.yearly.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Yearly"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "毎年"
           }
         }
       }

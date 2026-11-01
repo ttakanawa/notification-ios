@@ -21,12 +21,10 @@ struct ParsingPresetRepeatRuleFactoryTests {
             ),
             (.weekly, .weekly(interval: 1, weekdaySetKind: .explicit, weekdays: [.tuesday])),
             (.biweekly, .weekly(interval: 2, weekdaySetKind: .explicit, weekdays: [.tuesday])),
-            (.monthly, .monthly(interval: 1, selector: .anchorDay)),
-            (.every3Months, .monthly(interval: 3, selector: .anchorDay)),
-            (.every6Months, .monthly(interval: 6, selector: .anchorDay)),
-            (.yearly, .yearly(interval: 1, month: nil, selector: .anchorMonthDay))
+            (.monthly, .monthly(interval: 1, selector: .anchorDay))
         ]
 
+        #expect(RepeatPreset.allCases == expected.map(\.0))
         for (preset, rule) in expected {
             #expect(try factory.rule(for: preset, source: .repeatFixture) == rule)
         }

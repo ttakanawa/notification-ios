@@ -291,9 +291,6 @@ private enum RepeatChoice: String, CaseIterable, Identifiable {
     case weekly
     case biweekly
     case monthly
-    case every3Months
-    case every6Months
-    case yearly
     case custom
 
     var id: String { rawValue }
@@ -303,33 +300,11 @@ private enum RepeatChoice: String, CaseIterable, Identifiable {
             self = .custom
             return
         }
-        self =
-            switch rule {
-            case .none: .doesNotRepeat
-            case .hourly(interval: 1): .hourly
-            case .daily(interval: 1): .daily
-            case .weekly(
-                interval: 1,
-                weekdaySetKind: .weekday,
-                weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
-            ): .weekdays
-            case .weekly(
-                interval: 1,
-                weekdaySetKind: .weekend,
-                weekdays: [.saturday, .sunday]
-            ): .weekends
-            case .weekly(interval: 1, weekdaySetKind: .explicit, let weekdays)
-            where weekdays.count == 1:
-                .weekly
-            case .weekly(interval: 2, weekdaySetKind: .explicit, let weekdays)
-            where weekdays.count == 1:
-                .biweekly
-            case .monthly(interval: 1, selector: .anchorDay): .monthly
-            case .monthly(interval: 3, selector: .anchorDay): .every3Months
-            case .monthly(interval: 6, selector: .anchorDay): .every6Months
-            case .yearly(interval: 1, month: nil, selector: .anchorMonthDay): .yearly
-            default: .custom
-            }
+        guard let preset = RepeatPreset(rule: rule) else {
+            self = .custom
+            return
+        }
+        self = Self(rawValue: preset.rawValue) ?? .custom
     }
 
     var preset: NotificationManagerDomain.RepeatPreset? {
@@ -342,9 +317,6 @@ private enum RepeatChoice: String, CaseIterable, Identifiable {
         case .weekly: .weekly
         case .biweekly: .biweekly
         case .monthly: .monthly
-        case .every3Months: .every3Months
-        case .every6Months: .every6Months
-        case .yearly: .yearly
         case .custom: nil
         }
     }
@@ -367,12 +339,6 @@ private enum RepeatChoice: String, CaseIterable, Identifiable {
             LocalizedStringResource("reminder.repeat.biweekly", table: "ReminderForm")
         case .monthly:
             LocalizedStringResource("reminder.repeat.monthly", table: "ReminderForm")
-        case .every3Months:
-            LocalizedStringResource("reminder.repeat.every-3-months", table: "ReminderForm")
-        case .every6Months:
-            LocalizedStringResource("reminder.repeat.every-6-months", table: "ReminderForm")
-        case .yearly:
-            LocalizedStringResource("reminder.repeat.yearly", table: "ReminderForm")
         case .custom:
             LocalizedStringResource("reminder.repeat.custom", table: "ReminderForm")
         }

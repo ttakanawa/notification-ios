@@ -7,9 +7,39 @@ public enum RepeatPreset: String, Sendable, Equatable, CaseIterable {
     case weekly
     case biweekly
     case monthly
-    case every3Months
-    case every6Months
-    case yearly
+
+    public init?(rule: RepeatRule) {
+        switch rule {
+        case .none:
+            self = .doesNotRepeat
+        case .hourly(interval: 1):
+            self = .hourly
+        case .daily(interval: 1):
+            self = .daily
+        case .weekly(
+            interval: 1,
+            weekdaySetKind: .weekday,
+            weekdays: [.monday, .tuesday, .wednesday, .thursday, .friday]
+        ):
+            self = .weekdays
+        case .weekly(
+            interval: 1,
+            weekdaySetKind: .weekend,
+            weekdays: [.saturday, .sunday]
+        ):
+            self = .weekends
+        case .weekly(interval: 1, weekdaySetKind: .explicit, let weekdays)
+        where weekdays.count == 1:
+            self = .weekly
+        case .weekly(interval: 2, weekdaySetKind: .explicit, let weekdays)
+        where weekdays.count == 1:
+            self = .biweekly
+        case .monthly(interval: 1, selector: .anchorDay):
+            self = .monthly
+        default:
+            return nil
+        }
+    }
 }
 
 public enum PresetRepeatRuleFactoryError: Error, Sendable, Equatable {
@@ -59,12 +89,6 @@ public struct PresetRepeatRuleFactory: Sendable {
             )
         case .monthly:
             return .monthly(interval: 1, selector: .anchorDay)
-        case .every3Months:
-            return .monthly(interval: 3, selector: .anchorDay)
-        case .every6Months:
-            return .monthly(interval: 6, selector: .anchorDay)
-        case .yearly:
-            return .yearly(interval: 1, month: nil, selector: .anchorMonthDay)
         }
     }
 }

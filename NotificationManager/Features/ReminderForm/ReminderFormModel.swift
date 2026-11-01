@@ -233,6 +233,8 @@ final class ReminderFormModel {
         currentLocalizedRepeatSummary = savedRepeatPresentation?.localizedSummary
         if case .custom = savedRepeatPresentation {
             currentRepeatWasCustom = true
+        } else if RepeatPreset(rule: initialDraft.rule) == nil {
+            currentRepeatWasCustom = true
         }
         canonicalEnglishDisclosure = savedRepeatPresentation?.canonicalEnglishDisclosure
 
