@@ -475,11 +475,8 @@
 		AA0000000000000000000003 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Ocean AppIcon-Sunset";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
-					"AppIcon-Ocean",
-					"AppIcon-Sunset",
-				);
 				CLOUDKIT_CONTAINER_IDENTIFIER = iCloud.org.tknw.punctual;
 				CODE_SIGN_ENTITLEMENTS = NotificationManager/SupportingFiles/NotificationManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
@@ -504,11 +501,8 @@
 		AA0000000000000000000004 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = "AppIcon-Ocean AppIcon-Sunset";
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_ALTERNATE_APPICON_NAMES = (
-					"AppIcon-Ocean",
-					"AppIcon-Sunset",
-				);
 				CLOUDKIT_CONTAINER_IDENTIFIER = iCloud.org.tknw.punctual;
 				CODE_SIGN_ENTITLEMENTS = NotificationManager/SupportingFiles/NotificationManager.entitlements;
 				CODE_SIGN_STYLE = Automatic;
