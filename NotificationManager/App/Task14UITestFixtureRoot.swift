@@ -107,6 +107,8 @@
                 return unsupportedFixture()
             case "one-time-row":
                 return oneTimeFixture()
+            case "tag-filter":
+                return tagFilterFixture()
             case "capacity-and-expired-confirmations":
                 return editableFixture(
                     id: uuid("dddddddd-dddd-dddd-dddd-dddddddddddd"),
@@ -243,6 +245,88 @@
                     )
                 ]
             )
+        }
+
+        private static func tagFilterFixture() -> Task14ScenarioFixture {
+            let tags = [
+                ReminderTagPresentation(
+                    id: uuid("11111111-1111-1111-1111-111111111111"),
+                    name: "Family",
+                    normalizedName: "family"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("22222222-2222-2222-2222-222222222222"),
+                    name: "Food & Drink",
+                    normalizedName: "food & drink"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("33333333-3333-3333-3333-333333333333"),
+                    name: "Personal",
+                    normalizedName: "personal"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("44444444-4444-4444-4444-444444444444"),
+                    name: "Tech",
+                    normalizedName: "tech"
+                ),
+                fixtureTag,
+                ReminderTagPresentation(
+                    id: uuid("55555555-5555-5555-5555-555555555555"),
+                    name: "Health & Wellness",
+                    normalizedName: "health & wellness"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("66666666-6666-6666-6666-666666666666"),
+                    name: "Learning & Education",
+                    normalizedName: "learning & education"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("88888888-8888-8888-8888-888888888888"),
+                    name: "Local Community Events",
+                    normalizedName: "local community events"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("99999999-9999-9999-9999-999999999998"),
+                    name: "Professional Development",
+                    normalizedName: "professional development"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaa1"),
+                    name: "Shopping & Errands",
+                    normalizedName: "shopping & errands"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbb1"),
+                    name: "Sports & Fitness",
+                    normalizedName: "sports & fitness"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("cccccccc-cccc-cccc-cccc-ccccccccccc1"),
+                    name: "Volunteering & Community",
+                    normalizedName: "volunteering & community"
+                ),
+                ReminderTagPresentation(
+                    id: uuid("dddddddd-dddd-dddd-dddd-ddddddddddd1"),
+                    name: "Work & Career",
+                    normalizedName: "work & career"
+                )
+            ]
+            let items = zip(tags.indices, tags).map { index, tag in
+                makeListItem(
+                    id: uuid(
+                        String(
+                            format: "00000000-0000-0000-0000-%012d",
+                            index + 1
+                        )
+                    ),
+                    title: "\(tag.name) reminder",
+                    lifecycleStatus: .active,
+                    sourceWallClock: schedule.source,
+                    localizedRepeatSummary: nil,
+                    tags: [tag]
+                )
+            }
+            return Task14ScenarioFixture(items: items, forms: [])
         }
 
         private static func makeNewForm() -> ReminderFormModel {

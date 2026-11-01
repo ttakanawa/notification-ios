@@ -6,58 +6,77 @@ struct TagFilterView: View {
 
     var body: some View {
         Section {
-            Menu {
-                Button {
-                    selectedTagID = nil
-                } label: {
-                    filterLabel(
-                        LocalizedStringResource(
-                            "reminder.tag-filter.all",
-                            table: "Reminder"
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    filterButton(
+                        title: Text(
+                            LocalizedStringResource(
+                                "reminder.tag-filter.all",
+                                table: "Reminder"
+                            )
                         ),
-                        selected: selectedTagID == nil
+                        tagID: nil,
+                        identifier: "reminder.tag-filter.all"
                     )
-                }
 
-                ForEach(tags) { tag in
-                    Button {
-                        selectedTagID = tag.id
-                    } label: {
-                        Label {
-                            Text(verbatim: tag.name)
-                        } icon: {
-                            Image(systemName: selectedTagID == tag.id ? "checkmark" : "tag")
-                        }
+                    ForEach(tags) { tag in
+                        filterButton(
+                            title: Text(verbatim: tag.name),
+                            tagID: tag.id,
+                            identifier: "reminder.tag-filter.\(tag.id.uuidString.lowercased())"
+                        )
                     }
-                    .accessibilityIdentifier(
-                        "reminder.tag-filter.\(tag.id.uuidString.lowercased())")
                 }
-            } label: {
-                Label {
-                    Text(verbatim: selectedTagName)
-                } icon: {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, 4)
             }
-            .accessibilityIdentifier("reminder.tag-filter.menu")
-        }
-    }
-
-    private var selectedTagName: String {
-        guard let selectedTagID,
-            let tag = tags.first(where: { $0.id == selectedTagID })
-        else {
-            return String(
-                localized: "reminder.tag-filter.all",
-                defaultValue: "All Tags",
-                table: "Reminder"
+            .accessibilityIdentifier("reminder.tag-filter.scroll")
+            .listRowInsets(
+                EdgeInsets(
+                    top: 8,
+                    leading: 16,
+                    bottom: 8,
+                    trailing: 0
+                )
             )
+            .listRowSeparator(.hidden)
         }
-        return tag.name
     }
 
-    private func filterLabel(_ title: LocalizedStringResource, selected: Bool) -> some View {
-        Label(title, systemImage: selected ? "checkmark" : "tag")
+    private func filterButton(
+        title: Text,
+        tagID: UUID?,
+        identifier: String
+    ) -> some View {
+        let selected = selectedTagID == tagID
+
+        return Button {
+            selectedTagID = tagID
+        } label: {
+            Label {
+                title
+                    .lineLimit(1)
+            } icon: {
+                Image(systemName: selected ? "checkmark" : "tag")
+            }
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(selected ? Color.white : Color.accentColor)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .frame(minHeight: 44)
+            .background {
+                Capsule()
+                    .fill(selected ? Color.accentColor : Color.clear)
+            }
+            .overlay {
+                Capsule()
+                    .strokeBorder(
+                        selected ? Color.clear : Color.secondary.opacity(0.3),
+                        lineWidth: 1
+                    )
+            }
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier(identifier)
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

@@ -30,7 +30,7 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertEqual(dayOffset.label, "1 day ago")
         XCTAssertEqual(recurrence.label, "Repeat")
         XCTAssertEqual(recurrence.value as? String, "Every week")
-        XCTAssertTrue(app.buttons["reminder.tag-filter.menu"].exists)
+        XCTAssertTrue(app.buttons["reminder.tag-filter.all"].exists)
         XCTAssertFalse(row.label.localizedCaseInsensitiveContains("Travel"), row.label)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.device-status"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.group-outcome"].exists)
@@ -64,6 +64,68 @@ final class AcceptanceUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["reminder-row.times"].exists)
         XCTAssertFalse(app.descendants(matching: .any)["reminder-row.recurrence"].exists)
         XCTAssertFalse(row.label.localizedCaseInsensitiveContains("One time"), row.label)
+    }
+
+    @MainActor
+    func testTagChipsScrollHorizontallyAndFilterReminders() {
+        let app = launchAcceptanceFixture(
+            scenario: "tag-filter",
+            arguments: englishManilaArguments
+        )
+        let scrollView = app.scrollViews["reminder.tag-filter.scroll"]
+        let allTags = app.buttons["reminder.tag-filter.all"]
+        let family = app.buttons[
+            "reminder.tag-filter.11111111-1111-1111-1111-111111111111"
+        ]
+        let tech = app.buttons[
+            "reminder.tag-filter.44444444-4444-4444-4444-444444444444"
+        ]
+        let familyReminder = app.buttons[
+            "reminder-row.00000000-0000-0000-0000-000000000001"
+        ]
+        let techReminder = app.buttons[
+            "reminder-row.00000000-0000-0000-0000-000000000004"
+        ]
+
+        XCTAssertTrue(scrollView.waitForExistence(timeout: 2))
+        XCTAssertTrue(allTags.exists)
+        XCTAssertTrue(allTags.isSelected)
+        XCTAssertGreaterThanOrEqual(allTags.frame.height, 44)
+        XCTAssertTrue(family.exists)
+        XCTAssertTrue(familyReminder.exists)
+        XCTAssertTrue(techReminder.exists)
+
+        XCTAssertTrue(tech.waitForExistence(timeout: 1))
+        let initialTechMinX = tech.frame.minX
+        for _ in 0..<8 {
+            if tech.isHittable {
+                break
+            }
+            scrollView.swipeLeft(velocity: .fast)
+        }
+        XCTAssertTrue(tech.isHittable)
+        XCTAssertLessThan(tech.frame.minX, initialTechMinX)
+        tech.tap()
+
+        XCTAssertTrue(tech.isSelected)
+        XCTAssertTrue(techReminder.waitForExistence(timeout: 1))
+        XCTAssertTrue(familyReminder.waitForNonExistence(timeout: 1))
+
+        XCTAssertTrue(allTags.waitForExistence(timeout: 1))
+        let scrolledAllTagsMaxX = allTags.frame.maxX
+        for _ in 0..<8 {
+            if allTags.isHittable {
+                break
+            }
+            scrollView.swipeRight(velocity: .fast)
+        }
+        XCTAssertTrue(allTags.isHittable)
+        XCTAssertGreaterThan(allTags.frame.maxX, scrolledAllTagsMaxX)
+        allTags.tap()
+
+        XCTAssertTrue(allTags.isSelected)
+        XCTAssertTrue(familyReminder.waitForExistence(timeout: 1))
+        XCTAssertTrue(techReminder.exists)
     }
 
     @MainActor
