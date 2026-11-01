@@ -42,7 +42,7 @@ help:
 	@echo "make validate-testflight          Validate TestFlight configuration"
 	@echo "make test-package                 Run core package tests"
 	@echo "make test-testflight-validator     Test distribution build-number validation"
-	@echo "make test-ci-scripts               Test Xcode Cloud workflow guards"
+	@echo "make test-ci-scripts               Test Xcode Cloud hooks and TestFlight notes"
 	@echo "make ci-check                      Run checks before Xcode Cloud actions"
 
 format:
@@ -91,6 +91,7 @@ test-testflight-validator:
 
 test-ci-scripts:
 	sh Scripts/Tests/xcode-cloud-hooks.sh
+	sh Scripts/Tests/testflight-notes.sh
 
 ci-check:
 	$(MAKE) lint

@@ -5,6 +5,7 @@ worktrees/
 .swiftpm/
 xcuserdata/
 DerivedData/
+/TestFlight/
 
 *.xcuserstate
 .DS_Store
