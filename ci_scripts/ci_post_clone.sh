@@ -9,18 +9,9 @@ fail() {
 
 [ "${CI_XCODE_CLOUD:-}" = "TRUE" ] || fail "run local checks with make ci-check"
 
-case "${PUNCTUAL_CI_MODE:-}" in
-    verify)
-        [ "${CI_XCODEBUILD_ACTION:-}" != "archive" ] \
-            || fail "the verify workflow must not archive or distribute builds"
-        ;;
-    testflight)
-        case "${CI_START_CONDITION:-}" in
-            manual|manual_rebuild) ;;
-            *) fail "TestFlight distribution must be started manually for a selected branch" ;;
-        esac
-        ;;
-    *) fail "set PUNCTUAL_CI_MODE to verify or testflight in the workflow" ;;
+case "${CI_START_CONDITION:-}" in
+    manual|manual_rebuild) ;;
+    *) fail "TestFlight distribution must be started manually for a selected branch" ;;
 esac
 
 # Test runners consume the test products from build-for-testing. They do not

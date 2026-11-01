@@ -82,7 +82,7 @@ run_hook() {
         MOCK_LOG="$log_file" \
         MOCK_BIN="$fixture_bin" \
         CI_XCODE_CLOUD=TRUE \
-        PUNCTUAL_CI_MODE=verify \
+        CI_START_CONDITION=manual \
         CI_XCODEBUILD_ACTION=build-for-testing \
         CI_PRIMARY_REPOSITORY_PATH="$fixture_root" \
         "$@" /bin/sh "$hook" > "$output_file" 2>&1; then
@@ -139,37 +139,33 @@ expect_tool_failure() {
 
 expect_rejection "missing Xcode Cloud marker" "run local checks" CI_XCODE_CLOUD=
 expect_rejection "invalid Xcode Cloud marker" "run local checks" CI_XCODE_CLOUD=true
-expect_rejection "missing mode" "set PUNCTUAL_CI_MODE" PUNCTUAL_CI_MODE=
-expect_rejection "invalid mode" "set PUNCTUAL_CI_MODE" PUNCTUAL_CI_MODE=release
-expect_rejection "verification cannot archive" "must not archive" CI_XCODEBUILD_ACTION=archive
 expect_rejection "missing primary repository" "CI_PRIMARY_REPOSITORY_PATH is missing" CI_PRIMARY_REPOSITORY_PATH=
 expect_rejection "invalid primary repository" "must contain Makefile and mise.toml" CI_PRIMARY_REPOSITORY_PATH="$temporary_directory"
 
-for start_condition in '' push pr tag branch_changes pull_request_changes tag_changes; do
-    expect_rejection "automatic distribution: $start_condition" "must be started manually" \
-        PUNCTUAL_CI_MODE=testflight CI_START_CONDITION="$start_condition" CI_XCODEBUILD_ACTION=archive
+for action in archive build-for-testing test-without-building; do
+    for start_condition in '' unknown push pr_open pr_update schedule tag; do
+        expect_rejection "nonmanual distribution: $action / $start_condition" "must be started manually" \
+            CI_START_CONDITION="$start_condition" CI_XCODEBUILD_ACTION="$action"
+    done
 done
 
-expect_checks "verification runs checks in repository with spaces"
 for start_condition in manual manual_rebuild; do
-    expect_checks "manual distribution: $start_condition" \
-        PUNCTUAL_CI_MODE=testflight CI_START_CONDITION="$start_condition" CI_XCODEBUILD_ACTION=archive
+    for action in archive build-for-testing; do
+        expect_checks "manual distribution in repository with spaces: $action / $start_condition" \
+            CI_START_CONDITION="$start_condition" CI_XCODEBUILD_ACTION="$action"
+    done
 done
 
 # Test runners can lack a checkout and build tools, but cannot bypass policy.
-for mode in verify testflight; do
-    scenario="test runner skips repository and tools: $mode"
-    run_hook PUNCTUAL_CI_MODE="$mode" CI_START_CONDITION=manual \
+for start_condition in manual manual_rebuild; do
+    scenario="test runner skips repository and tools: $start_condition"
+    run_hook CI_START_CONDITION="$start_condition" \
         CI_XCODEBUILD_ACTION=test-without-building CI_PRIMARY_REPOSITORY_PATH= PATH=/nonexistent
     [ "$hook_status" -eq 0 ] || fail_test "unexpected failure"
     [ ! -s "$log_file" ] || fail_test "test runner invoked tools"
 done
 expect_rejection "test runner still requires Cloud" "run local checks" \
     CI_XCODEBUILD_ACTION=test-without-building CI_XCODE_CLOUD=
-expect_rejection "test runner still requires mode" "set PUNCTUAL_CI_MODE" \
-    CI_XCODEBUILD_ACTION=test-without-building PUNCTUAL_CI_MODE=
-expect_rejection "test runner still requires manual distribution" "must be started manually" \
-    CI_XCODEBUILD_ACTION=test-without-building PUNCTUAL_CI_MODE=testflight CI_START_CONDITION=push
 
 expect_tool_failure "mise trust failure" 31 "mise cwd=<$fixture_root> <trust> <$fixture_root/mise.toml>" MOCK_TRUST_STATUS=31
 expect_tool_failure "mise install failure" 32 "mise cwd=<$fixture_root> <install>" MOCK_INSTALL_STATUS=32
