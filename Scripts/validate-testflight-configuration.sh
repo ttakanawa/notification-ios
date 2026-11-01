@@ -42,6 +42,8 @@ project_json=$(plutil -convert json -o - "$project_file")
 assert_equal "Punctual" "$(printf '%s' "$info_json" | jq -r '.CFBundleDisplayName')" "CFBundleDisplayName"
 assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$info_json" | jq -r '.CFBundleShortVersionString')" "CFBundleShortVersionString"
 assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$info_json" | jq -r '.CFBundleVersion')" "CFBundleVersion"
+assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleShortVersionString')" "Widget CFBundleShortVersionString"
+assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleVersion')" "Widget CFBundleVersion"
 
 printf '%s' "$info_json" | jq -e '.UIBackgroundModes == ["remote-notification"]' >/dev/null \
     || fail "UIBackgroundModes must contain only remote-notification for CloudKit sync"
@@ -175,17 +177,45 @@ printf '%s' "$project_json" | jq -e \
     }
 ' >/dev/null || fail "target capability metadata must preserve app services and Widget App Groups"
 
-printf '%s' "$project_json" | jq -e --arg app_target_id "$app_target_id" '
+printf '%s' "$project_json" | jq -e \
+    --arg app_target_id "$app_target_id" \
+    --arg widget_target_id "$widget_target_id" '
     .objects as $objects
-    | $objects[$app_target_id].buildConfigurationList as $configuration_list_id
-    | $objects[$configuration_list_id].buildConfigurations as $configuration_ids
-    | ($configuration_ids | length) == 2
-    and ([$configuration_ids[] | $objects[.].name] | sort) == ["Debug", "Release"]
-    and all(
-        $configuration_ids[];
-        $objects[.].buildSettings.CURRENT_PROJECT_VERSION == "2"
+    | [$app_target_id, $widget_target_id] as $target_ids
+    | all(
+        $target_ids[];
+        $objects[.].buildConfigurationList as $configuration_list_id
+        | $objects[$configuration_list_id].buildConfigurations as $configuration_ids
+        | ($configuration_ids | type) == "array"
+        and ($configuration_ids | length) == 2
+        and ([$configuration_ids[]? | $objects[.].name] | sort) == ["Debug", "Release"]
     )
-' >/dev/null || fail "app Debug and Release build numbers must both be 2"
+    and (
+        [
+            $target_ids[]
+            | $objects[.].buildConfigurationList as $configuration_list_id
+            | $objects[$configuration_list_id].buildConfigurations[]?
+            | $objects[.].buildSettings.CURRENT_PROJECT_VERSION
+        ] as $versions
+        | ($versions | length) == 4
+        and all($versions[]; if type == "string" then test("^[1-9][0-9]*$") else false end)
+        and ($versions | unique | length) == 1
+    )
+' >/dev/null || fail "app and Widget Debug and Release build numbers must be matching positive integers"
+
+printf '%s' "$project_json" | jq -e \
+    --arg app_target_id "$app_target_id" \
+    --arg widget_target_id "$widget_target_id" '
+    .objects as $objects
+    | [
+        [$app_target_id, $widget_target_id][]
+        | $objects[.].buildConfigurationList as $configuration_list_id
+        | $objects[$configuration_list_id].buildConfigurations[]
+        | $objects[.].buildSettings.MARKETING_VERSION
+    ] as $versions
+    | all($versions[]; if type == "string" then test("^[0-9]+(\\.[0-9]+){0,2}$") else false end)
+    and ($versions | unique | length) == 1
+' >/dev/null || fail "app and Widget Debug and Release marketing versions must match and use one to three numeric components"
 
 printf '%s' "$project_json" | jq -e --arg widget_target_id "$widget_target_id" '
     .objects as $objects
@@ -197,7 +227,6 @@ printf '%s' "$project_json" | jq -e --arg widget_target_id "$widget_target_id" '
         $configuration_ids[];
         $objects[.].buildSettings.APPLICATION_EXTENSION_API_ONLY == "YES"
         and $objects[.].buildSettings.SKIP_INSTALL == "YES"
-        and $objects[.].buildSettings.CURRENT_PROJECT_VERSION == "2"
         and $objects[.].buildSettings.IPHONEOS_DEPLOYMENT_TARGET == "18.0"
         and $objects[.].buildSettings.SUPPORTED_PLATFORMS == "iphoneos iphonesimulator"
         and $objects[.].buildSettings.SWIFT_VERSION == "6.0"

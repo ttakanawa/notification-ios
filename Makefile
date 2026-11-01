@@ -27,7 +27,8 @@ LOCALIZATION_CATALOGS := \
 	NotificationManagerWidget/Resources/Widget.xcstrings
 
 .PHONY: help format lint test-unit test-integration test-ui build-release \
-	validate-localizations test-localization-validator validate-testflight
+	validate-localizations test-localization-validator validate-testflight \
+	test-package test-testflight-validator test-ci-scripts ci-check
 
 help:
 	@echo "make format                       Format maintained Swift sources"
@@ -39,6 +40,10 @@ help:
 	@echo "make validate-localizations       Validate string catalogs and source coverage"
 	@echo "make test-localization-validator  Test localization validator fixtures"
 	@echo "make validate-testflight          Validate TestFlight configuration"
+	@echo "make test-package                 Run core package tests"
+	@echo "make test-testflight-validator     Test distribution build-number validation"
+	@echo "make test-ci-scripts               Test Xcode Cloud workflow guards"
+	@echo "make ci-check                      Run checks before Xcode Cloud actions"
 
 format:
 	swift format --configuration .swift-format --in-place --recursive $(SWIFT_PATHS)
@@ -48,7 +53,7 @@ lint:
 	swiftlint lint --strict --no-cache $(SWIFT_PATHS)
 
 test-unit:
-	swift test --package-path Packages/NotificationManagerCore
+	$(MAKE) test-package
 	xcodebuild test -project $(PROJECT) -scheme $(SCHEME) \
 		-destination '$(SIMULATOR_DESTINATION)' \
 		-only-testing:NotificationManagerTests
@@ -77,3 +82,18 @@ test-localization-validator:
 
 validate-testflight:
 	sh Scripts/validate-testflight-configuration.sh
+
+test-package:
+	swift test --package-path Packages/NotificationManagerCore
+
+test-testflight-validator:
+	sh Scripts/Tests/validate-testflight-build-numbers.sh
+
+test-ci-scripts:
+	sh Scripts/Tests/xcode-cloud-hooks.sh
+
+ci-check:
+	$(MAKE) lint
+	$(MAKE) validate-localizations test-localization-validator
+	$(MAKE) validate-testflight test-testflight-validator test-ci-scripts
+	$(MAKE) test-package

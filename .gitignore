@@ -1,4 +1,5 @@
 .worktrees/
+worktrees/
 .superpowers/
 .build/
 .swiftpm/
