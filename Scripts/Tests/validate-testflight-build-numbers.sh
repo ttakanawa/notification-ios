@@ -90,6 +90,17 @@ build_diagnostic="build numbers must be matching positive integers"
 marketing_diagnostic="marketing versions must match"
 
 expect_success "current project"
+
+# Select valid values that differ from the source project after version bumps.
+mismatched_build_number=$(jq -r --arg configuration_id "$app_debug_id" '
+    .objects[$configuration_id].buildSettings.CURRENT_PROJECT_VERSION
+    | if . == "1" then "2" else "1" end
+' "$temporary_directory/original.json")
+mismatched_marketing_version=$(jq -r --arg configuration_id "$app_debug_id" '
+    .objects[$configuration_id].buildSettings.MARKETING_VERSION
+    | if . == "1.0" then "1.1" else "1.0" end
+' "$temporary_directory/original.json")
+
 mutate_setting all CURRENT_PROJECT_VERSION 123
 expect_success "incremented app and Widget build numbers"
 mutate_setting all MARKETING_VERSION 2.1.3
@@ -106,7 +117,7 @@ for configuration_id in $app_ids $widget_ids; do
     mutate_setting "$configuration_id" CURRENT_PROJECT_VERSION missing
     expect_failure "missing build number in $configuration_id" "$build_diagnostic"
     reset_project
-    mutate_setting "$configuration_id" CURRENT_PROJECT_VERSION 3
+    mutate_setting "$configuration_id" CURRENT_PROJECT_VERSION "$mismatched_build_number"
     expect_failure "mismatched build number in $configuration_id" "$build_diagnostic"
     reset_project
     mutate_setting "$configuration_id" MARKETING_VERSION missing
@@ -114,7 +125,7 @@ for configuration_id in $app_ids $widget_ids; do
 done
 
 reset_project
-mutate_setting "$widget_release_id" MARKETING_VERSION 1.1
+mutate_setting "$widget_release_id" MARKETING_VERSION "$mismatched_marketing_version"
 expect_failure "Widget marketing version differs from app" "$marketing_diagnostic"
 reset_project
 mutate_setting "$app_debug_id" MARKETING_VERSION invalid
