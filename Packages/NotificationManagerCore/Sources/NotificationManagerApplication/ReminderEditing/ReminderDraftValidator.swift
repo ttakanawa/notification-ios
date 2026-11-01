@@ -44,6 +44,7 @@ public struct ReminderDraftValidator: Sendable {
             rule: draft.rule,
             end: draft.end,
             early: draft.early,
+            durationSeconds: draft.durationSeconds,
             scheduleChange: .preserveOriginal,
             originalScheduleData: Data(),
             tagIDs: draft.tagIDs,

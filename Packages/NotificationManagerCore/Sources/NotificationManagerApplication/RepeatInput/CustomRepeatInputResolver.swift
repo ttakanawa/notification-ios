@@ -68,17 +68,20 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
     private let source: SourceWallClock
     private let end: RepeatEnd
     private let early: EarlyReminder?
+    private let durationSeconds: Int?
     private let assistedInterpreter: any AssistedRepeatInterpreting
 
     public init(
         source: SourceWallClock,
         end: RepeatEnd,
         early: EarlyReminder?,
+        durationSeconds: Int? = nil,
         assistedInterpreter: any AssistedRepeatInterpreting
     ) {
         self.source = source
         self.end = end
         self.early = early
+        self.durationSeconds = durationSeconds
         self.assistedInterpreter = assistedInterpreter
     }
 
@@ -135,7 +138,8 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
                 source: source,
                 rule: rule,
                 end: end,
-                early: early
+                early: early,
+                durationSeconds: durationSeconds
             )
             return .resolved(
                 ResolvedCustomRepeat(

@@ -138,6 +138,86 @@ struct ReminderAggregateValidatorTests {
         }
     }
 
+    @Test func replacementRejectsDurationThatDivergesAfterEditing() {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        var replacementDraft = draft(scheduleChange: .replace(schedule))
+        #expect(replacementDraft.durationSeconds == 3_600)
+        replacementDraft.durationSeconds = nil
+
+        #expect(throws: ReminderValidationIssue.scheduleFieldsDoNotMatchReplacement) {
+            try validator.validate(replacementDraft, replacementScheduleData: Data())
+        }
+    }
+
+    @Test(arguments: [60, 3_600, 86_400])
+    func acceptsWholeMinuteRangeDurationsIncludingLongRanges(_ duration: Int) throws {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: duration
+        )
+        try validator.validate(
+            draft(scheduleChange: .replace(schedule)),
+            replacementScheduleData: Data()
+        )
+    }
+
+    @Test(arguments: [0, -60, 1, 59, 61])
+    func rejectsNonpositiveAndPartialMinuteDurations(_ duration: Int) {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: duration
+        )
+        #expect(validator.scheduleIssues(for: schedule) == [.invalidDuration])
+    }
+
+    @Test func editingDraftCarriesRangeFromValidAndRepairableSchedules() {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .daily(interval: 1),
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        let original = Data([1, 2, 3])
+        let states: [ScheduleReadState] = [
+            .valid(schedule, sourceVersion: 3, originalData: original),
+            .domainInvalid(
+                repairSeed: ScheduleRepairSeed(
+                    source: validSource,
+                    rule: .daily(interval: 1),
+                    end: .never,
+                    durationSeconds: 3_600
+                ),
+                originalData: original,
+                issues: [.earlyValueOutOfRange]
+            )
+        ]
+        for state in states {
+            let snapshot = ReminderSnapshot(
+                id: UUID(), title: "Meeting", notes: nil, urlString: nil, enabled: true,
+                schedule: state, tagIDs: [],
+                createdAt: Date(timeIntervalSince1970: 1_786_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_786_000_000)
+            )
+            let editingDraft = ReminderDraft(snapshot: snapshot)
+            #expect(editingDraft.durationSeconds == 3_600)
+            #expect(editingDraft.scheduleChange == .preserveOriginal)
+            #expect(editingDraft.originalScheduleData == original)
+        }
+    }
+
     @Test func newDraftWithoutACompleteScheduleCannotValidate() {
         #expect(throws: ReminderValidationIssue.missingScheduleData) {
             try validator.validate(draft(originalScheduleData: nil))
@@ -211,6 +291,7 @@ struct ReminderAggregateValidatorTests {
         #expect(draft.rule == .none)
         #expect(draft.end == .never)
         #expect(draft.early == nil)
+        #expect(draft.durationSeconds == nil)
         #expect(draft.scheduleChange == .preserveOriginal)
         #expect(draft.createdAt == Date(timeIntervalSince1970: 1_786_000_000))
         #expect(draft.updatedAt == Date(timeIntervalSince1970: 1_786_000_000))

@@ -89,7 +89,7 @@ public struct SaveReminderUseCase: Sendable {
         if let replacementSchedule {
             let evaluationNow = now()
             saveEvaluationNow = evaluationNow
-            if try !hasFutureNotification(
+            if try !isScheduleUnexpired(
                 reminderID: draft.id,
                 schedule: replacementSchedule,
                 evaluationNow: evaluationNow
@@ -137,7 +137,7 @@ public struct SaveReminderUseCase: Sendable {
 
         let commitNow = now()
         if let replacementSchedule,
-            try !hasFutureNotification(
+            try !isScheduleUnexpired(
                 reminderID: draft.id,
                 schedule: replacementSchedule,
                 evaluationNow: commitNow
@@ -203,7 +203,7 @@ public struct SaveReminderUseCase: Sendable {
         }
     }
 
-    private func hasFutureNotification(
+    private func isScheduleUnexpired(
         reminderID: UUID,
         schedule: ScheduleDefinition,
         evaluationNow: Date
@@ -215,6 +215,11 @@ public struct SaveReminderUseCase: Sendable {
             limit: 1,
             environment: recurrenceEnvironment
         ).notifications.isEmpty
+            || ReminderStatusCalculator().hasOngoingRange(
+                schedule: schedule,
+                at: evaluationNow,
+                environment: recurrenceEnvironment
+            )
     }
 
     private func hypotheticalSnapshot(

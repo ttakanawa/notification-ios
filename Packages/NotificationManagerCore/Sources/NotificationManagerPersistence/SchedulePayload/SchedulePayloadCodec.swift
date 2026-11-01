@@ -8,7 +8,7 @@ public enum SchedulePayloadCodecError: Error, Sendable, Equatable {
 
 public struct SchedulePayloadCodec: SchedulePayloadCoding {
     public static let format = "notification-manager.schedule"
-    public static let currentVersion: UInt32 = 2
+    public static let currentVersion: UInt32 = 3
 
     public init() {}
 
@@ -20,7 +20,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         }
         guard probe.version > 0 else { return .corrupt(originalData: data) }
         switch probe.version {
-        case 1, 2:
+        case 1, 2, 3:
             guard let document = try? StrictJSONValue.parse(data) else {
                 return .corrupt(originalData: data)
             }
@@ -89,6 +89,7 @@ private struct RawPayload {
     let rule: RawRule
     let end: RawEnd
     let early: EarlyReminder?
+    let durationSeconds: Int?
 
     init(_ document: StrictJSONValue, version: UInt32) throws {
         let envelope = try document.requireObject(
@@ -101,8 +102,10 @@ private struct RawPayload {
         else {
             throw PayloadStructureError.invalid
         }
+        var allowedKeys: Set<String> = ["source", "rule", "end", "early"]
+        if version >= 3 { allowedKeys.insert("durationSeconds") }
         let payload = try payloadValue.requireObject(
-            exactKeys: ["source", "rule", "end", "early"],
+            exactKeys: allowedKeys,
             requiredKeys: ["source", "rule", "end"]
         )
         guard let sourceValue = payload["source"],
@@ -115,6 +118,7 @@ private struct RawPayload {
         rule = try RawRule(ruleValue)
         end = try RawEnd(endValue)
         early = try payload["early"].map { try Self.decodeEarly($0, version: version) }
+        durationSeconds = try payload.optionalInteger("durationSeconds")
     }
 
     func makeDomain() -> DecodedPayload {
@@ -123,7 +127,13 @@ private struct RawPayload {
         var issues = ruleResult.issues + endResult.issues
         let definition: ScheduleDefinition?
         if let rule = ruleResult.value, let end = endResult.value {
-            definition = ScheduleDefinition(source: source, rule: rule, end: end, early: early)
+            definition = ScheduleDefinition(
+                source: source,
+                rule: rule,
+                end: end,
+                early: early,
+                durationSeconds: durationSeconds
+            )
         } else {
             definition = nil
         }
@@ -136,7 +146,8 @@ private struct RawPayload {
                 source: source,
                 rule: ruleResult.value,
                 end: endResult.value,
-                early: early
+                early: early,
+                durationSeconds: durationSeconds
             ),
             combinationIssues: issues.removingDuplicates()
         )
@@ -172,7 +183,7 @@ private struct RawPayload {
         case (_, "hours"): unit = .hours
         case (_, "days"): unit = .days
         case (_, "weeks"): unit = .weeks
-        case (2, "seconds"): unit = .seconds
+        case (2..., "seconds"): unit = .seconds
         default: throw PayloadStructureError.invalid
         }
         return EarlyReminder(

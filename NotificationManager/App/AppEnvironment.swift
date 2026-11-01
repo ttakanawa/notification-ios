@@ -14,6 +14,8 @@ final class AppEnvironment {
         @MainActor @Sendable (UUID) async -> ReminderSnapshot?
     typealias WidgetSnapshotPublication =
         @Sendable (WidgetSnapshot, UInt64) async -> Void
+    typealias LiveActivityPublication =
+        @MainActor @Sendable ([ReminderLiveActivityEvent], Bool) async -> Void
 
     private static let widgetSnapshotLogger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "org.tknw.punctual",
@@ -37,21 +39,29 @@ final class AppEnvironment {
     private let deepLinkReminderPreparation: DeepLinkReminderPreparation
     private let widgetSnapshotProjector: WidgetSnapshotProjector
     private let widgetSnapshotPublication: WidgetSnapshotPublication
+    private let liveActivityPublication: LiveActivityPublication
+    private let liveActivityProjector = ReminderLiveActivityProjector()
     private let presentationRefreshCoordinator:
         LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
             DeviceSchedulingStateSnapshot
         >?
     private var schedulingStateObserver: SchedulingStatePresentationObserver?
+    private var liveActivityRefreshTask: Task<Void, Never>?
     private var snapshotGeneration: UInt64 = 0
     private var hasStarted = false
     private var notificationHandlingIsActive = false
+
+    deinit {
+        liveActivityRefreshTask?.cancel()
+    }
 
     /// Identity-only environment used by bootstrap state-machine tests.
     init(
         notificationHandlingActivation: @escaping NotificationHandlingActivation = {},
         deepLinkReminderPreparation: @escaping DeepLinkReminderPreparation = { _ in nil },
-        widgetSnapshotPublication: @escaping WidgetSnapshotPublication = { _, _ in }
+        widgetSnapshotPublication: @escaping WidgetSnapshotPublication = { _, _ in },
+        liveActivityPublication: @escaping LiveActivityPublication = { _, _ in }
     ) {
         let actions = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -85,6 +95,7 @@ final class AppEnvironment {
         self.deepLinkReminderPreparation = deepLinkReminderPreparation
         widgetSnapshotProjector = WidgetSnapshotProjector()
         self.widgetSnapshotPublication = widgetSnapshotPublication
+        self.liveActivityPublication = liveActivityPublication
         presentationRefreshCoordinator = nil
         schedulingStateObserver = nil
     }
@@ -105,6 +116,7 @@ final class AppEnvironment {
         notificationHandlingActivation: @escaping NotificationHandlingActivation,
         deepLinkReminderPreparation: @escaping DeepLinkReminderPreparation,
         widgetSnapshotPublication: @escaping WidgetSnapshotPublication,
+        liveActivityPublication: @escaping LiveActivityPublication,
         presentationRefreshCoordinator: LatestPresentationRefreshCoordinator<
             CompleteReminderSnapshot,
             DeviceSchedulingStateSnapshot
@@ -126,6 +138,7 @@ final class AppEnvironment {
         self.deepLinkReminderPreparation = deepLinkReminderPreparation
         widgetSnapshotProjector = WidgetSnapshotProjector()
         self.widgetSnapshotPublication = widgetSnapshotPublication
+        self.liveActivityPublication = liveActivityPublication
         self.presentationRefreshCoordinator = presentationRefreshCoordinator
         schedulingStateObserver = nil
     }
@@ -310,9 +323,6 @@ final class AppEnvironment {
                 }
             )
         }
-        let deepLinkReminderPreparation: DeepLinkReminderPreparation = { reminderID in
-            await responseSnapshotPreparer.prepare(reminderID: reminderID)
-        }
         let environment = AppEnvironment(
             container: container,
             repository: repository,
@@ -327,8 +337,11 @@ final class AppEnvironment {
             formActions: formActions,
             assistedRepeatInterpreter: assistedRepeatInterpreter,
             notificationHandlingActivation: notificationHandlingActivation,
-            deepLinkReminderPreparation: deepLinkReminderPreparation,
+            deepLinkReminderPreparation: { reminderID in
+                await responseSnapshotPreparer.prepare(reminderID: reminderID)
+            },
             widgetSnapshotPublication: widgetSnapshotPublication,
+            liveActivityPublication: makeLiveActivityPublication(),
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
         relay.environment = environment
@@ -339,6 +352,13 @@ final class AppEnvironment {
             }
         )
         return environment
+    }
+
+    private static func makeLiveActivityPublication() -> LiveActivityPublication {
+        let service = ReminderLiveActivityService()
+        return { events, allowStarts in
+            await service.reconcile(events: events, allowStarts: allowStarts)
+        }
     }
 
     func activateNotificationHandling() {
@@ -442,6 +462,26 @@ final class AppEnvironment {
             ))
 
         do {
+            let events = try liveActivityProjector.project(
+                reminders: snapshot.reminders,
+                notificationsEnabled: deviceState.deviceNotificationsEnabled,
+                now: now
+            )
+            let rangeEnd = try liveActivityProjector.nextRangeEnd(
+                reminders: snapshot.reminders, after: now)
+            scheduleLiveActivityRefresh(events: events, rangeEnd: rangeEnd, now: now)
+            Task { [weak self] in
+                guard let self, snapshotGeneration == generation else { return }
+                await liveActivityPublication(
+                    events, UIApplication.shared.applicationState == .active)
+            }
+        } catch {
+            Self.widgetSnapshotLogger.error(
+                "Live Activity projection failed: \(String(describing: error), privacy: .public)"
+            )
+        }
+
+        do {
             let widgetSnapshot = try widgetSnapshotProjector.project(
                 reminders: snapshot.reminders,
                 items: items,
@@ -456,6 +496,30 @@ final class AppEnvironment {
             Self.widgetSnapshotLogger.error(
                 "Widget snapshot projection failed: \(String(describing: error), privacy: .public)"
             )
+        }
+    }
+
+    private func scheduleLiveActivityRefresh(
+        events: [ReminderLiveActivityEvent], rangeEnd: Date?, now: Date
+    ) {
+        liveActivityRefreshTask?.cancel()
+        liveActivityRefreshTask = nil
+        let boundaries =
+            events.flatMap { [$0.startDate, $0.activityEndDate] } + [rangeEnd].compactMap { $0 }
+        guard stateStore != nil,
+            let boundary =
+                boundaries
+                .filter({ $0 > now }).min()
+        else { return }
+        liveActivityRefreshTask = Task { [weak self] in
+            do {
+                try await Task.sleep(for: .seconds(boundary.timeIntervalSince(now)))
+            } catch {
+                return
+            }
+            guard !Task.isCancelled else { return }
+            // Refresh the bounded recurrence queue whenever the process can run again.
+            await self?.refreshPresentation()
         }
     }
 
@@ -504,7 +568,7 @@ final class AppEnvironment {
             deviceState.globalFailure == nil
             ? earliestOutcome
             : .unscheduledError
-        let deviceStatus = DeviceSchedulingStatus.resolve(
+        let resolvedDeviceStatus = DeviceSchedulingStatus.resolve(
             DeviceSchedulingStatusInput(
                 lifecycleStatus: status.primary,
                 deviceNotificationsEnabled: deviceState.deviceNotificationsEnabled,
@@ -515,6 +579,9 @@ final class AppEnvironment {
                 earliestRequestPresentOrAddSucceeded:
                     displayedEarliestOutcome == .scheduled
             ))
+        let deviceStatus: DeviceSchedulingStatus =
+            status.primary == .active && physical.isEmpty && schedule?.durationSeconds != nil
+            ? .notApplicable : resolvedDeviceStatus
         let item = ReminderListItemPresentation(
             id: reminder.id,
             title: reminder.title,

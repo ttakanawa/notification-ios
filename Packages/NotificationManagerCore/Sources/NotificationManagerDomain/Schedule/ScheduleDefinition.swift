@@ -116,17 +116,20 @@ public struct ScheduleDefinition: Sendable, Equatable {
     public let rule: RepeatRule
     public let end: RepeatEnd
     public let early: EarlyReminder?
+    public let durationSeconds: Int?
 
     public init(
         source: SourceWallClock,
         rule: RepeatRule,
         end: RepeatEnd,
-        early: EarlyReminder?
+        early: EarlyReminder?,
+        durationSeconds: Int? = nil
     ) {
         self.source = source
         self.rule = rule
         self.end = end
         self.early = early
+        self.durationSeconds = durationSeconds
     }
 }
 
@@ -135,17 +138,20 @@ public struct ScheduleRepairSeed: Sendable, Equatable {
     public let rule: RepeatRule?
     public let end: RepeatEnd?
     public let early: EarlyReminder?
+    public let durationSeconds: Int?
 
     public init(
         source: SourceWallClock? = nil,
         rule: RepeatRule? = nil,
         end: RepeatEnd? = nil,
-        early: EarlyReminder? = nil
+        early: EarlyReminder? = nil,
+        durationSeconds: Int? = nil
     ) {
         self.source = source
         self.rule = rule
         self.end = end
         self.early = early
+        self.durationSeconds = durationSeconds
     }
 }
 
@@ -164,6 +170,7 @@ public enum ScheduleValidationIssue: Sendable, Equatable {
     case endBeforeStart
     case endNotAllowed
     case earlyValueOutOfRange
+    case invalidDuration
 }
 
 public enum ScheduleReadState: Sendable, Equatable {

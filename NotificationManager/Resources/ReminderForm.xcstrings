@@ -1,6 +1,54 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "reminder.field.range-enabled": {
+      "comment": "Toggle for an optional reminder end date and Live Activity.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "End date" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "終了日時を設定" } }
+      }
+    },
+    "reminder.field.range-end-date": {
+      "comment": "Date picker for the optional end of a reminder time range.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "End date" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "終了日" } }
+      }
+    },
+    "reminder.field.range-end-time": {
+      "comment": "Time picker for the optional end of a reminder time range.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "End time" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "終了時刻" } }
+      }
+    },
+    "reminder.form.error.range-end-invalid": {
+      "comment": "Error shown visually and announced for an incomplete reminder time range.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Select an end date and time." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "終了日時を選択してください。" } }
+      }
+    },
+    "reminder.form.error.range-end-before-start": {
+      "comment": "Error shown visually and announced when a reminder ends at or before its start.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The end must be after the start." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "終了日時は開始日時より後にしてください。" } }
+      }
+    },
+    "reminder.form.range.live-activity-help": {
+      "comment": "Explains the device-only Live Activity behavior for optional time ranges.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Live Activities last up to 8 hours: iOS 26 or later starts automatically; earlier versions start when you open the app. Removal may wait until the app runs again. Repeats keep the same duration." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Live Activity は最大8時間。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 消去は次回のアプリ動作時になる場合があります。 繰り返しも同じ長さです。" } }
+      }
+    },
     "reminder.custom.error.assistance-unavailable": {
       "comment": "User-facing error text announced by VoiceOver and also shown visually.",
       "extractionState": "manual",

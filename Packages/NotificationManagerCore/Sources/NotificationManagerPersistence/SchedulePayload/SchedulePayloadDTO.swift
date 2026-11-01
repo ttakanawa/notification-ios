@@ -11,12 +11,14 @@ struct SchedulePayloadDTO: Encodable {
     let rule: RuleDTO
     let end: EndDTO
     let early: EarlyDTO?
+    let durationSeconds: Int?
 
     init(_ definition: ScheduleDefinition) {
         source = SourceDTO(definition.source)
         rule = RuleDTO(definition.rule)
         end = EndDTO(definition.end)
         early = definition.early.map(EarlyDTO.init)
+        durationSeconds = definition.durationSeconds
     }
 
     struct SourceDTO: Encodable {

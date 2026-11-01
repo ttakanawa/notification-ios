@@ -78,6 +78,62 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testOptionalEndControlsValidateTheRangeAndCanBeRemoved() {
+        let app = launch(
+            scenario: "empty-list",
+            extraArguments: deterministicEnglish24HourArguments
+        )
+        app.buttons["reminder-list.add"].tap()
+
+        let title = app.textFields["reminder-form.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 2))
+        title.tap()
+        title.typeText("Time range")
+        app.keyboards.buttons["Return"].tap()
+
+        let save = app.buttons["reminder-form.save"]
+        let endDate = app.otherElements["reminder-form.range-end-date"]
+        let endTime = app.otherElements["reminder-form.range-end-time"]
+        let rangeToggle = app.switches["reminder-form.range-enabled"]
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertFalse(endDate.exists)
+        XCTAssertFalse(endTime.exists)
+
+        scrollToHittable(rangeToggle, in: app)
+        rangeToggle.switches.firstMatch.tap()
+        XCTAssertEqual(rangeToggle.value as? String, "1")
+        scrollToHittable(endTime, in: app)
+        XCTAssertTrue(endDate.waitForExistence(timeout: 1))
+        XCTAssertTrue(endTime.exists)
+        XCTAssertEqual(endDate.value as? String, "2040-07-05")
+        XCTAssertEqual(endTime.value as? String, "00:00")
+        XCTAssertTrue(save.isEnabled)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "optional-range-enabled"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        let endDateButton = app.buttons.matching(identifier: "Date Picker").element(boundBy: 1)
+        scrollToHittable(endDateButton, in: app)
+        endDateButton.tap()
+        app.buttons["Wednesday 4 July"].tap()
+        app.buttons["PopoverDismissRegion"].tap()
+
+        XCTAssertEqual(endDate.value as? String, "2040-07-04")
+        XCTAssertTrue(
+            app.descendants(matching: .any)["reminder-form.range-end-error"].exists)
+        XCTAssertFalse(save.isEnabled)
+
+        for _ in 0..<3 where !rangeToggle.isHittable {
+            app.swipeDown()
+        }
+        rangeToggle.switches.firstMatch.tap()
+        XCTAssertTrue(endDate.waitForNonExistence(timeout: 1))
+        XCTAssertFalse(endTime.exists)
+        XCTAssertTrue(save.isEnabled)
+    }
+
+    @MainActor
     func testRepeatEndDateCanBeSelectedFromTheMissingValueSheet() {
         let app = launch(
             scenario: "empty-list",
