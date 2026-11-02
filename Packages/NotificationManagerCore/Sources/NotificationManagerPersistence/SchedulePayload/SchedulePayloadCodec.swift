@@ -8,7 +8,7 @@ public enum SchedulePayloadCodecError: Error, Sendable, Equatable {
 
 public struct SchedulePayloadCodec: SchedulePayloadCoding {
     public static let format = "notification-manager.schedule"
-    public static let currentVersion: UInt32 = 3
+    public static let currentVersion: UInt32 = 4
 
     public init() {}
 
@@ -20,7 +20,7 @@ public struct SchedulePayloadCodec: SchedulePayloadCoding {
         }
         guard probe.version > 0 else { return .corrupt(originalData: data) }
         switch probe.version {
-        case 1, 2, 3:
+        case 1, 2, 3, 4:
             guard let document = try? StrictJSONValue.parse(data) else {
                 return .corrupt(originalData: data)
             }
@@ -90,6 +90,7 @@ private struct RawPayload {
     let end: RawEnd
     let early: EarlyReminder?
     let durationSeconds: Int?
+    let liveActivityWindow: LiveActivityWindow?
 
     init(_ document: StrictJSONValue, version: UInt32) throws {
         let envelope = try document.requireObject(
@@ -104,6 +105,7 @@ private struct RawPayload {
         }
         var allowedKeys: Set<String> = ["source", "rule", "end", "early"]
         if version >= 3 { allowedKeys.insert("durationSeconds") }
+        if version >= 4 { allowedKeys.insert("liveActivityWindow") }
         let payload = try payloadValue.requireObject(
             exactKeys: allowedKeys,
             requiredKeys: ["source", "rule", "end"]
@@ -119,6 +121,7 @@ private struct RawPayload {
         end = try RawEnd(endValue)
         early = try payload["early"].map { try Self.decodeEarly($0, version: version) }
         durationSeconds = try payload.optionalInteger("durationSeconds")
+        liveActivityWindow = try payload["liveActivityWindow"].map(Self.decodeLiveActivityWindow)
     }
 
     func makeDomain() -> DecodedPayload {
@@ -132,7 +135,8 @@ private struct RawPayload {
                 rule: rule,
                 end: end,
                 early: early,
-                durationSeconds: durationSeconds
+                durationSeconds: durationSeconds,
+                liveActivityWindow: liveActivityWindow
             )
         } else {
             definition = nil
@@ -147,7 +151,8 @@ private struct RawPayload {
                 rule: ruleResult.value,
                 end: endResult.value,
                 early: early,
-                durationSeconds: durationSeconds
+                durationSeconds: durationSeconds,
+                liveActivityWindow: liveActivityWindow
             ),
             combinationIssues: issues.removingDuplicates()
         )
@@ -165,6 +170,19 @@ private struct RawPayload {
             hour: try object.requireInteger("hour"),
             minute: try object.requireInteger("minute"),
             timeZoneIdentifier: try object.requireString("timeZone")
+        )
+    }
+
+    private static func decodeLiveActivityWindow(_ value: StrictJSONValue) throws
+        -> LiveActivityWindow
+    {
+        let object = try value.requireObject(
+            exactKeys: ["beforeSeconds", "afterSeconds"],
+            requiredKeys: ["beforeSeconds", "afterSeconds"]
+        )
+        return LiveActivityWindow(
+            beforeSeconds: try object.requireInteger("beforeSeconds"),
+            afterSeconds: try object.requireInteger("afterSeconds")
         )
     }
 

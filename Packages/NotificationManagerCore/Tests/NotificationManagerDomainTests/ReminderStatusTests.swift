@@ -145,6 +145,76 @@ struct ReminderStatusTests {
         #expect(state.primary == .invalidSchedule)
     }
 
+    @Test(arguments: [-300.0, -299.0, 0.0, 360.0, 599.75])
+    func explicitLiveActivityWindowKeepsReminderActive(_ elapsed: TimeInterval) throws {
+        let schedule = liveActivitySchedule()
+        let notification = try SourceWallClockResolver().resolve(
+            schedule.source, environment: FoundationRecurrenceEnvironment())
+        let evaluation = notification.addingTimeInterval(elapsed)
+        #expect(
+            try calculator.hasOngoingLiveActivityWindow(
+                schedule: schedule, at: evaluation, environment: .foundation))
+        let status = try calculator.status(
+            schedule: .valid(schedule, sourceVersion: 4, originalData: Data()),
+            enabled: true, after: evaluation, environment: .foundation
+        )
+        #expect(status.primary == .active)
+        #expect(status.secondary.isEmpty)
+    }
+
+    @Test func explicitLiveActivityWindowHasInclusiveStartAndExclusiveEnd() throws {
+        let schedule = liveActivitySchedule()
+        let notification = try SourceWallClockResolver().resolve(
+            schedule.source, environment: FoundationRecurrenceEnvironment())
+        #expect(
+            try !calculator.hasOngoingLiveActivityWindow(
+                schedule: schedule, at: notification.addingTimeInterval(-301),
+                environment: .foundation))
+        let end = notification.addingTimeInterval(600)
+        #expect(
+            try !calculator.hasOngoingLiveActivityWindow(
+                schedule: schedule, at: end, environment: .foundation))
+        #expect(
+            try calculator.status(
+                schedule: .valid(schedule, sourceVersion: 4, originalData: Data()),
+                enabled: true, after: end, environment: .foundation
+            ).primary == .expired)
+    }
+
+    @Test func activePostNotificationWindowDoesNotCreateAGhostNotification() throws {
+        let schedule = liveActivitySchedule()
+        let notification = try SourceWallClockResolver().resolve(
+            schedule.source, environment: FoundationRecurrenceEnvironment())
+        let evaluation = notification.addingTimeInterval(360)
+        let pending = try NextNotificationProvider().nextPhysicalNotifications(
+            for: UUID(), schedule: schedule, after: evaluation, environment: .foundation)
+        #expect(pending.notifications.isEmpty)
+        #expect(pending.exhausted)
+        #expect(
+            try calculator.status(
+                schedule: .valid(schedule, sourceVersion: 4, originalData: Data()),
+                enabled: false, after: evaluation, environment: .foundation
+            ) == ReminderStatus(primary: .disabled, secondary: []))
+    }
+
+    @Test func finalRecurringLiveActivityWindowRemainsActiveAfterRepeatCutoff() throws {
+        let schedule = liveActivitySchedule(
+            rule: .daily(interval: 1),
+            end: .onDate(SourceDate(year: 2026, month: 8, day: 7)))
+        let notification = try SourceWallClockResolver().resolve(
+            schedule.source, environment: FoundationRecurrenceEnvironment())
+        #expect(
+            try calculator.status(
+                schedule: .valid(schedule, sourceVersion: 4, originalData: Data()),
+                enabled: true, after: notification.addingTimeInterval(360), environment: .foundation
+            ).primary == .active)
+        #expect(
+            try calculator.status(
+                schedule: .valid(schedule, sourceVersion: 4, originalData: Data()),
+                enabled: true, after: notification.addingTimeInterval(600), environment: .foundation
+            ).primary == .expired)
+    }
+
     @Test func validScheduleEnvironmentFailurePropagatesWithoutBecomingInvalid() {
         #expect(throws: SourceWallClockResolutionError.unknownTimeZone) {
             try calculator.status(
@@ -178,6 +248,19 @@ struct ReminderStatusTests {
                 timeZoneIdentifier: "Asia/Manila"
             ),
             rule: rule, end: end, early: nil, durationSeconds: duration
+        )
+    }
+
+    private func liveActivitySchedule(
+        rule: RepeatRule = .none,
+        end: RepeatEnd = .never
+    ) -> ScheduleDefinition {
+        ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2026, month: 8, day: 7, hour: 10, minute: 0,
+                timeZoneIdentifier: "Africa/Abidjan"),
+            rule: rule, end: end, early: nil,
+            liveActivityWindow: LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
         )
     }
 

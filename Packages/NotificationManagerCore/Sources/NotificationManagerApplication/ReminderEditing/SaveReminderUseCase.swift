@@ -220,6 +220,11 @@ public struct SaveReminderUseCase: Sendable {
                 at: evaluationNow,
                 environment: recurrenceEnvironment
             )
+            || ReminderStatusCalculator().hasOngoingLiveActivityWindow(
+                schedule: schedule,
+                at: evaluationNow,
+                environment: recurrenceEnvironment
+            )
     }
 
     private func hypotheticalSnapshot(

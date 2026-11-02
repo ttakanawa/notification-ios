@@ -26,6 +26,94 @@ struct ReminderLiveActivityServiceTests {
         #expect(legacy.client.scheduled == [false])
     }
 
+    @Test func aNewBeforeActivityUsesTheNotificationAsItsFuturePhaseBoundary() {
+        let notification = now.addingTimeInterval(300)
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Before", startDate: now,
+            endDate: notification.addingTimeInterval(600), notificationDate: notification)
+        let content = SystemReminderLiveActivityClient.content(for: event, at: now)
+
+        #expect(!content.state.notificationHasOccurred)
+        #expect(content.staleDate == notification)
+        #expect(content.staleDate.map { $0 > now } == true)
+    }
+
+    @Test func aNewAfterActivityStartsFreshInsteadOfRequestingInitiallyStaleContent() {
+        let notification = now.addingTimeInterval(-360)
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "After", startDate: notification.addingTimeInterval(-300),
+            endDate: notification.addingTimeInterval(600), notificationDate: notification)
+        let content = SystemReminderLiveActivityClient.content(for: event, at: now)
+
+        #expect(content.state.notificationHasOccurred)
+        #expect(content.state.notificationDate == notification)
+        #expect(content.staleDate == event.activityEndDate)
+        #expect(content.staleDate.map { $0 > now } == true)
+    }
+
+    @Test func initialPhaseTreatsTheNotificationInstantAsAfter() {
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Boundary", startDate: now.addingTimeInterval(-300),
+            endDate: now.addingTimeInterval(600), notificationDate: now)
+
+        #expect(
+            !SystemReminderLiveActivityClient.content(
+                for: event, at: now.addingTimeInterval(-1)
+            ).state.notificationHasOccurred)
+        #expect(
+            SystemReminderLiveActivityClient.content(for: event, at: now)
+                .state.notificationHasOccurred)
+        #expect(
+            SystemReminderLiveActivityClient.content(for: event, at: now).staleDate == event.endDate
+        )
+    }
+
+    @Test func anExistingAfterPhaseDoesNotCauseRepeatedContentUpdates() async throws {
+        let context = try makeContext()
+        let event = event(startOffset: -60)
+        await context.service.reconcile(events: [event], now: now)
+        let record = try #require(context.client.records.first)
+        context.client.records = [
+            ReminderLiveActivityRecord(
+                id: record.id, eventID: record.eventID, state: .active,
+                content: .init(event: event, notificationHasOccurred: true))
+        ]
+
+        await context.service.reconcile(events: [event], now: now.addingTimeInterval(1))
+        await context.service.reconcile(events: [event], now: now.addingTimeInterval(2))
+
+        #expect(context.client.requested == [event])
+        #expect(context.client.updated.isEmpty)
+        #expect(context.client.ended.isEmpty)
+        #expect(context.client.records.first?.content.notificationHasOccurred == true)
+    }
+
+    @Test func legacyPhaseMetadataIsRefreshedOnceWithoutRecreatingTheActivity() async throws {
+        let context = try makeContext()
+        let event = event(startOffset: -60)
+        await context.service.reconcile(events: [event], now: now)
+        let record = try #require(context.client.records.first)
+        let encoded = try JSONEncoder().encode(record.content)
+        var legacy = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        legacy["displayVersion"] = 2
+        legacy.removeValue(forKey: "notificationHasOccurred")
+        let oldContent = try JSONDecoder().decode(
+            ReminderActivityAttributes.ContentState.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+        context.client.records = [
+            ReminderLiveActivityRecord(
+                id: record.id, eventID: record.eventID, state: .stale, content: oldContent)
+        ]
+
+        await context.service.reconcile(events: [event], now: now)
+        await context.service.reconcile(events: [event], now: now)
+
+        #expect(context.client.requested == [event])
+        #expect(context.client.updated == [event])
+        #expect(context.client.ended.isEmpty)
+        #expect(context.client.records.first?.content.displayVersion == 3)
+    }
+
     @Test func editsUpdateExistingActivityAndDeletionEndsIt() async throws {
         let context = try makeContext()
         let original = event(startOffset: -60)
@@ -57,6 +145,91 @@ struct ReminderLiveActivityServiceTests {
 
         #expect(context.client.ended == ["activity-1"])
         #expect(context.client.requested == [original, revised])
+    }
+
+    @Test func changingBeforeOffsetReschedulesTheSamePendingNotification() async throws {
+        let context = try makeContext()
+        context.client.retainsEndedActivities = true
+        let notification = now.addingTimeInterval(600)
+        let original = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Reminder", startDate: now.addingTimeInterval(300),
+            endDate: notification.addingTimeInterval(600), notificationDate: notification)
+        await context.service.reconcile(events: [original], now: now)
+        let revised = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title,
+            startDate: now.addingTimeInterval(60), endDate: original.endDate,
+            notificationDate: notification)
+
+        await context.service.reconcile(events: [revised], now: now)
+
+        #expect(original.id == revised.id)
+        #expect(context.client.ended == ["activity-1"])
+        #expect(context.client.requested == [original, revised])
+        #expect(context.client.scheduled == [true, true])
+        #expect(context.client.updated.isEmpty)
+
+        // ActivityKit can still report the old ended activity after its replacement exists.
+        await context.service.reconcile(events: [revised], now: now)
+        #expect(context.client.requested == [original, revised])
+        #expect(context.client.records.contains { $0.id == "activity-2" && $0.state == .pending })
+    }
+
+    @Test func shorteningAnActiveBeforeWindowReschedulesItsFutureStart() async throws {
+        let context = try makeContext()
+        let notification = now.addingTimeInterval(120)
+        let original = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Reminder", startDate: now.addingTimeInterval(-180),
+            endDate: notification.addingTimeInterval(600), notificationDate: notification)
+        await context.service.reconcile(events: [original], now: now)
+        let revised = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title,
+            startDate: now.addingTimeInterval(60), endDate: original.endDate,
+            notificationDate: notification)
+
+        await context.service.reconcile(events: [revised], now: now)
+
+        #expect(context.client.ended == ["activity-1"])
+        #expect(context.client.requested == [original, revised])
+        #expect(context.client.scheduled == [false, true])
+    }
+
+    @Test func changingAnActiveWindowKeepsItsNotificationAnchorAndUpdatesInPlace() async throws {
+        let context = try makeContext()
+        let original = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Reminder", startDate: now.addingTimeInterval(-300),
+            endDate: now.addingTimeInterval(600), notificationDate: now)
+        await context.service.reconcile(events: [original], now: now)
+        let revised = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title,
+            startDate: now.addingTimeInterval(-600), endDate: now.addingTimeInterval(900),
+            notificationDate: now)
+
+        await context.service.reconcile(events: [revised], now: now)
+
+        #expect(context.client.requested == [original])
+        #expect(context.client.updated == [revised])
+        #expect(context.client.ended.isEmpty)
+    }
+
+    @Test func existingActivityContentWithoutAnAnchorStillDecodesAfterAnUpdate() throws {
+        let original = event(startOffset: -60)
+        let content = ReminderActivityAttributes.ContentState(event: original)
+        let encoded = try JSONEncoder().encode(content)
+        var legacy = try #require(JSONSerialization.jsonObject(with: encoded) as? [String: Any])
+        legacy.removeValue(forKey: "notificationDate")
+        legacy.removeValue(forKey: "displayVersion")
+        legacy.removeValue(forKey: "notificationHasOccurred")
+        let decoded = try JSONDecoder().decode(
+            ReminderActivityAttributes.ContentState.self,
+            from: JSONSerialization.data(withJSONObject: legacy))
+
+        #expect(decoded.notificationDate == original.startDate)
+        #expect(decoded.startDate == original.startDate)
+        #expect(decoded.activityEndDate == original.activityEndDate)
+        #expect(decoded.displayVersion == 1)
+        #expect(content.displayVersion == 3)
+        #expect(!decoded.notificationHasOccurred)
+        #expect(decoded != content)
     }
 
     @Test func foregroundReconciliationEndsExpiredRange() async throws {
@@ -91,6 +264,28 @@ struct ReminderLiveActivityServiceTests {
         await relaunched.reconcile(events: [event], now: now)
 
         #expect(context.client.requested.count == 1)
+    }
+
+    @Test func extendingADismissedWindowDoesNotResurrectItAfterTheOriginalEnd() async throws {
+        let context = try makeContext()
+        let original = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Reminder", startDate: now.addingTimeInterval(-300),
+            endDate: now.addingTimeInterval(60), notificationDate: now)
+        await context.service.reconcile(events: [original], now: now)
+        context.client.records.removeAll()
+        await context.service.reconcile(events: [original], now: now.addingTimeInterval(1))
+        let extended = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title, startDate: original.startDate,
+            endDate: now.addingTimeInterval(180), notificationDate: original.notificationDate)
+
+        await context.service.reconcile(events: [extended], now: now.addingTimeInterval(61))
+        #expect(context.client.requested == [original])
+
+        let relaunched = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { true })
+        await relaunched.reconcile(events: [extended], now: now.addingTimeInterval(120))
+        #expect(context.client.requested == [original])
     }
 
     @Test func backgroundReconciliationCleansUpWithoutStarting() async throws {
@@ -255,6 +450,7 @@ private struct LiveActivityTestContext {
 @MainActor
 private final class FakeReminderLiveActivityClient: ReminderLiveActivityClient {
     var activitiesEnabled = true
+    var retainsEndedActivities = false
     let supportsScheduling: Bool
     var records: [ReminderLiveActivityRecord] = []
     var requested: [ReminderLiveActivityEvent] = []
@@ -296,6 +492,12 @@ private final class FakeReminderLiveActivityClient: ReminderLiveActivityClient {
     func end(_ id: String) async {
         ended.append(id)
         await beforeEnding?(id)
-        records.removeAll { $0.id == id }
+        if retainsEndedActivities, let index = records.firstIndex(where: { $0.id == id }) {
+            let record = records[index]
+            records[index] = ReminderLiveActivityRecord(
+                id: record.id, eventID: record.eventID, state: .ended, content: record.content)
+        } else {
+            records.removeAll { $0.id == id }
+        }
     }
 }

@@ -461,24 +461,28 @@ final class AppEnvironment {
                 availableTags: snapshot.tags.map(Self.tagPresentation)
             ))
 
-        do {
-            let events = try liveActivityProjector.project(
-                reminders: snapshot.reminders,
-                notificationsEnabled: deviceState.deviceNotificationsEnabled,
-                now: now
-            )
-            let rangeEnd = try liveActivityProjector.nextRangeEnd(
-                reminders: snapshot.reminders, after: now)
-            scheduleLiveActivityRefresh(events: events, rangeEnd: rangeEnd, now: now)
-            Task { [weak self] in
-                guard let self, snapshotGeneration == generation else { return }
-                await liveActivityPublication(
-                    events, UIApplication.shared.applicationState == .active)
+        // The bootstrap state's false preference is a placeholder, not a user decision.
+        // Do not end existing activities during a cold launch before settings are loaded.
+        if deviceState.hasResolvedDeviceSettings {
+            do {
+                let events = try liveActivityProjector.project(
+                    reminders: snapshot.reminders,
+                    notificationsEnabled: deviceState.deviceNotificationsEnabled,
+                    now: now
+                )
+                let rangeEnd = try liveActivityProjector.nextRangeEnd(
+                    reminders: snapshot.reminders, after: now)
+                scheduleLiveActivityRefresh(events: events, rangeEnd: rangeEnd, now: now)
+                Task { [weak self] in
+                    guard let self, snapshotGeneration == generation else { return }
+                    await liveActivityPublication(
+                        events, UIApplication.shared.applicationState == .active)
+                }
+            } catch {
+                Self.widgetSnapshotLogger.error(
+                    "Live Activity projection failed: \(String(describing: error), privacy: .public)"
+                )
             }
-        } catch {
-            Self.widgetSnapshotLogger.error(
-                "Live Activity projection failed: \(String(describing: error), privacy: .public)"
-            )
         }
 
         do {
@@ -505,7 +509,8 @@ final class AppEnvironment {
         liveActivityRefreshTask?.cancel()
         liveActivityRefreshTask = nil
         let boundaries =
-            events.flatMap { [$0.startDate, $0.activityEndDate] } + [rangeEnd].compactMap { $0 }
+            events.flatMap { [$0.startDate, $0.notificationDate, $0.activityEndDate] }
+            + [rangeEnd].compactMap { $0 }
         guard stateStore != nil,
             let boundary =
                 boundaries
@@ -580,7 +585,8 @@ final class AppEnvironment {
                     displayedEarliestOutcome == .scheduled
             ))
         let deviceStatus: DeviceSchedulingStatus =
-            status.primary == .active && physical.isEmpty && schedule?.durationSeconds != nil
+            status.primary == .active && physical.isEmpty
+                && (schedule?.durationSeconds != nil || schedule?.liveActivityWindow != nil)
             ? .notApplicable : resolvedDeviceStatus
         let item = ReminderListItemPresentation(
             id: reminder.id,

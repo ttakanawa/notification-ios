@@ -15,11 +15,11 @@ struct ReminderLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    Image(systemName: context.isStale ? "bell.slash.fill" : "bell.fill")
-                        .foregroundStyle(.orange)
+                    ReminderLiveActivityAppIcon(size: 24)
+                        .accessibilityHidden(true)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ReminderLiveActivityCountdown(context: context)
+                    ReminderLiveActivityRelativeTime(context: context)
                         .font(.headline.monospacedDigit())
                         .frame(maxWidth: 110, alignment: .trailing)
                 }
@@ -33,18 +33,19 @@ struct ReminderLiveActivityWidget: Widget {
                             .foregroundStyle(.secondary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 8)
                 }
             } compactLeading: {
-                Image(systemName: context.isStale ? "bell.slash.fill" : "bell.fill")
-                    .foregroundStyle(.orange)
+                ReminderLiveActivityAppIcon(size: 20)
                     .accessibilityLabel(Text(verbatim: context.state.title))
             } compactTrailing: {
-                ReminderLiveActivityCountdown(context: context)
+                ReminderLiveActivityRelativeTime(context: context)
                     .font(.caption.monospacedDigit())
-                    .frame(maxWidth: 54)
+                    .frame(width: 78)
+                    .minimumScaleFactor(0.7)
             } minimal: {
-                Image(systemName: context.isStale ? "bell.slash.fill" : "bell.fill")
-                    .foregroundStyle(.orange)
+                ReminderLiveActivityAppIcon(size: 20)
                     .accessibilityLabel(Text(verbatim: context.state.title))
             }
             .widgetURL(PunctualDeepLinkCodec().url(for: .reminder(context.attributes.reminderID)))
@@ -53,14 +54,25 @@ struct ReminderLiveActivityWidget: Widget {
     }
 }
 
+private struct ReminderLiveActivityAppIcon: View {
+    let size: CGFloat
+
+    var body: some View {
+        Image("LiveActivityAppIcon")
+            .renderingMode(.original)
+            .resizable()
+            .scaledToFit()
+            .frame(width: size, height: size)
+            .clipShape(RoundedRectangle(cornerRadius: size * 0.24, style: .continuous))
+    }
+}
+
 private struct ReminderLiveActivityContent: View {
     let context: ActivityViewContext<ReminderActivityAttributes>
 
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
-            Image(systemName: context.isStale ? "bell.slash.fill" : "bell.fill")
-                .foregroundStyle(.orange)
-                .font(.title2)
+            ReminderLiveActivityAppIcon(size: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: context.state.title)
@@ -69,7 +81,7 @@ private struct ReminderLiveActivityContent: View {
                 ReminderLiveActivityRange(state: context.state)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                ReminderLiveActivityCountdown(context: context)
+                ReminderLiveActivityRelativeTime(context: context)
                     .font(.title3.monospacedDigit())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -84,29 +96,41 @@ private struct ReminderLiveActivityRange: View {
 
     var body: some View {
         HStack(spacing: 4) {
-            Text(state.startDate, format: .dateTime.month(.abbreviated).day().hour().minute())
-            Text(verbatim: "–")
-            Text(state.endDate, format: .dateTime.month(.abbreviated).day().hour().minute())
+            Text(LocalizedStringResource("widget.live-activity.notification-time", table: "Widget"))
+                .lineLimit(1)
+                .layoutPriority(1)
+            Text(
+                state.notificationDate, format: .dateTime.month(.abbreviated).day().hour().minute()
+            )
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
         }
         .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-private struct ReminderLiveActivityCountdown: View {
+private struct ReminderLiveActivityRelativeTime: View {
     let context: ActivityViewContext<ReminderActivityAttributes>
+    @Environment(\.locale) private var locale
 
     var body: some View {
-        if context.isStale {
-            Text(LocalizedStringResource("widget.live-activity.ended", table: "Widget"))
-                .lineLimit(1)
-                .minimumScaleFactor(0.8)
-        } else {
-            Text(timerInterval: context.state.startDate...context.state.endDate, countsDown: true)
-                .monospacedDigit()
-                .contentTransition(.numericText(countsDown: true))
-                .accessibilityLabel(
-                    Text(LocalizedStringResource("widget.live-activity.remaining", table: "Widget"))
-                )
-        }
+        relativeTime
+            .monospacedDigit()
+            .lineLimit(1)
+            .minimumScaleFactor(0.65)
+    }
+
+    private var relativeTime: Text {
+        let afterNotification = context.state.notificationHasOccurred || context.isStale
+        let timer = ReminderLiveActivityTimePresentation.timer(
+            startDate: context.state.startDate, notificationDate: context.state.notificationDate,
+            endDate: context.state.activityEndDate, afterNotification: afterNotification
+        )
+        .locale(locale)
+        let suffix =
+            afterNotification
+            ? LocalizedStringResource("widget.live-activity.after", table: "Widget")
+            : LocalizedStringResource("widget.live-activity.before", table: "Widget")
+        return Text(.currentDate, format: timer) + Text(suffix)
     }
 }

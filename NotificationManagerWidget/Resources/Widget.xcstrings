@@ -1,38 +1,36 @@
 {
   "sourceLanguage": "en",
   "strings": {
-    "widget.live-activity.ended": {
-      "comment": "Shown after the reminder range or the eight-hour Live Activity display limit ends.",
+    "widget.live-activity.before": {
+      "comment": "Suffix appended to the system-formatted duration before the notification time. Preserve the leading space in English.",
       "extractionState": "manual",
       "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Ended"
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "表示終了"
-          }
-        }
+        "en": { "stringUnit": { "state": "translated", "value": " before" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "前" } }
       }
     },
-    "widget.live-activity.remaining": {
-      "comment": "VoiceOver label for the reminder range countdown.",
+    "widget.live-activity.after": {
+      "comment": "Suffix appended to the system-formatted duration after the notification time. Preserve the leading space in English.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": " after" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "後" } }
+      }
+    },
+    "widget.live-activity.notification-time": {
+      "comment": "Label for the notification time anchoring the before/after Live Activity display.",
       "extractionState": "manual",
       "localizations": {
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Time remaining"
+            "value": "Notification"
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "残り時間"
+            "value": "通知時刻"
           }
         }
       }

@@ -53,6 +53,11 @@ public struct ReminderStatusCalculator: Sendable {
                         at: evaluationNow,
                         environment: environment
                     )
+                    || hasOngoingLiveActivityWindow(
+                        schedule: definition,
+                        at: evaluationNow,
+                        environment: environment
+                    )
             } catch let error as NextNotificationProviderError {
                 switch error {
                 case .invalidSchedule:
@@ -109,6 +114,42 @@ public struct ReminderStatusCalculator: Sendable {
         return occurrences.first { occurrence in
             occurrence.instant <= evaluationNow
                 && occurrence.instant.addingTimeInterval(Double(duration)) > evaluationNow
+        } != nil
+    }
+
+    public func hasOngoingLiveActivityWindow(
+        schedule: ScheduleDefinition,
+        at evaluationNow: Date,
+        environment: any RecurrenceEnvironment
+    ) throws -> Bool {
+        guard let window = schedule.liveActivityWindow else { return false }
+        let issues = ReminderAggregateValidator().scheduleIssues(for: schedule)
+        guard issues.isEmpty else { throw NextNotificationProviderError.invalidSchedule(issues) }
+        let nowInterval = evaluationNow.timeIntervalSinceReferenceDate
+        guard nowInterval.isFinite else { throw NextNotificationProviderError.invalidEvaluationNow }
+        guard let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier)
+        else {
+            throw SourceWallClockResolutionError.unknownTimeZone
+        }
+        let calendar = environment.gregorianCalendar(in: timeZone)
+        let anchor = try SourceWallClockResolver().resolve(schedule.source, calendar: calendar)
+        let earliestInterval = (nowInterval - Double(window.afterSeconds)).nextUp
+        let latestInterval = (nowInterval + Double(window.beforeSeconds)).nextUp
+        guard earliestInterval.isFinite, latestInterval.isFinite else {
+            throw NextNotificationProviderError.arithmeticOverflow
+        }
+        let lowerBound = max(anchor, Date(timeIntervalSinceReferenceDate: earliestInterval))
+        let upperBound = Date(timeIntervalSinceReferenceDate: latestInterval)
+        guard lowerBound < upperBound else { return false }
+        let occurrences = try FoundationRecurrenceEngine().baseOccurrences(
+            for: schedule,
+            in: lowerBound..<upperBound,
+            environment: environment
+        )
+        return occurrences.first { occurrence in
+            occurrence.instant.addingTimeInterval(-Double(window.beforeSeconds)) <= evaluationNow
+                && occurrence.instant.addingTimeInterval(Double(window.afterSeconds))
+                    > evaluationNow
         } != nil
     }
 }

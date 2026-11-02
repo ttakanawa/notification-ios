@@ -90,8 +90,7 @@ enum ReminderFormFieldIssue: Sendable, Equatable {
     case timeZoneInvalid
     case repeatEndInvalid
     case repeatEndBeforeStart
-    case rangeEndInvalid
-    case rangeEndBeforeStart
+    case liveActivityWindowInvalid
 }
 
 enum EarlyReminderChoice: String, Sendable, Equatable, CaseIterable, Identifiable {
@@ -133,9 +132,9 @@ final class ReminderFormModel {
     private(set) var currentRepeatWasCustom = false
     private(set) var canonicalEnglishDisclosure: String?
     private(set) var repeatEndsOnDate = false
-    private(set) var rangeEnabled = false
-    private(set) var rangeEndDate: SourceDate?
-    private(set) var rangeEndTime: SourceTime?
+    private(set) var liveActivityEnabled = false
+    private(set) var liveActivityBeforeMinutes = 5
+    private(set) var liveActivityAfterMinutes = 10
     private(set) var earlyReminderChoice: EarlyReminderChoice = .none
     private(set) var customRepeatText = ""
     private(set) var isReplacingCustomRepeat = false
@@ -243,19 +242,17 @@ final class ReminderFormModel {
         }
         canonicalEnglishDisclosure = savedRepeatPresentation?.canonicalEnglishDisclosure
 
-        if let duration = initialDraft.durationSeconds {
-            rangeEnabled = true
-            if let date = initialDraft.date, let time = initialDraft.time {
-                let timeZone =
-                    initialDraft.timeZoneIdentifier.flatMap(TimeZone.init(identifier:))
-                    ?? Self.validatedPickerFallbackTimeZone(defaultTimeZone)
-                let adapter = SourceWallClockDateAdapter(timeZone: timeZone)
-                if let start = adapter.instant(date: date, time: time) {
-                    let end = start.addingTimeInterval(TimeInterval(duration))
-                    rangeEndDate = adapter.sourceDate(from: end)
-                    rangeEndTime = adapter.sourceTime(from: end)
-                }
-            }
+        if let window = initialDraft.liveActivityWindow
+            ?? initialDraft.durationSeconds.map({
+                LiveActivityWindow(beforeSeconds: 0, afterSeconds: min($0, 28_800))
+            })
+        {
+            liveActivityEnabled = true
+            let maximum = LiveActivityWindow.maximumDurationSeconds
+            let beforeSeconds = min(max(window.beforeSeconds, 0), maximum)
+            let afterSeconds = min(max(window.afterSeconds, 0), maximum)
+            liveActivityBeforeMinutes = (beforeSeconds + 59) / 60
+            liveActivityAfterMinutes = (afterSeconds + 59) / 60
         }
 
         switch snapshot.schedule {
@@ -344,7 +341,7 @@ final class ReminderFormModel {
             guard canEditSchedule, newValue != detachedDraft.date else { return }
             detachedDraft.date = newValue
             refreshAnchorDependentPreset()
-            scheduleFieldChanged(recomputingRangeDuration: true)
+            scheduleFieldChanged()
             refreshRepeatSummaryAfterSourceDateEdit()
         }
     }
@@ -354,7 +351,7 @@ final class ReminderFormModel {
         set {
             guard canEditSchedule, newValue != detachedDraft.time else { return }
             detachedDraft.time = newValue
-            scheduleFieldChanged(recomputingRangeDuration: true)
+            scheduleFieldChanged()
         }
     }
 
@@ -367,7 +364,7 @@ final class ReminderFormModel {
                 return
             }
             detachedDraft.timeZoneIdentifier = newValue
-            scheduleFieldChanged(recomputingRangeDuration: true)
+            scheduleFieldChanged()
         }
     }
 
@@ -463,22 +460,6 @@ final class ReminderFormModel {
         )
     }
 
-    var rangeEndDatePickerValue: Date? {
-        guard let rangeEndDate else { return nil }
-        return SourceWallClockDateAdapter(timeZone: pickerTimeZone).instant(
-            date: rangeEndDate,
-            time: SourceTime(hour: 12, minute: 0)
-        )
-    }
-
-    var rangeEndTimePickerValue: Date? {
-        guard let rangeEndTime else { return nil }
-        return SourceWallClockDateAdapter(timeZone: pickerTimeZone).instant(
-            date: SourceDate(year: 2001, month: 1, day: 1),
-            time: rangeEndTime
-        )
-    }
-
     var missingPickerDefaultValue: Date {
         let adapter = SourceWallClockDateAdapter(timeZone: pickerTimeZone)
         return adapter.instant(
@@ -539,16 +520,15 @@ final class ReminderFormModel {
             : nil
     }
 
-    var rangeEndFieldIssue: ReminderFormFieldIssue? {
-        guard canEditSchedule, rangeEnabled else { return nil }
-        guard let rangeEndDate, let rangeEndTime,
-            SourceWallClockDateAdapter(timeZone: pickerTimeZone).instant(
-                date: rangeEndDate, time: rangeEndTime
-            ) != nil
-        else { return .rangeEndInvalid }
-        guard sourceInstant != nil else { return nil }
-        guard let duration = detachedDraft.durationSeconds else { return .rangeEndInvalid }
-        return duration > 0 ? nil : .rangeEndBeforeStart
+    var liveActivityWindowFieldIssue: ReminderFormFieldIssue? {
+        guard canEditSchedule, liveActivityEnabled else { return nil }
+        let window =
+            detachedDraft.liveActivityWindow
+            ?? detachedDraft.durationSeconds.map {
+                LiveActivityWindow(beforeSeconds: 0, afterSeconds: min($0, 28_800))
+            }
+        guard window?.isValid == true else { return .liveActivityWindowInvalid }
+        return nil
     }
 
     var canSaveWithoutReplacingSchedule: Bool {
@@ -597,37 +577,34 @@ final class ReminderFormModel {
         )
     }
 
-    func setRangeEnabled(_ enabled: Bool) {
-        guard canEditSchedule, enabled != rangeEnabled else { return }
-        rangeEnabled = enabled
-        if enabled {
-            let adapter = SourceWallClockDateAdapter(timeZone: pickerTimeZone)
-            let end = (sourceInstant ?? missingPickerDefaultValue).addingTimeInterval(3_600)
-            rangeEndDate = adapter.sourceDate(from: end)
-            rangeEndTime = adapter.sourceTime(from: end)
-            detachedDraft.durationSeconds = 3_600
-        } else {
-            rangeEndDate = nil
-            rangeEndTime = nil
+    func setLiveActivityEnabled(_ enabled: Bool) {
+        guard canEditSchedule, enabled != liveActivityEnabled else { return }
+        liveActivityEnabled = enabled
+        if !enabled {
+            // A v3 duration also enabled Live Activities. Clear it on an explicit
+            // disable so the compatibility fallback cannot turn the activity back on.
             detachedDraft.durationSeconds = nil
         }
+        updateLiveActivityWindow()
         scheduleFieldChanged()
     }
 
-    func updateRangeEndDate(from value: Date) {
-        guard canEditSchedule, rangeEnabled else { return }
-        let date = SourceWallClockDateAdapter(timeZone: pickerTimeZone).sourceDate(from: value)
-        guard date != rangeEndDate else { return }
-        rangeEndDate = date
-        scheduleFieldChanged(recomputingRangeDuration: true)
+    func updateLiveActivityBeforeMinutes(_ value: Int) {
+        guard canEditSchedule, liveActivityEnabled,
+            (0...480).contains(value), value != liveActivityBeforeMinutes
+        else { return }
+        liveActivityBeforeMinutes = value
+        updateLiveActivityWindow()
+        scheduleFieldChanged()
     }
 
-    func updateRangeEndTime(from value: Date) {
-        guard canEditSchedule, rangeEnabled else { return }
-        let time = SourceWallClockDateAdapter(timeZone: pickerTimeZone).sourceTime(from: value)
-        guard time != rangeEndTime else { return }
-        rangeEndTime = time
-        scheduleFieldChanged(recomputingRangeDuration: true)
+    func updateLiveActivityAfterMinutes(_ value: Int) {
+        guard canEditSchedule, liveActivityEnabled,
+            (0...480).contains(value), value != liveActivityAfterMinutes
+        else { return }
+        liveActivityAfterMinutes = value
+        updateLiveActivityWindow()
+        scheduleFieldChanged()
     }
 
     func updateEarlyReminderAmount(_ amount: Int) {
@@ -824,6 +801,7 @@ final class ReminderFormModel {
                 end: detachedDraft.end,
                 early: detachedDraft.early,
                 durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow,
                 assistedInterpreter: assistedRepeatInterpreter
             ),
             reminderID: detachedDraft.id,
@@ -879,7 +857,8 @@ final class ReminderFormModel {
                 rule: schedule.rule,
                 end: schedule.end,
                 early: schedule.early,
-                durationSeconds: detachedDraft.durationSeconds
+                durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow
             ))
         customRepeatState = .confirmed(preview)
         isReplacingCustomRepeat = false
@@ -995,9 +974,9 @@ final class ReminderFormModel {
         customRepeatState = .idle
         detachedDraft = baseline.draft
         repeatEndsOnDate = baseline.editableContent.repeatEndsOnDate
-        rangeEnabled = baseline.editableContent.rangeEnabled
-        rangeEndDate = baseline.editableContent.rangeEndDate
-        rangeEndTime = baseline.editableContent.rangeEndTime
+        liveActivityEnabled = baseline.editableContent.liveActivityEnabled
+        liveActivityBeforeMinutes = baseline.editableContent.liveActivityBeforeMinutes
+        liveActivityAfterMinutes = baseline.editableContent.liveActivityAfterMinutes
         earlyReminderChoice = baseline.editableContent.earlyReminderChoice
         isReplacingCustomRepeat = baseline.editableContent.isReplacingCustomRepeat
         customRepeatText = baseline.editableContent.customRepeatText
@@ -1031,9 +1010,10 @@ final class ReminderFormModel {
             repeatRule: detachedDraft.rule,
             repeatEnd: detachedDraft.end,
             repeatEndsOnDate: repeatEndsOnDate,
-            rangeEnabled: rangeEnabled,
-            rangeEndDate: rangeEndDate,
-            rangeEndTime: rangeEndTime,
+            liveActivityEnabled: liveActivityEnabled,
+            liveActivityBeforeMinutes: liveActivityEnabled ? liveActivityBeforeMinutes : 5,
+            liveActivityAfterMinutes: liveActivityEnabled ? liveActivityAfterMinutes : 10,
+            legacyDurationSeconds: detachedDraft.durationSeconds,
             earlyReminder: detachedDraft.early,
             earlyReminderChoice: earlyReminderChoice,
             isReplacingCustomRepeat: isReplacingCustomRepeat,
@@ -1056,7 +1036,7 @@ final class ReminderFormModel {
 
     private var scheduleInputFieldsAreValid: Bool {
         guard canEditSchedule else { return true }
-        return repeatEndDateFieldIssue == nil && rangeEndFieldIssue == nil
+        return repeatEndDateFieldIssue == nil && liveActivityWindowFieldIssue == nil
     }
 
     private func refreshAnchorDependentPreset() {
@@ -1097,16 +1077,14 @@ final class ReminderFormModel {
                 rule: detachedDraft.rule,
                 end: detachedDraft.end,
                 early: detachedDraft.early,
-                durationSeconds: detachedDraft.durationSeconds
+                durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow
             ))
         if currentRepeatWasCustom { canonicalEnglishDisclosure = nil }
     }
 
-    private func scheduleFieldChanged(recomputingRangeDuration: Bool = false) {
+    private func scheduleFieldChanged() {
         guard canEditSchedule else { return }
-        if recomputingRangeDuration {
-            updateRangeDuration()
-        }
         scheduleHasEditIntent = true
         if isReplacingCustomRepeat {
             customRepeatState = .idle
@@ -1120,7 +1098,8 @@ final class ReminderFormModel {
                     rule: detachedDraft.rule,
                     end: detachedDraft.end,
                     early: detachedDraft.early,
-                    durationSeconds: detachedDraft.durationSeconds
+                    durationSeconds: detachedDraft.durationSeconds,
+                    liveActivityWindow: detachedDraft.liveActivityWindow
                 ))
         } else {
             detachedDraft.scheduleChange = .preserveOriginal
@@ -1129,27 +1108,17 @@ final class ReminderFormModel {
         resetSaveStateAfterEdit()
     }
 
-    private var sourceInstant: Date? {
-        guard let date = detachedDraft.date, let time = detachedDraft.time else { return nil }
-        return SourceWallClockDateAdapter(timeZone: pickerTimeZone).instant(date: date, time: time)
-    }
-
-    private func updateRangeDuration() {
-        guard rangeEnabled else {
+    private func updateLiveActivityWindow() {
+        if let duration = detachedDraft.durationSeconds, duration < 60 || duration % 60 != 0 {
+            // Explicitly repairing the display window also replaces an invalid v3 range.
             detachedDraft.durationSeconds = nil
-            return
         }
-        guard let start = sourceInstant,
-            let rangeEndDate, let rangeEndTime,
-            let end = SourceWallClockDateAdapter(timeZone: pickerTimeZone).instant(
-                date: rangeEndDate, time: rangeEndTime
-            ),
-            let seconds = Int(exactly: end.timeIntervalSince(start))
-        else {
-            detachedDraft.durationSeconds = 0
-            return
-        }
-        detachedDraft.durationSeconds = seconds
+        detachedDraft.liveActivityWindow =
+            liveActivityEnabled
+            ? LiveActivityWindow(
+                beforeSeconds: liveActivityBeforeMinutes * 60,
+                afterSeconds: liveActivityAfterMinutes * 60
+            ) : nil
     }
 
     private func refreshPreview() {
@@ -1173,7 +1142,8 @@ final class ReminderFormModel {
                     rule: detachedDraft.rule,
                     end: detachedDraft.end,
                     early: detachedDraft.early,
-                    durationSeconds: detachedDraft.durationSeconds
+                    durationSeconds: detachedDraft.durationSeconds,
+                    liveActivityWindow: detachedDraft.liveActivityWindow
                 )
             } else {
                 schedule = nil
@@ -1288,9 +1258,10 @@ private struct ReminderFormEditableContent: Equatable {
     let repeatRule: RepeatRule
     let repeatEnd: RepeatEnd
     let repeatEndsOnDate: Bool
-    let rangeEnabled: Bool
-    let rangeEndDate: SourceDate?
-    let rangeEndTime: SourceTime?
+    let liveActivityEnabled: Bool
+    let liveActivityBeforeMinutes: Int
+    let liveActivityAfterMinutes: Int
+    let legacyDurationSeconds: Int?
     let earlyReminder: EarlyReminder?
     let earlyReminderChoice: EarlyReminderChoice
     let isReplacingCustomRepeat: Bool

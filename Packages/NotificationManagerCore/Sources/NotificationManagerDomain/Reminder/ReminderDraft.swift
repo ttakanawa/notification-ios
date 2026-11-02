@@ -13,6 +13,7 @@ public struct ReminderDraft: Sendable, Equatable {
     public var end: RepeatEnd
     public var early: EarlyReminder?
     public var durationSeconds: Int?
+    public var liveActivityWindow: LiveActivityWindow?
     public var scheduleChange: DraftScheduleChange
     public let originalScheduleData: Data?
     public var tagIDs: Set<UUID>
@@ -49,6 +50,7 @@ public struct ReminderDraft: Sendable, Equatable {
         end: RepeatEnd = .never,
         early: EarlyReminder? = nil,
         durationSeconds: Int? = nil,
+        liveActivityWindow: LiveActivityWindow? = nil,
         scheduleChange: DraftScheduleChange = .preserveOriginal,
         originalScheduleData: Data? = nil,
         tagIDs: Set<UUID> = [],
@@ -60,6 +62,7 @@ public struct ReminderDraft: Sendable, Equatable {
         let effectiveEnd: RepeatEnd
         let effectiveEarly: EarlyReminder?
         let effectiveDurationSeconds: Int?
+        let effectiveLiveActivityWindow: LiveActivityWindow?
         switch scheduleChange {
         case .preserveOriginal:
             effectiveSource = source
@@ -67,12 +70,14 @@ public struct ReminderDraft: Sendable, Equatable {
             effectiveEnd = end
             effectiveEarly = early
             effectiveDurationSeconds = durationSeconds
+            effectiveLiveActivityWindow = liveActivityWindow
         case .replace(let schedule):
             effectiveSource = schedule.source
             effectiveRule = schedule.rule
             effectiveEnd = schedule.end
             effectiveEarly = schedule.early
             effectiveDurationSeconds = schedule.durationSeconds
+            effectiveLiveActivityWindow = schedule.liveActivityWindow
         }
 
         self.id = id
@@ -87,6 +92,7 @@ public struct ReminderDraft: Sendable, Equatable {
         self.end = effectiveEnd
         self.early = effectiveEarly
         self.durationSeconds = effectiveDurationSeconds
+        self.liveActivityWindow = effectiveLiveActivityWindow
         self.scheduleChange = scheduleChange
         self.originalScheduleData = originalScheduleData
         self.tagIDs = tagIDs
@@ -108,7 +114,8 @@ public struct ReminderDraft: Sendable, Equatable {
                 rule: schedule.rule,
                 end: schedule.end,
                 early: schedule.early,
-                durationSeconds: schedule.durationSeconds
+                durationSeconds: schedule.durationSeconds,
+                liveActivityWindow: schedule.liveActivityWindow
             )
         case .domainInvalid(let repairSeed, _, _):
             editableSchedule = repairSeed
@@ -127,6 +134,7 @@ public struct ReminderDraft: Sendable, Equatable {
             end: editableSchedule.end ?? .never,
             early: editableSchedule.early,
             durationSeconds: editableSchedule.durationSeconds,
+            liveActivityWindow: editableSchedule.liveActivityWindow,
             scheduleChange: .preserveOriginal,
             originalScheduleData: snapshot.schedule.originalData,
             tagIDs: snapshot.tagIDs,

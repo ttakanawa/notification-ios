@@ -1,5 +1,9 @@
 import Foundation
 
+#if canImport(SwiftUI)
+    import SwiftUI
+#endif
+
 public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
     public static let maximumActivityDuration: TimeInterval = 8 * 60 * 60
 
@@ -7,16 +11,21 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
     public let title: String
     public let startDate: Date
     public let endDate: Date
+    public let notificationDate: Date
 
-    public init(reminderID: UUID, title: String, startDate: Date, endDate: Date) {
+    public init(
+        reminderID: UUID, title: String, startDate: Date, endDate: Date,
+        notificationDate: Date? = nil
+    ) {
         self.reminderID = reminderID
         self.title = title
         self.startDate = startDate
         self.endDate = endDate
+        self.notificationDate = notificationDate ?? startDate
     }
 
     public var id: String {
-        "\(reminderID.uuidString.lowercased())/\(startDate.timeIntervalSince1970)"
+        "\(reminderID.uuidString.lowercased())/\(notificationDate.timeIntervalSince1970)"
     }
 
     public var activityEndDate: Date {
@@ -26,10 +35,31 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
     public var isValid: Bool {
         startDate.timeIntervalSince1970.isFinite
             && endDate.timeIntervalSince1970.isFinite
+            && notificationDate.timeIntervalSince1970.isFinite
             && endDate > startDate
+            && notificationDate >= startDate && notificationDate <= endDate
             && !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
+
+#if canImport(SwiftUI)
+    /// Returns a system-defined format style that the Live Activity renderer can decode itself.
+    /// The bounded timer keeps updating without the app and stops at the display window's end.
+    public enum ReminderLiveActivityTimePresentation {
+        public static func timer(
+            startDate: Date, notificationDate: Date, endDate: Date, afterNotification: Bool
+        ) -> SystemFormatStyle.Timer {
+            if afterNotification {
+                return .init(
+                    countingUpIn: notificationDate..<endDate, showsHours: false,
+                    maxFieldCount: 1, maxPrecision: .seconds(60))
+            }
+            return .init(
+                countingDownIn: startDate..<notificationDate, showsHours: false,
+                maxFieldCount: 1, maxPrecision: .seconds(60))
+        }
+    }
+#endif
 
 public enum ReminderLiveActivitySelection {
     /// Scheduled activities share the system's activity limit with active ones.

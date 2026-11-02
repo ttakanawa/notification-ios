@@ -113,14 +113,9 @@ extension ReminderFormFieldIssue {
                 "reminder.form.error.repeat-end-before-start",
                 table: "ReminderForm"
             )
-        case .rangeEndInvalid:
+        case .liveActivityWindowInvalid:
             LocalizedStringResource(
-                "reminder.form.error.range-end-invalid",
-                table: "ReminderForm"
-            )
-        case .rangeEndBeforeStart:
-            LocalizedStringResource(
-                "reminder.form.error.range-end-before-start",
+                "reminder.form.error.live-activity-window-invalid",
                 table: "ReminderForm"
             )
         }

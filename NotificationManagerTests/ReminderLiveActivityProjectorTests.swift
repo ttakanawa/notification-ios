@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerDomain
 import NotificationManagerWidgetSupport
+import SwiftUI
 import Testing
 
 @testable import NotificationManager
@@ -25,6 +26,108 @@ struct ReminderLiveActivityProjectorTests {
         #expect(events.first?.reminderID == reminder.id)
         #expect(events.first?.startDate == now.addingTimeInterval(-900))
         #expect(events.first?.endDate == now.addingTimeInterval(2_700))
+    }
+
+    @Test func fiveMinutesBeforeAndTenMinutesAfterUseAnIndependentNotificationAnchor() throws {
+        let source = reminder(
+            duration: nil, startOffset: 300,
+            window: .init(beforeSeconds: 300, afterSeconds: 600))
+        let event = try #require(try project([source]).first)
+
+        #expect(event.startDate == now)
+        #expect(event.notificationDate == now.addingTimeInterval(300))
+        #expect(event.endDate == now.addingTimeInterval(900))
+        #expect(
+            ReminderLiveActivitySelection.select(
+                events: [event], at: now, supportsScheduling: false) == [event])
+        let before = ReminderLiveActivityTimePresentation.timer(
+            startDate: event.startDate, notificationDate: event.notificationDate,
+            endDate: event.endDate, afterNotification: false
+        ).locale(Locale(identifier: "ja_JP"))
+        let after = ReminderLiveActivityTimePresentation.timer(
+            startDate: event.startDate, notificationDate: event.notificationDate,
+            endDate: event.endDate, afterNotification: true
+        ).locale(Locale(identifier: "ja_JP"))
+        #expect(String(before.format(now).characters) + "前" == "5分前")
+        #expect(String(after.format(now.addingTimeInterval(660)).characters) + "後" == "6分後")
+    }
+
+    @Test func nativeMinuteTimersStayBoundedAtBothDisplayWindowEdges() {
+        let before = ReminderLiveActivityTimePresentation.timer(
+            startDate: now.addingTimeInterval(-300), notificationDate: now,
+            endDate: now.addingTimeInterval(600), afterNotification: false
+        )
+        .locale(Locale(identifier: "ja_JP"))
+        let after = ReminderLiveActivityTimePresentation.timer(
+            startDate: now.addingTimeInterval(-300), notificationDate: now,
+            endDate: now.addingTimeInterval(600), afterNotification: true
+        )
+        .locale(Locale(identifier: "ja_JP"))
+
+        #expect(String(before.format(now.addingTimeInterval(-600)).characters) == "5分")
+        #expect(String(before.format(now).characters) == "0分")
+        #expect(String(after.format(now.addingTimeInterval(-1)).characters) == "0分")
+        #expect(String(after.format(now.addingTimeInterval(360)).characters) == "6分")
+        #expect(String(after.format(now.addingTimeInterval(1_200)).characters) == "10分")
+    }
+
+    @Test func appRelaunchSixMinutesAfterTheNotificationRecoversItsDisplayWindow() throws {
+        let source = reminder(
+            duration: nil, startOffset: -360,
+            window: .init(beforeSeconds: 300, afterSeconds: 600))
+        let event = try #require(try project([source]).first)
+
+        #expect(event.startDate == now.addingTimeInterval(-660))
+        #expect(event.notificationDate == now.addingTimeInterval(-360))
+        #expect(event.endDate == now.addingTimeInterval(240))
+        #expect(
+            try ReminderLiveActivityProjector().project(
+                reminders: [source], notificationsEnabled: true,
+                now: now.addingTimeInterval(240)
+            ).isEmpty)
+    }
+
+    @Test func beforeAfterOffsetsDoNotMoveMainOrEarlyNotificationTimes() throws {
+        let source = reminder(
+            duration: nil, startOffset: 300, rule: .daily(interval: 1),
+            early: .init(value: 1, unit: .hours, mainEnabled: false),
+            window: .init(beforeSeconds: 300, afterSeconds: 600))
+        let events = try project([source])
+
+        #expect(events.count == ReminderLiveActivitySelection.maximumActivities)
+        #expect(events[0].notificationDate == now.addingTimeInterval(300))
+        #expect(events[0].startDate == now)
+        #expect(events[1].notificationDate == now.addingTimeInterval(86_700))
+        #expect(events.allSatisfy { $0.notificationDate.timeIntervalSince($0.startDate) == 300 })
+        #expect(events.allSatisfy { $0.endDate.timeIntervalSince($0.notificationDate) == 600 })
+    }
+
+    @Test func displayOffsetsPreserveElapsedTimeAcrossTheDaylightSavingJump() throws {
+        let schedule = ScheduleDefinition(
+            source: .init(
+                year: 2026, month: 3, day: 8, hour: 1, minute: 58,
+                timeZoneIdentifier: "America/New_York"),
+            rule: .none, end: .never, early: nil,
+            liveActivityWindow: .init(beforeSeconds: 300, afterSeconds: 600))
+        let clock = try #require(ISO8601DateFormatter().date(from: "2026-03-08T06:55:00Z"))
+        let reminder = ReminderSnapshot(
+            id: UUID(), title: "DST", notes: nil, urlString: nil, enabled: true,
+            schedule: .valid(schedule, sourceVersion: 4, originalData: Data()), tagIDs: [],
+            createdAt: clock, updatedAt: clock)
+        let events = try ReminderLiveActivityProjector().project(
+            reminders: [reminder], notificationsEnabled: true, now: clock)
+        let event = try #require(events.first)
+        let resolved = try SourceWallClockResolver().resolve(
+            schedule.source, environment: FoundationRecurrenceEnvironment())
+
+        #expect(event.notificationDate == resolved)
+        #expect(event.notificationDate.timeIntervalSince(event.startDate) == 300)
+        #expect(event.endDate.timeIntervalSince(event.notificationDate) == 600)
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone(identifier: "America/New_York")
+        formatter.dateFormat = "HH:mm"
+        #expect(formatter.string(from: event.startDate) == "01:53")
+        #expect(formatter.string(from: event.endDate) == "03:08")
     }
 
     @Test func endIsExclusiveAndEightHourActivitiesAreNotRestarted() throws {
@@ -125,7 +228,8 @@ struct ReminderLiveActivityProjectorTests {
 
     private func reminder(
         duration: Int?, enabled: Bool = true, startOffset: TimeInterval = -900,
-        rule: RepeatRule = .none, early: EarlyReminder? = nil, repeatEnd: RepeatEnd = .never
+        rule: RepeatRule = .none, early: EarlyReminder? = nil, repeatEnd: RepeatEnd = .never,
+        window: LiveActivityWindow? = nil
     ) -> ReminderSnapshot {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = .gmt
@@ -136,7 +240,8 @@ struct ReminderLiveActivityProjectorTests {
                 year: parts.year ?? 2026, month: parts.month ?? 1, day: parts.day ?? 1,
                 hour: parts.hour ?? 0, minute: parts.minute ?? 0,
                 timeZoneIdentifier: "Africa/Abidjan"),
-            rule: rule, end: repeatEnd, early: early, durationSeconds: duration
+            rule: rule, end: repeatEnd, early: early, durationSeconds: duration,
+            liveActivityWindow: window
         )
         return ReminderSnapshot(
             id: UUID(), title: "Time range", notes: nil, urlString: nil, enabled: enabled,

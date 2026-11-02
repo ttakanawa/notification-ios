@@ -31,6 +31,8 @@ protocol ReminderLiveActivityClient {
 
 @MainActor
 struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
+    nonisolated static let scheduledStartSoundName = "LiveActivitySilence.wav"
+
     var activitiesEnabled: Bool { ActivityAuthorizationInfo().areActivitiesEnabled }
 
     var supportsScheduling: Bool {
@@ -63,7 +65,7 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
 
     func request(_ event: ReminderLiveActivityEvent, scheduled: Bool) throws -> String {
         let attributes = ReminderActivityAttributes(event: event)
-        let content = content(for: event)
+        let content = Self.content(for: event, at: Date())
         let activity: Activity<ReminderActivityAttributes>
         if #available(iOS 26.0, *), scheduled {
             activity = try Activity.request(
@@ -78,7 +80,9 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
                         defaultValue: "\(event.title)",
                         table: "Reminder"
                     ),
-                    sound: .default
+                    // Scheduling requires an alert configuration. Starting the display
+                    // window must not play the main notification sound ahead of time.
+                    sound: .named(Self.scheduledStartSoundName)
                 ),
                 start: event.startDate
             )
@@ -90,7 +94,7 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
 
     func update(_ id: String, event: ReminderLiveActivityEvent) async {
         guard let activity = activity(id) else { return }
-        await activity.update(content(for: event))
+        await activity.update(Self.content(for: event, at: Date()))
     }
 
     func end(_ id: String) async {
@@ -102,12 +106,18 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
         Activity<ReminderActivityAttributes>.activities.first { $0.id == id }
     }
 
-    private func content(
-        for event: ReminderLiveActivityEvent
+    nonisolated static func content(
+        for event: ReminderLiveActivityEvent, at date: Date
     ) -> ActivityContent<ReminderActivityAttributes.ContentState> {
-        ActivityContent(
-            state: ReminderActivityAttributes.ContentState(event: event),
-            staleDate: event.activityEndDate,
+        let notificationHasOccurred = date >= event.notificationDate
+        return ActivityContent(
+            state: ReminderActivityAttributes.ContentState(
+                event: event, notificationHasOccurred: notificationHasOccurred),
+            // Native staleness is the phase boundary: it switches the widget from
+            // "before" to "after" without requiring the app to execute at this time.
+            // If the notification already fired, start with fresh content and an explicit
+            // after-phase rather than creating an initially stale, potentially hidden card.
+            staleDate: notificationHasOccurred ? event.activityEndDate : event.notificationDate,
             relevanceScore: 1
         )
     }

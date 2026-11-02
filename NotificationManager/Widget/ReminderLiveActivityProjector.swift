@@ -44,7 +44,7 @@ struct ReminderLiveActivityProjector: Sendable {
         var events: [ReminderLiveActivityEvent] = []
         for reminder in reminders where reminder.enabled {
             guard case .valid(let schedule, _, _) = reminder.schedule,
-                let duration = schedule.durationSeconds,
+                let window = schedule.effectiveLiveActivityWindow,
                 ReminderAggregateValidator().scheduleIssues(for: schedule).isEmpty,
                 let timeZone = environment.timeZone(identifier: schedule.source.timeZoneIdentifier)
             else { continue }
@@ -52,8 +52,7 @@ struct ReminderLiveActivityProjector: Sendable {
             guard
                 let upperBound = calendar.date(from: DateComponents(year: 10_000, month: 1, day: 1))
             else { continue }
-            let lowerBound = now.addingTimeInterval(
-                -ReminderLiveActivityEvent.maximumActivityDuration)
+            let lowerBound = now.addingTimeInterval(-TimeInterval(window.afterSeconds))
             guard lowerBound < upperBound else { continue }
             let occurrences = try FoundationRecurrenceEngine().baseOccurrences(
                 for: schedule,
@@ -65,8 +64,11 @@ struct ReminderLiveActivityProjector: Sendable {
                 let event = ReminderLiveActivityEvent(
                     reminderID: reminder.id,
                     title: reminder.title,
-                    startDate: occurrence.instant,
-                    endDate: occurrence.instant.addingTimeInterval(TimeInterval(duration))
+                    startDate: occurrence.instant.addingTimeInterval(
+                        -TimeInterval(window.beforeSeconds)),
+                    endDate: occurrence.instant.addingTimeInterval(
+                        TimeInterval(window.afterSeconds)),
+                    notificationDate: occurrence.instant
                 )
                 guard event.isValid, event.activityEndDate > now else { continue }
                 events.append(event)

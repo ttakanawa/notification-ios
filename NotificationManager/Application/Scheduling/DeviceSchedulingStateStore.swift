@@ -17,6 +17,7 @@ public struct DeviceSchedulingStateSnapshot: Sendable, Equatable {
     public let reconcileInProgressOrQueued: Bool
     public let globalFailure: SchedulingGlobalFailure?
     public let deviceNotificationsEnabled: Bool
+    public let hasResolvedDeviceSettings: Bool
     public let authorization: NotificationAuthorizationSnapshot
     public let outcomes: [AlertGroupID: AlertGroupSchedulingOutcome]
     public let scheduledThrough: [UUID: Date]
@@ -34,12 +35,14 @@ public struct DeviceSchedulingStateSnapshot: Sendable, Equatable {
         scheduledThrough: [UUID: Date],
         materializedKinds: [String: MaterializedNotificationKind],
         nextTriggerDates: [String: Date] = [:],
-        pendingOrAddedIdentifiers: Set<String>
+        pendingOrAddedIdentifiers: Set<String>,
+        hasResolvedDeviceSettings: Bool = true
     ) {
         self.generation = generation
         self.reconcileInProgressOrQueued = reconcileInProgressOrQueued
         self.globalFailure = globalFailure
         self.deviceNotificationsEnabled = deviceNotificationsEnabled
+        self.hasResolvedDeviceSettings = hasResolvedDeviceSettings
         self.authorization = authorization
         self.outcomes = outcomes
         self.scheduledThrough = scheduledThrough
@@ -63,7 +66,8 @@ public actor DeviceSchedulingStateStore {
         scheduledThrough: [:],
         materializedKinds: [:],
         nextTriggerDates: [:],
-        pendingOrAddedIdentifiers: []
+        pendingOrAddedIdentifiers: [],
+        hasResolvedDeviceSettings: false
     )
     private var updateContinuations:
         [UUID: AsyncStream<DeviceSchedulingStateSnapshot>.Continuation] = [:]
@@ -105,7 +109,8 @@ public actor DeviceSchedulingStateStore {
             scheduledThrough: current.scheduledThrough,
             materializedKinds: current.materializedKinds,
             nextTriggerDates: current.nextTriggerDates,
-            pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers
+            pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers,
+            hasResolvedDeviceSettings: current.hasResolvedDeviceSettings
         )
         publishUpdate()
     }
@@ -121,7 +126,8 @@ public actor DeviceSchedulingStateStore {
             scheduledThrough: current.scheduledThrough,
             materializedKinds: current.materializedKinds,
             nextTriggerDates: current.nextTriggerDates,
-            pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers
+            pendingOrAddedIdentifiers: current.pendingOrAddedIdentifiers,
+            hasResolvedDeviceSettings: current.hasResolvedDeviceSettings
         )
         publishUpdate()
     }
@@ -145,7 +151,8 @@ public actor DeviceSchedulingStateStore {
             scheduledThrough: scheduledThrough,
             materializedKinds: materializedKinds,
             nextTriggerDates: nextTriggerDates,
-            pendingOrAddedIdentifiers: pendingOrAddedIdentifiers
+            pendingOrAddedIdentifiers: pendingOrAddedIdentifiers,
+            hasResolvedDeviceSettings: true
         )
         publishUpdate()
     }

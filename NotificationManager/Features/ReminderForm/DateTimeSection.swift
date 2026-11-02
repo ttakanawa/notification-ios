@@ -5,6 +5,7 @@ import SwiftUI
 struct DateTimeSection: View {
     @Bindable var model: ReminderFormModel
     @State private var isTimeZonePickerPresented = false
+    @Environment(\.locale) private var locale
 
     var body: some View {
         Section {
@@ -69,20 +70,20 @@ struct DateTimeSection: View {
             if model.scheduleFieldsAreEditable {
                 Toggle(
                     isOn: Binding(
-                        get: { model.rangeEnabled },
-                        set: { model.setRangeEnabled($0) }
+                        get: { model.liveActivityEnabled },
+                        set: { model.setLiveActivityEnabled($0) }
                     )
                 ) {
                     Text(
                         LocalizedStringResource(
-                            "reminder.field.range-enabled",
+                            "reminder.field.live-activity-enabled",
                             table: "ReminderForm"
                         ))
                 }
-                .accessibilityIdentifier("reminder-form.range-enabled")
+                .accessibilityIdentifier("reminder-form.live-activity-enabled")
 
-                if model.rangeEnabled {
-                    rangeEndControls
+                if model.liveActivityEnabled {
+                    liveActivityControls
                 }
             }
 
@@ -160,49 +161,58 @@ struct DateTimeSection: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var rangeEndControls: some View {
+    private var liveActivityControls: some View {
         Group {
-            ScheduleDatePickerRow(
-                title: LocalizedStringResource(
-                    "reminder.field.range-end-date",
-                    table: "ReminderForm"
-                ),
-                selection: model.rangeEndDatePickerValue,
-                fallbackSelection: model.missingPickerDefaultValue,
-                displayedComponents: .date,
-                timeZone: model.pickerTimeZone,
-                accessibilityIdentifier: "reminder-form.range-end-date",
-                accessibilityValue: model.rangeEndDate.map {
-                    String(format: "%04d-%02d-%02d", $0.year, $0.month, $0.day)
-                },
-                onSelect: model.updateRangeEndDate(from:)
-            )
-            ScheduleDatePickerRow(
-                title: LocalizedStringResource(
-                    "reminder.field.range-end-time",
-                    table: "ReminderForm"
-                ),
-                selection: model.rangeEndTimePickerValue,
-                fallbackSelection: model.missingPickerDefaultValue,
-                displayedComponents: .hourAndMinute,
-                timeZone: model.pickerTimeZone,
-                accessibilityIdentifier: "reminder-form.range-end-time",
-                accessibilityValue: model.rangeEndTime.map {
-                    String(format: "%02d:%02d", $0.hour, $0.minute)
-                },
-                onSelect: model.updateRangeEndTime(from:)
-            )
+            Stepper(
+                value: Binding(
+                    get: { model.liveActivityBeforeMinutes },
+                    set: { model.updateLiveActivityBeforeMinutes($0) }
+                ), in: 0...480
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.live-activity-before",
+                            table: "ReminderForm"
+                        ))
+                    Text(verbatim: liveActivityBeforeText)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityIdentifier("reminder-form.live-activity-before-minutes")
+            .accessibilityValue(Text(model.liveActivityBeforeMinutes, format: .number))
 
-            if let issue = model.rangeEndFieldIssue {
+            Stepper(
+                value: Binding(
+                    get: { model.liveActivityAfterMinutes },
+                    set: { model.updateLiveActivityAfterMinutes($0) }
+                ), in: 0...480
+            ) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.live-activity-after",
+                            table: "ReminderForm"
+                        ))
+                    Text(verbatim: liveActivityAfterText)
+                        .foregroundStyle(.secondary)
+                }
+                .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityIdentifier("reminder-form.live-activity-after-minutes")
+            .accessibilityValue(Text(model.liveActivityAfterMinutes, format: .number))
+
+            if let issue = model.liveActivityWindowFieldIssue {
                 Label(issue.localizedResource, systemImage: "exclamationmark.triangle")
                     .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-form.range-end-error")
+                    .accessibilityIdentifier("reminder-form.live-activity-error")
             }
 
             Text(
                 LocalizedStringResource(
-                    "reminder.form.range.live-activity-help",
+                    "reminder.form.live-activity-help",
                     table: "ReminderForm"
                 )
             )
@@ -210,6 +220,20 @@ struct DateTimeSection: View {
             .foregroundStyle(.secondary)
             .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    private var liveActivityBeforeText: String {
+        let format = LocalizedTextProvider.live.value(
+            for: "reminder.form.live-activity.minutes-before", locale: locale)
+        return String(
+            format: format, locale: locale, arguments: [Int64(model.liveActivityBeforeMinutes)])
+    }
+
+    private var liveActivityAfterText: String {
+        let format = LocalizedTextProvider.live.value(
+            for: "reminder.form.live-activity.minutes-after", locale: locale)
+        return String(
+            format: format, locale: locale, arguments: [Int64(model.liveActivityAfterMinutes)])
     }
 
     private func unavailableValue(

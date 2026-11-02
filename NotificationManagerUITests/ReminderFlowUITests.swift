@@ -78,7 +78,7 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
-    func testOptionalEndControlsValidateTheRangeAndCanBeRemoved() {
+    func testLiveActivityOffsetsValidateTheDisplayWindowAndCanBeDisabled() {
         let app = launch(
             scenario: "empty-list",
             extraArguments: deterministicEnglish24HourArguments
@@ -88,48 +88,52 @@ final class ReminderFlowUITests: XCTestCase {
         let title = app.textFields["reminder-form.title"]
         XCTAssertTrue(title.waitForExistence(timeout: 2))
         title.tap()
-        title.typeText("Time range")
+        title.typeText("Notification window")
         app.keyboards.buttons["Return"].tap()
 
         let save = app.buttons["reminder-form.save"]
-        let endDate = app.otherElements["reminder-form.range-end-date"]
-        let endTime = app.otherElements["reminder-form.range-end-time"]
-        let rangeToggle = app.switches["reminder-form.range-enabled"]
+        let before = app.steppers["reminder-form.live-activity-before-minutes"]
+        let after = app.steppers["reminder-form.live-activity-after-minutes"]
+        let beforeDecrement = app.buttons["reminder-form.live-activity-before-minutes-Decrement"]
+        let afterDecrement = app.buttons["reminder-form.live-activity-after-minutes-Decrement"]
+        let afterIncrement = app.buttons["reminder-form.live-activity-after-minutes-Increment"]
+        let activityToggle = app.switches["reminder-form.live-activity-enabled"]
         XCTAssertTrue(save.isEnabled)
-        XCTAssertFalse(endDate.exists)
-        XCTAssertFalse(endTime.exists)
+        XCTAssertFalse(before.exists)
+        XCTAssertFalse(after.exists)
 
-        scrollToHittable(rangeToggle, in: app)
-        rangeToggle.switches.firstMatch.tap()
-        XCTAssertEqual(rangeToggle.value as? String, "1")
-        scrollToHittable(endTime, in: app)
-        XCTAssertTrue(endDate.waitForExistence(timeout: 1))
-        XCTAssertTrue(endTime.exists)
-        XCTAssertEqual(endDate.value as? String, "2040-07-05")
-        XCTAssertEqual(endTime.value as? String, "00:00")
+        scrollToHittable(activityToggle, in: app)
+        activityToggle.switches.firstMatch.tap()
+        XCTAssertEqual(activityToggle.value as? String, "1")
+        scrollToHittable(afterDecrement, in: app)
+        XCTAssertTrue(before.waitForExistence(timeout: 1))
+        XCTAssertTrue(after.exists)
+        XCTAssertEqual(before.value as? String, "5")
+        XCTAssertEqual(after.value as? String, "10")
         XCTAssertTrue(save.isEnabled)
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "optional-range-enabled"
+        screenshot.name = "live-activity-five-before-ten-after"
         screenshot.lifetime = .keepAlways
         add(screenshot)
 
-        let endDateButton = app.buttons.matching(identifier: "Date Picker").element(boundBy: 1)
-        scrollToHittable(endDateButton, in: app)
-        endDateButton.tap()
-        app.buttons["Wednesday 4 July"].tap()
-        app.buttons["PopoverDismissRegion"].tap()
+        scrollToHittable(beforeDecrement, in: app)
+        for _ in 0..<5 { beforeDecrement.tap() }
+        scrollToHittable(afterDecrement, in: app)
+        for _ in 0..<10 { afterDecrement.tap() }
 
-        XCTAssertEqual(endDate.value as? String, "2040-07-04")
         XCTAssertTrue(
-            app.descendants(matching: .any)["reminder-form.range-end-error"].exists)
+            app.descendants(matching: .any)["reminder-form.live-activity-error"].exists)
         XCTAssertFalse(save.isEnabled)
 
-        for _ in 0..<3 where !rangeToggle.isHittable {
+        afterIncrement.tap()
+        XCTAssertTrue(save.isEnabled)
+
+        for _ in 0..<3 where !activityToggle.isHittable {
             app.swipeDown()
         }
-        rangeToggle.switches.firstMatch.tap()
-        XCTAssertTrue(endDate.waitForNonExistence(timeout: 1))
-        XCTAssertFalse(endTime.exists)
+        activityToggle.switches.firstMatch.tap()
+        XCTAssertTrue(before.waitForNonExistence(timeout: 1))
+        XCTAssertFalse(after.exists)
         XCTAssertTrue(save.isEnabled)
     }
 

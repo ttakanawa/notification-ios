@@ -111,25 +111,59 @@ public struct EarlyReminder: Sendable, Equatable {
     }
 }
 
+public struct LiveActivityWindow: Sendable, Equatable {
+    public static let maximumDurationSeconds = 8 * 60 * 60
+
+    public let beforeSeconds: Int
+    public let afterSeconds: Int
+
+    public init(beforeSeconds: Int, afterSeconds: Int) {
+        self.beforeSeconds = beforeSeconds
+        self.afterSeconds = afterSeconds
+    }
+
+    public var isValid: Bool {
+        guard beforeSeconds >= 0, afterSeconds >= 0,
+            beforeSeconds <= Self.maximumDurationSeconds,
+            afterSeconds <= Self.maximumDurationSeconds
+        else { return false }
+        let total = beforeSeconds + afterSeconds
+        return total > 0 && total <= Self.maximumDurationSeconds
+    }
+}
+
 public struct ScheduleDefinition: Sendable, Equatable {
     public let source: SourceWallClock
     public let rule: RepeatRule
     public let end: RepeatEnd
     public let early: EarlyReminder?
     public let durationSeconds: Int?
+    public let liveActivityWindow: LiveActivityWindow?
+
+    public var effectiveLiveActivityWindow: LiveActivityWindow? {
+        if let liveActivityWindow { return liveActivityWindow }
+        return durationSeconds.map {
+            LiveActivityWindow(
+                beforeSeconds: 0,
+                afterSeconds: min($0, LiveActivityWindow.maximumDurationSeconds)
+            )
+        }
+    }
 
     public init(
         source: SourceWallClock,
         rule: RepeatRule,
         end: RepeatEnd,
         early: EarlyReminder?,
-        durationSeconds: Int? = nil
+        durationSeconds: Int? = nil,
+        liveActivityWindow: LiveActivityWindow? = nil
     ) {
         self.source = source
         self.rule = rule
         self.end = end
         self.early = early
         self.durationSeconds = durationSeconds
+        self.liveActivityWindow = liveActivityWindow
     }
 }
 
@@ -139,19 +173,22 @@ public struct ScheduleRepairSeed: Sendable, Equatable {
     public let end: RepeatEnd?
     public let early: EarlyReminder?
     public let durationSeconds: Int?
+    public let liveActivityWindow: LiveActivityWindow?
 
     public init(
         source: SourceWallClock? = nil,
         rule: RepeatRule? = nil,
         end: RepeatEnd? = nil,
         early: EarlyReminder? = nil,
-        durationSeconds: Int? = nil
+        durationSeconds: Int? = nil,
+        liveActivityWindow: LiveActivityWindow? = nil
     ) {
         self.source = source
         self.rule = rule
         self.end = end
         self.early = early
         self.durationSeconds = durationSeconds
+        self.liveActivityWindow = liveActivityWindow
     }
 }
 
@@ -171,6 +208,7 @@ public enum ScheduleValidationIssue: Sendable, Equatable {
     case endNotAllowed
     case earlyValueOutOfRange
     case invalidDuration
+    case invalidLiveActivityWindow
 }
 
 public enum ScheduleReadState: Sendable, Equatable {

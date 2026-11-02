@@ -90,6 +90,7 @@ final class ReminderLiveActivityService {
         let recordIDs = Set(records.map(\.id))
         let eventByID = Dictionary(
             events.filter(\.isValid).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        extendSuppressionWindows(using: eventByID)
         suppressedUntil = suppressedUntil.filter { $0.value > now.timeIntervalSince1970 }
 
         // Missing activities that this app previously created were dismissed by the person or system.
@@ -99,7 +100,10 @@ final class ReminderLiveActivityService {
                 suppressedUntil[eventID] = event.activityEndDate.timeIntervalSince1970
             }
         }
-        for record in records where record.state == .dismissed || record.state == .ended {
+        for record in records
+        where (record.state == .dismissed || record.state == .ended)
+            && knownActivities[record.eventID] == record.id
+        {
             suppressedUntil[record.eventID] = record.content.activityEndDate.timeIntervalSince1970
         }
 
@@ -111,11 +115,15 @@ final class ReminderLiveActivityService {
                 supportsScheduling: client.supportsScheduling,
                 suppressedIDs: Set(suppressedUntil.keys)
             ) : []
-        let desiredIDs = Set(desired.map(\.id))
+        let desiredByID = Dictionary(uniqueKeysWithValues: desired.map { ($0.id, $0) })
         var retained: [String: ReminderLiveActivityRecord] = [:]
         for record in records {
-            if desiredIDs.contains(record.eventID),
+            if let event = desiredByID[record.eventID],
                 record.state != .dismissed, record.state != .ended,
+                // ActivityKit's scheduled start cannot be changed by a content update.
+                record.state != .pending || record.content.startDate == event.startDate,
+                // An edited window may no longer include the currently displayed time.
+                record.state == .pending || event.startDate <= now,
                 retained[record.eventID] == nil
             {
                 retained[record.eventID] = record
@@ -134,7 +142,9 @@ final class ReminderLiveActivityService {
 
         for event in desired {
             if let record = retained[event.id] {
-                if record.content != ReminderActivityAttributes.ContentState(event: event) {
+                let expectedContent = ReminderActivityAttributes.ContentState(
+                    event: event, notificationHasOccurred: record.content.notificationHasOccurred)
+                if record.content != expectedContent {
                     await client.update(record.id, event: event)
                     guard revision == currentRevision else { return }
                 }
@@ -156,6 +166,16 @@ final class ReminderLiveActivityService {
     private func persistState() {
         defaults.set(knownActivities, forKey: Self.knownActivitiesKey)
         defaults.set(suppressedUntil, forKey: Self.suppressedActivitiesKey)
+    }
+
+    private func extendSuppressionWindows(using events: [String: ReminderLiveActivityEvent]) {
+        // Extend before expiring entries so changing the display end cannot resurrect
+        // an occurrence that the person already dismissed.
+        for (eventID, expiry) in suppressedUntil {
+            if let event = events[eventID] {
+                suppressedUntil[eventID] = max(expiry, event.activityEndDate.timeIntervalSince1970)
+            }
+        }
     }
 
     private func scheduleNextReconciliation(

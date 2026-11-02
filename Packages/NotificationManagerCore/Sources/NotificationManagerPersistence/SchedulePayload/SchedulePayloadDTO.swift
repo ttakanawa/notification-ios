@@ -12,6 +12,7 @@ struct SchedulePayloadDTO: Encodable {
     let end: EndDTO
     let early: EarlyDTO?
     let durationSeconds: Int?
+    let liveActivityWindow: LiveActivityWindowDTO?
 
     init(_ definition: ScheduleDefinition) {
         source = SourceDTO(definition.source)
@@ -19,6 +20,17 @@ struct SchedulePayloadDTO: Encodable {
         end = EndDTO(definition.end)
         early = definition.early.map(EarlyDTO.init)
         durationSeconds = definition.durationSeconds
+        liveActivityWindow = definition.liveActivityWindow.map(LiveActivityWindowDTO.init)
+    }
+
+    struct LiveActivityWindowDTO: Encodable {
+        let beforeSeconds: Int
+        let afterSeconds: Int
+
+        init(_ window: LiveActivityWindow) {
+            beforeSeconds = window.beforeSeconds
+            afterSeconds = window.afterSeconds
+        }
     }
 
     struct SourceDTO: Encodable {

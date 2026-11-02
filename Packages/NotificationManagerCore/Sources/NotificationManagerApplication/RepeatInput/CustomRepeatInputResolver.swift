@@ -69,6 +69,7 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
     private let end: RepeatEnd
     private let early: EarlyReminder?
     private let durationSeconds: Int?
+    private let liveActivityWindow: LiveActivityWindow?
     private let assistedInterpreter: any AssistedRepeatInterpreting
 
     public init(
@@ -76,12 +77,14 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
         end: RepeatEnd,
         early: EarlyReminder?,
         durationSeconds: Int? = nil,
+        liveActivityWindow: LiveActivityWindow? = nil,
         assistedInterpreter: any AssistedRepeatInterpreting
     ) {
         self.source = source
         self.end = end
         self.early = early
         self.durationSeconds = durationSeconds
+        self.liveActivityWindow = liveActivityWindow
         self.assistedInterpreter = assistedInterpreter
     }
 
@@ -139,7 +142,8 @@ public struct CustomRepeatInputResolver: CustomRepeatInputResolving, Sendable {
                 rule: rule,
                 end: end,
                 early: early,
-                durationSeconds: durationSeconds
+                durationSeconds: durationSeconds,
+                liveActivityWindow: liveActivityWindow
             )
             return .resolved(
                 ResolvedCustomRepeat(
