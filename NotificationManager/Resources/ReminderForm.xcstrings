@@ -50,11 +50,11 @@
       }
     },
     "reminder.form.live-activity-help": {
-      "comment": "Explains the notification-relative Live Activity display window and device-only start limitations.",
+      "comment": "Explains the notification-relative Live Activity display window and device-only start and cleanup limitations.",
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Show the time until the notification, then the time elapsed after it. The display window can total up to 8 hours. iOS 26 or later starts automatically; earlier versions start when you open the app. Removal may wait until the app runs again." } },
-        "ja": { "stringUnit": { "state": "translated", "value": "通知前は通知までの時間、 通知後は通知からの経過時間を表示します。 表示時間は前後の合計で最大8時間です。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 消去は次回のアプリ動作時になる場合があります。" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Show the time until the notification, then the time elapsed after it. The display window can total up to 8 hours. iOS 26 or later starts automatically; earlier versions start when you open the app. Removal uses background refresh and may be delayed. Open the app to remove expired activities." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前は通知までの時間、 通知後は通知からの経過時間を表示します。 表示時間は前後の合計で最大8時間です。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 バックグラウンド更新による消去は遅れる場合があります。 期限切れの表示はアプリを開くと消去されます。" } }
       }
     },
     "reminder.custom.error.assistance-unavailable": {

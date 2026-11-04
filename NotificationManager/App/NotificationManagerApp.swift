@@ -27,6 +27,9 @@ struct NotificationManagerApp: App {
                 AppBootstrapRoot(notificationDelegate: notificationDelegate)
             #endif
         }
+        .backgroundTask(.appRefresh(ReminderLiveActivityBackgroundRefresh.identifier)) {
+            await ReminderLiveActivityService.shared.removeExpiredActivities()
+        }
     }
 
     private static var uiScenario: String {

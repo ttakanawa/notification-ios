@@ -243,6 +243,165 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.requested.count == 1)
     }
 
+    @Test func backgroundOnlyLaunchCleansExpiredActivitiesWithoutASnapshotOrStarts() async throws {
+        let context = try makeContext()
+        let expired = event(startOffset: -600)
+        let ongoing = event(startOffset: -60)
+        let pending = event(startOffset: 60)
+        context.client.records = [
+            record("expired", event: expired, state: .stale),
+            record("ended", event: expired, state: .ended),
+            record("ongoing", event: ongoing),
+            record("pending", event: pending, state: .pending)
+        ]
+        var scheduledRecords: [[ReminderLiveActivityRecord]] = []
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { false }, currentDate: { now },
+            scheduleBackgroundExpiration: { scheduledRecords.append($0) })
+
+        await service.removeExpiredActivities()
+
+        #expect(context.client.ended == ["expired", "ended"])
+        #expect(context.client.records.map(\.id) == ["ongoing", "pending"])
+        #expect(context.client.requested.isEmpty)
+        #expect(scheduledRecords.last?.map(\.id) == ["ongoing", "pending"])
+    }
+
+    @Test func automaticBackgroundExpiryDoesNotSuppressALaterWindowExtension() async throws {
+        let context = try makeContext()
+        let original = event(startOffset: -60)
+        var clock = now
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { true }, currentDate: { clock })
+        await service.reconcile(events: [original], now: now)
+        clock = original.activityEndDate
+
+        await service.removeExpiredActivities()
+        #expect(context.client.ended == ["activity-1"])
+
+        let extended = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title, startDate: original.startDate,
+            endDate: original.endDate.addingTimeInterval(300),
+            notificationDate: original.notificationDate)
+        let relaunched = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { true })
+        await relaunched.reconcile(events: [extended], now: clock)
+
+        #expect(context.client.requested == [original, extended])
+    }
+
+    @Test func reconciliationSchedulesTheUpdatedActivityInventoryAndCancelsAfterDeletion()
+        async throws
+    {
+        let context = try makeContext()
+        var scheduledRecords: [[ReminderLiveActivityRecord]] = []
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { true },
+            scheduleBackgroundExpiration: { scheduledRecords.append($0) })
+        let original = event(startOffset: -60)
+        let extended = ReminderLiveActivityEvent(
+            reminderID: original.reminderID, title: original.title, startDate: original.startDate,
+            endDate: original.endDate.addingTimeInterval(300))
+
+        await service.reconcile(events: [original], now: now)
+        await service.reconcile(events: [extended], now: now)
+        await service.reconcile(events: [], now: now)
+
+        #expect(
+            scheduledRecords.map { $0.first?.content.activityEndDate }
+                == [original.activityEndDate, extended.activityEndDate, nil])
+    }
+
+    @Test func cleanupYieldsToAnEditQueuedWhileEndingAnotherActivity() async throws {
+        let context = try makeContext()
+        let first = event(startOffset: -600)
+        let second = event(startOffset: -600)
+        context.client.records = [record("first", event: first), record("second", event: second)]
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { true }, currentDate: { now })
+        let (ending, endingContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        let (editing, editingContinuation) = AsyncStream<Void>.makeStream()
+        context.client.beforeEnding = { _ in
+            endingContinuation.yield(())
+            var iterator = release.makeAsyncIterator()
+            _ = await iterator.next()
+        }
+        var endingIterator = ending.makeAsyncIterator()
+        var editingIterator = editing.makeAsyncIterator()
+        let cleanup = Task { await service.removeExpiredActivities() }
+        _ = await endingIterator.next()
+        let extended = ReminderLiveActivityEvent(
+            reminderID: second.reminderID, title: second.title, startDate: second.startDate,
+            endDate: now.addingTimeInterval(300), notificationDate: second.notificationDate)
+        let edit = Task {
+            editingContinuation.yield(())
+            await service.reconcile(events: [extended], now: now)
+        }
+        _ = await editingIterator.next()
+        releaseContinuation.yield(())
+        await cleanup.value
+        await edit.value
+
+        #expect(context.client.ended == ["first"])
+        #expect(context.client.updated == [extended])
+        #expect(context.client.records.first?.id == "second")
+        endingContinuation.finish()
+        releaseContinuation.finish()
+        editingContinuation.finish()
+    }
+
+    @Test func cancelledBackgroundCleanupStopsAndReschedulesRemainingActivities() async throws {
+        let context = try makeContext()
+        let expired = event(startOffset: -600)
+        context.client.records = [record("first", event: expired), record("second", event: expired)]
+        var scheduledRecords: [[ReminderLiveActivityRecord]] = []
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { false }, currentDate: { now },
+            scheduleBackgroundExpiration: { scheduledRecords.append($0) })
+        let (ending, endingContinuation) = AsyncStream<Void>.makeStream()
+        let (release, releaseContinuation) = AsyncStream<Void>.makeStream()
+        context.client.beforeEnding = { _ in
+            endingContinuation.yield(())
+            var iterator = release.makeAsyncIterator()
+            _ = await iterator.next()
+        }
+        var endingIterator = ending.makeAsyncIterator()
+        let cleanup = Task { await service.removeExpiredActivities() }
+        _ = await endingIterator.next()
+        cleanup.cancel()
+        releaseContinuation.yield(())
+        await cleanup.value
+
+        #expect(context.client.ended == ["first"])
+        #expect(scheduledRecords.last?.map(\.id) == ["second"])
+        endingContinuation.finish()
+        releaseContinuation.finish()
+    }
+
+    @Test func alreadyCancelledBackgroundTaskReschedulesWithoutEndingActivities() async throws {
+        let context = try makeContext()
+        context.client.records = [record("expired", event: event(startOffset: -600))]
+        var scheduledRecords: [[ReminderLiveActivityRecord]] = []
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, schedulesExpiration: false,
+            canStart: { false }, currentDate: { now },
+            scheduleBackgroundExpiration: { scheduledRecords.append($0) })
+
+        let cleanup = Task { await service.removeExpiredActivities() }
+        cleanup.cancel()
+        await cleanup.value
+
+        #expect(context.client.ended.isEmpty)
+        #expect(scheduledRecords.last?.map(\.id) == ["expired"])
+    }
+
     @Test func restoredActivityIsNotDuplicatedAndDismissalSurvivesRelaunch() async throws {
         let context = try makeContext()
         let event = event(startOffset: -60)
@@ -437,6 +596,13 @@ struct ReminderLiveActivityServiceTests {
             reminderID: UUID(), title: "Reminder", startDate: start,
             endDate: start.addingTimeInterval(600)
         )
+    }
+
+    private func record(
+        _ id: String, event: ReminderLiveActivityEvent, state: ReminderLiveActivityState = .active
+    ) -> ReminderLiveActivityRecord {
+        ReminderLiveActivityRecord(
+            id: id, eventID: event.id, state: state, content: .init(event: event))
     }
 }
 
