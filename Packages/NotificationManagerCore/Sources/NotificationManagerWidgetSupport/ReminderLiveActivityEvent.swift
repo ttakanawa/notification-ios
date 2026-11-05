@@ -54,11 +54,13 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
                 maxFieldCount: 2, maxPrecision: .seconds(1))
         }
 
-        public static func elapsed(since notificationDate: Date) -> SystemFormatStyle.Stopwatch {
-            // Keep the elapsed time accurate if the system retains the activity after
-            // its display window. A bounded count-up can stop or reset at that boundary.
+        public static func elapsed(
+            since notificationDate: Date, until endDate: Date
+        ) -> SystemFormatStyle.Timer {
+            // The system may retain the activity after its display window. Freeze the
+            // elapsed time at that window's end rather than counting indefinitely.
             .init(
-                startingAt: notificationDate, showsHours: false,
+                countingUpIn: notificationDate..<max(notificationDate, endDate), showsHours: false,
                 maxFieldCount: 2, maxPrecision: .seconds(1))
         }
     }

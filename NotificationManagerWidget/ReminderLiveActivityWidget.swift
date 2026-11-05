@@ -124,7 +124,7 @@ private struct ReminderLiveActivityRelativeTime: View {
         let afterNotification = context.state.notificationHasOccurred || context.isStale
         if afterNotification {
             let elapsed = ReminderLiveActivityTimePresentation.elapsed(
-                since: context.state.notificationDate
+                since: context.state.notificationDate, until: context.state.activityEndDate
             ).locale(locale)
             return Text(.currentDate, format: elapsed)
                 + Text(LocalizedStringResource("widget.live-activity.after", table: "Widget"))

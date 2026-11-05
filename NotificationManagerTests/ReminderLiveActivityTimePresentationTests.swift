@@ -21,47 +21,64 @@ struct LiveActivityTimePresentationTests {
     }
 
     @Test(arguments: ["en_US", "ja_JP"])
-    func elapsedTimeKeepsSecondsBeyondTheDisplayWindow(localeIdentifier: String) throws {
-        let stopwatch = ReminderLiveActivityTimePresentation.elapsed(since: notificationDate)
-            .locale(Locale(identifier: localeIdentifier))
-        let originalWindowEnd = notificationDate.addingTimeInterval(600)
-        let oneHourLater = notificationDate.addingTimeInterval(3_661)
+    func threeMinuteWindowStopsAtItsExactEnd(localeIdentifier: String) throws {
+        let endDate = notificationDate.addingTimeInterval(180)
+        let timer = ReminderLiveActivityTimePresentation.elapsed(
+            since: notificationDate, until: endDate
+        )
+        .locale(Locale(identifier: localeIdentifier))
 
-        #expect(String(stopwatch.format(originalWindowEnd).characters) == "10:00")
+        #expect(String(timer.format(endDate.addingTimeInterval(-1)).characters) == "2:59")
+        #expect(String(timer.format(endDate).characters) == "3:00")
+        #expect(String(timer.format(endDate.addingTimeInterval(1)).characters) == "3:00")
         #expect(
-            String(stopwatch.format(originalWindowEnd.addingTimeInterval(1)).characters) == "10:01")
-        #expect(String(stopwatch.format(oneHourLater).characters) == "61:01")
-        let nextUpdate = try #require(stopwatch.discreteInput(after: originalWindowEnd))
-        #expect(nextUpdate.timeIntervalSince(originalWindowEnd) == 1)
+            String(timer.format(notificationDate.addingTimeInterval(360)).characters) == "3:00")
+        let lastUpdate = try #require(timer.discreteInput(after: endDate.addingTimeInterval(-1)))
+        #expect(lastUpdate == endDate)
+        #expect(timer.discreteInput(after: endDate) == nil)
+    }
+
+    @Test func zeroAfterWindowCannotCountPastTheNotification() {
+        let timer = ReminderLiveActivityTimePresentation.elapsed(
+            since: notificationDate, until: notificationDate)
+        #expect(String(timer.format(notificationDate).characters) == "0:00")
+        #expect(String(timer.format(notificationDate.addingTimeInterval(360)).characters) == "0:00")
+        #expect(timer.discreteInput(after: notificationDate) == nil)
     }
 
     @Test func zeroBeforeWindowAndTheNotificationInstantAreSafe() {
         let countdown = ReminderLiveActivityTimePresentation.countdown(
             startDate: notificationDate, notificationDate: notificationDate
         ).locale(Locale(identifier: "ja_JP"))
-        let elapsed = ReminderLiveActivityTimePresentation.elapsed(since: notificationDate)
-            .locale(Locale(identifier: "ja_JP"))
+        let elapsed = ReminderLiveActivityTimePresentation.elapsed(
+            since: notificationDate, until: notificationDate.addingTimeInterval(600)
+        )
+        .locale(Locale(identifier: "ja_JP"))
 
         #expect(String(countdown.format(notificationDate).characters) == "0:00")
-        #expect(String(elapsed.format(notificationDate).characters) == "00:00")
+        #expect(String(elapsed.format(notificationDate).characters) == "0:00")
         #expect(
-            String(elapsed.format(notificationDate.addingTimeInterval(1)).characters) == "00:01")
+            String(elapsed.format(notificationDate.addingTimeInterval(1)).characters) == "0:01")
     }
 
     @Test func builtInStylesSurviveEncodingForSystemRendering() throws {
         let countdown = ReminderLiveActivityTimePresentation.countdown(
             startDate: notificationDate.addingTimeInterval(-300), notificationDate: notificationDate
         )
-        let elapsed = ReminderLiveActivityTimePresentation.elapsed(since: notificationDate)
+        let elapsed = ReminderLiveActivityTimePresentation.elapsed(
+            since: notificationDate, until: notificationDate.addingTimeInterval(180))
         let decoder = JSONDecoder()
         let encoder = JSONEncoder()
         let restoredCountdown = try decoder.decode(
             SystemFormatStyle.Timer.self, from: encoder.encode(countdown))
         let restoredElapsed = try decoder.decode(
-            SystemFormatStyle.Stopwatch.self, from: encoder.encode(elapsed))
+            SystemFormatStyle.Timer.self, from: encoder.encode(elapsed))
 
         #expect(restoredCountdown == countdown)
         #expect(restoredElapsed == elapsed)
+        #expect(
+            String(restoredElapsed.format(notificationDate.addingTimeInterval(360)).characters)
+                == "3:00")
     }
 
     @Test(arguments: [("en", " before", " elapsed"), ("ja", "前", "経過")])
