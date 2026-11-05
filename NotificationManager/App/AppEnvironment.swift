@@ -355,7 +355,7 @@ final class AppEnvironment {
     }
 
     private static func makeLiveActivityPublication() -> LiveActivityPublication {
-        let service = ReminderLiveActivityService.shared
+        let service = ReminderLiveActivityService()
         return { events, allowStarts in
             await service.reconcile(events: events, allowStarts: allowStarts)
         }

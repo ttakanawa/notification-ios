@@ -45,12 +45,8 @@ assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$info_json" | jq -r '.
 assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleShortVersionString')" "Widget CFBundleShortVersionString"
 assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleVersion')" "Widget CFBundleVersion"
 
-printf '%s' "$info_json" | jq -e \
-    '(.UIBackgroundModes | sort) == ["fetch", "remote-notification"]' >/dev/null \
-    || fail "UIBackgroundModes must contain only fetch for Live Activity cleanup and remote-notification for CloudKit sync"
-printf '%s' "$info_json" | jq -e \
-    '.BGTaskSchedulerPermittedIdentifiers == ["org.tknw.punctual.live-activity-expiration"]' >/dev/null \
-    || fail "BGTaskSchedulerPermittedIdentifiers must contain only the Live Activity expiration task"
+printf '%s' "$info_json" | jq -e '.UIBackgroundModes == ["remote-notification"]' >/dev/null \
+    || fail "UIBackgroundModes must contain only remote-notification for CloudKit sync"
 printf '%s' "$info_json" | jq -e '
     .CFBundleURLTypes == [{
         "CFBundleTypeRole": "Editor",

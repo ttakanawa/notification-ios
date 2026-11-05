@@ -43,20 +43,23 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
 }
 
 #if canImport(SwiftUI)
-    /// Returns a system-defined format style that the Live Activity renderer can decode itself.
-    /// The bounded timer keeps updating without the app and stops at the display window's end.
+    /// Returns system-defined format styles that the Live Activity renderer can decode
+    /// and update without the app running.
     public enum ReminderLiveActivityTimePresentation {
-        public static func timer(
-            startDate: Date, notificationDate: Date, endDate: Date, afterNotification: Bool
+        public static func countdown(
+            startDate: Date, notificationDate: Date
         ) -> SystemFormatStyle.Timer {
-            if afterNotification {
-                return .init(
-                    countingUpIn: notificationDate..<endDate, showsHours: false,
-                    maxFieldCount: 1, maxPrecision: .seconds(60))
-            }
-            return .init(
+            .init(
                 countingDownIn: startDate..<notificationDate, showsHours: false,
-                maxFieldCount: 1, maxPrecision: .seconds(60))
+                maxFieldCount: 2, maxPrecision: .seconds(1))
+        }
+
+        public static func elapsed(since notificationDate: Date) -> SystemFormatStyle.Stopwatch {
+            // Keep the elapsed time accurate if the system retains the activity after
+            // its display window. A bounded count-up can stop or reset at that boundary.
+            .init(
+                startingAt: notificationDate, showsHours: false,
+                maxFieldCount: 2, maxPrecision: .seconds(1))
         }
     }
 #endif

@@ -42,7 +42,7 @@ struct ReminderLiveActivityWidget: Widget {
             } compactTrailing: {
                 ReminderLiveActivityRelativeTime(context: context)
                     .font(.caption.monospacedDigit())
-                    .frame(width: 78)
+                    .frame(width: 90)
                     .minimumScaleFactor(0.7)
             } minimal: {
                 ReminderLiveActivityAppIcon(size: 20)
@@ -122,15 +122,17 @@ private struct ReminderLiveActivityRelativeTime: View {
 
     private var relativeTime: Text {
         let afterNotification = context.state.notificationHasOccurred || context.isStale
-        let timer = ReminderLiveActivityTimePresentation.timer(
-            startDate: context.state.startDate, notificationDate: context.state.notificationDate,
-            endDate: context.state.activityEndDate, afterNotification: afterNotification
-        )
-        .locale(locale)
-        let suffix =
-            afterNotification
-            ? LocalizedStringResource("widget.live-activity.after", table: "Widget")
-            : LocalizedStringResource("widget.live-activity.before", table: "Widget")
-        return Text(.currentDate, format: timer) + Text(suffix)
+        if afterNotification {
+            let elapsed = ReminderLiveActivityTimePresentation.elapsed(
+                since: context.state.notificationDate
+            ).locale(locale)
+            return Text(.currentDate, format: elapsed)
+                + Text(LocalizedStringResource("widget.live-activity.after", table: "Widget"))
+        }
+        let countdown = ReminderLiveActivityTimePresentation.countdown(
+            startDate: context.state.startDate, notificationDate: context.state.notificationDate
+        ).locale(locale)
+        return Text(.currentDate, format: countdown)
+            + Text(LocalizedStringResource("widget.live-activity.before", table: "Widget"))
     }
 }

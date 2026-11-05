@@ -10,11 +10,11 @@
       }
     },
     "widget.live-activity.after": {
-      "comment": "Suffix appended to the system-formatted duration after the notification time. Preserve the leading space in English.",
+      "comment": "Suffix indicating time elapsed since the notification. Preserve the leading space in English.",
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": " after" } },
-        "ja": { "stringUnit": { "state": "translated", "value": "後" } }
+        "en": { "stringUnit": { "state": "translated", "value": " elapsed" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "経過" } }
       }
     },
     "widget.live-activity.notification-time": {

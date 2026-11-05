@@ -5,11 +5,6 @@ import UIKit
 
 @MainActor
 final class ReminderLiveActivityService {
-    static let shared = ReminderLiveActivityService(
-        scheduleBackgroundExpiration: {
-            ReminderLiveActivityBackgroundRefresh.shared.schedule(activities: $0)
-        })
-
     private static let knownActivitiesKey = "reminder-live-activities.known"
     private static let suppressedActivitiesKey = "reminder-live-activities.suppressed"
     private let client: any ReminderLiveActivityClient
@@ -18,7 +13,6 @@ final class ReminderLiveActivityService {
     private let canStart: @MainActor () -> Bool
     private let currentDate: @MainActor () -> Date
     private let sleep: @Sendable (TimeInterval) async throws -> Void
-    private let scheduleBackgroundExpiration: @MainActor ([ReminderLiveActivityRecord]) -> Void
     private let logger = Logger(subsystem: "org.tknw.punctual", category: "LiveActivities")
     private var expirationTask: Task<Void, Never>?
     private var revision: UInt64 = 0
@@ -38,9 +32,7 @@ final class ReminderLiveActivityService {
         currentDate: @escaping @MainActor () -> Date = { Date() },
         sleep: @escaping @Sendable (TimeInterval) async throws -> Void = {
             try await Task.sleep(for: .seconds($0))
-        },
-        scheduleBackgroundExpiration:
-            @escaping @MainActor ([ReminderLiveActivityRecord]) -> Void = { _ in }
+        }
     ) {
         self.defaults = defaults
         self.client = client
@@ -48,7 +40,6 @@ final class ReminderLiveActivityService {
         self.canStart = canStart
         self.currentDate = currentDate
         self.sleep = sleep
-        self.scheduleBackgroundExpiration = scheduleBackgroundExpiration
         knownActivities =
             defaults.dictionary(forKey: Self.knownActivitiesKey) as? [String: String] ?? [:]
         suppressedUntil =
@@ -76,35 +67,6 @@ final class ReminderLiveActivityService {
             isReconciling = true
             Task { await drainReconciliations() }
         }
-    }
-
-    /// Runs without a repository snapshot, including on a background-only cold launch.
-    /// Share the reconciliation gate and bookkeeping so automatic expiry is never
-    /// mistaken for a user dismissal when the display window is later extended.
-    func removeExpiredActivities() async {
-        while isReconciling {
-            await withCheckedContinuation { waiters.append($0) }
-        }
-        guard !Task.isCancelled else {
-            scheduleBackgroundExpiration(client.currentActivities())
-            return
-        }
-        isReconciling = true
-        let cleanupRevision = revision
-        for id in client.currentActivities().map(\.id) {
-            guard !Task.isCancelled, revision == cleanupRevision else { break }
-            guard let record = client.currentActivities().first(where: { $0.id == id }),
-                record.state != .dismissed, record.content.activityEndDate <= currentDate()
-            else { continue }
-            if knownActivities[record.eventID] == record.id {
-                knownActivities.removeValue(forKey: record.eventID)
-                persistState()
-            }
-            await client.end(record.id)
-        }
-        scheduleBackgroundExpiration(client.currentActivities())
-        // Apply any edits queued while ActivityKit was ending an expired activity.
-        await drainReconciliations()
     }
 
     private func drainReconciliations() async {
@@ -198,7 +160,6 @@ final class ReminderLiveActivityService {
             }
         }
         persistState()
-        scheduleBackgroundExpiration(client.currentActivities())
         scheduleNextReconciliation(events: events, selected: desired, now: now)
     }
 

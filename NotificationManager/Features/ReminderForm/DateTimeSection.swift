@@ -163,45 +163,19 @@ struct DateTimeSection: View {
 
     private var liveActivityControls: some View {
         Group {
-            Stepper(
-                value: Binding(
-                    get: { model.liveActivityBeforeMinutes },
-                    set: { model.updateLiveActivityBeforeMinutes($0) }
-                ), in: 0...480
-            ) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        LocalizedStringResource(
-                            "reminder.field.live-activity-before",
-                            table: "ReminderForm"
-                        ))
-                    Text(verbatim: liveActivityBeforeText)
-                        .foregroundStyle(.secondary)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityIdentifier("reminder-form.live-activity-before-minutes")
-            .accessibilityValue(Text(model.liveActivityBeforeMinutes, format: .number))
+            LiveActivityDurationPickerRow(
+                title: LocalizedStringResource(
+                    "reminder.field.live-activity-before", table: "ReminderForm"),
+                minutes: model.liveActivityBeforeMinutes, valueText: liveActivityBeforeText,
+                accessibilityIdentifier: "reminder-form.live-activity-before-minutes",
+                onSelect: model.updateLiveActivityBeforeMinutes)
 
-            Stepper(
-                value: Binding(
-                    get: { model.liveActivityAfterMinutes },
-                    set: { model.updateLiveActivityAfterMinutes($0) }
-                ), in: 0...480
-            ) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(
-                        LocalizedStringResource(
-                            "reminder.field.live-activity-after",
-                            table: "ReminderForm"
-                        ))
-                    Text(verbatim: liveActivityAfterText)
-                        .foregroundStyle(.secondary)
-                }
-                .fixedSize(horizontal: false, vertical: true)
-            }
-            .accessibilityIdentifier("reminder-form.live-activity-after-minutes")
-            .accessibilityValue(Text(model.liveActivityAfterMinutes, format: .number))
+            LiveActivityDurationPickerRow(
+                title: LocalizedStringResource(
+                    "reminder.field.live-activity-after", table: "ReminderForm"),
+                minutes: model.liveActivityAfterMinutes, valueText: liveActivityAfterText,
+                accessibilityIdentifier: "reminder-form.live-activity-after-minutes",
+                onSelect: model.updateLiveActivityAfterMinutes)
 
             if let issue = model.liveActivityWindowFieldIssue {
                 Label(issue.localizedResource, systemImage: "exclamationmark.triangle")

@@ -1,6 +1,22 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "reminder.form.duration.hours": {
+      "comment": "Hour column label in the Live Activity display duration wheel picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hours" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "時間" } }
+      }
+    },
+    "reminder.form.duration.minutes": {
+      "comment": "Minute column label in the Live Activity display duration wheel picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Minutes" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "分" } }
+      }
+    },
     "reminder.field.live-activity-enabled": {
       "comment": "Enables a Live Activity around the reminder notification time.",
       "extractionState": "manual",
@@ -13,16 +29,16 @@
       "comment": "Label for the number of minutes before notification when a Live Activity starts.",
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Display starts before notification" } },
-        "ja": { "stringUnit": { "state": "translated", "value": "表示開始（通知の何分前）" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Before notification" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前の表示時間" } }
       }
     },
     "reminder.field.live-activity-after": {
       "comment": "Label for the number of minutes after notification when a Live Activity ends.",
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Display ends after notification" } },
-        "ja": { "stringUnit": { "state": "translated", "value": "表示終了（通知の何分後）" } }
+        "en": { "stringUnit": { "state": "translated", "value": "After notification" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知後の表示時間" } }
       }
     },
     "reminder.form.live-activity.minutes-before": {
@@ -50,11 +66,11 @@
       }
     },
     "reminder.form.live-activity-help": {
-      "comment": "Explains the notification-relative Live Activity display window and device-only start and cleanup limitations.",
+      "comment": "Explains the notification-relative Live Activity display window and device-only start limitations.",
       "extractionState": "manual",
       "localizations": {
-        "en": { "stringUnit": { "state": "translated", "value": "Show the time until the notification, then the time elapsed after it. The display window can total up to 8 hours. iOS 26 or later starts automatically; earlier versions start when you open the app. Removal uses background refresh and may be delayed. Open the app to remove expired activities." } },
-        "ja": { "stringUnit": { "state": "translated", "value": "通知前は通知までの時間、 通知後は通知からの経過時間を表示します。 表示時間は前後の合計で最大8時間です。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 バックグラウンド更新による消去は遅れる場合があります。 期限切れの表示はアプリを開くと消去されます。" } }
+        "en": { "stringUnit": { "state": "translated", "value": "Show the time until the notification, then the time elapsed after it. The display window can total up to 8 hours. iOS 26 or later starts automatically; earlier versions start when you open the app. Removal may wait until the app runs again." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前は通知までの時間、 通知後は通知からの経過時間を表示します。 表示時間は前後の合計で最大8時間です。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 消去は次回のアプリ動作時になる場合があります。" } }
       }
     },
     "reminder.custom.error.assistance-unavailable": {
