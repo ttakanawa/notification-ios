@@ -1,6 +1,174 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "settings.alarmkit-trial.refresh-state": {
+      "comment": "Refreshes the tracked trial's current state from AlarmKit.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Check alarm state" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "アラームの状態を確認" } }
+      }
+    },
+    "settings.alarmkit-trial.phase.scheduled": {
+      "comment": "The system reports a scheduled trial alarm.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Alarm is scheduled." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "アラームは予約済みです。" } }
+      }
+    },
+    "settings.alarmkit-trial.phase.countdown": {
+      "comment": "The system reports an active countdown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Countdown is running." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "カウントダウン中です。" } }
+      }
+    },
+    "settings.alarmkit-trial.phase.paused": {
+      "comment": "The system reports a paused countdown.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Countdown is paused." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "カウントダウンは一時停止中です。" } }
+      }
+    },
+    "settings.alarmkit-trial.phase.alerting": {
+      "comment": "The system reports that the trial alarm is alerting.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The alarm time has arrived." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "アラームの時刻になりました。" } }
+      }
+    },
+    "settings.alarmkit-trial.link": {
+      "comment": "Navigation link to the opt-in AlarmKit prototype.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Try AlarmKit" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "AlarmKit を試す" } }
+      }
+    },
+    "settings.alarmkit-trial.title": {
+      "comment": "Title of the AlarmKit prototype screen.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "AlarmKit Trial" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "AlarmKit 検証" } }
+      }
+    },
+    "settings.alarmkit-trial.description": {
+      "comment": "Explains the OS-managed countdown-to-alert trial.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Start a test countdown, then close the app. At zero, iOS displays your message as an alarm until you stop it." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証用タイマーを開始してアプリを閉じると、 時刻になったときにメッセージを表示します。 アラーム表示は停止するまで残ります。" } }
+      }
+    },
+    "settings.alarmkit-trial.sound-note": {
+      "comment": "Explains the silent-file experiment and the requested no-snooze behavior.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "This trial uses a silent audio file and has no snooze. Check the sound and vibration on your device." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "無音の音源を使用し、 スヌーズは表示しません。 音や振動の動作を端末で確認してください。" } }
+      }
+    },
+    "settings.alarmkit-trial.default-message": {
+      "comment": "Editable initial message for the trial alarm.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "It is time" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知時刻です" } }
+      }
+    },
+    "settings.alarmkit-trial.message": {
+      "comment": "Label of the editable alarm title.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Message to display" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "表示するメッセージ" } }
+      }
+    },
+    "settings.alarmkit-trial.duration": {
+      "comment": "Duration before the trial alarm fires.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Countdown" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "表示までの時間" } }
+      }
+    },
+    "settings.alarmkit-trial.start": {
+      "comment": "Starts only the trial timer, requesting alarm permission if needed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Start test timer" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証タイマーを開始" } }
+      }
+    },
+    "settings.alarmkit-trial.cancel": {
+      "comment": "Cancels only the trial timer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stop test timer" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証タイマーを停止" } }
+      }
+    },
+    "settings.alarmkit-trial.stop": {
+      "comment": "Stop label required by the iOS 26.0 alarm presentation.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Stop" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "停止" } }
+      }
+    },
+    "settings.alarmkit-trial.status.idle": {
+      "comment": "Initial state of the trial timer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Choose a message and start the test timer." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "メッセージと時間を選んで開始してください。" } }
+      }
+    },
+    "settings.alarmkit-trial.status.scheduled": {
+      "comment": "Trial alarm scheduled successfully.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Timer scheduled. Close the app to test it." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "予約しました。 アプリを閉じて動作を確認できます。" } }
+      }
+    },
+    "settings.alarmkit-trial.status.cancelled": {
+      "comment": "Trial alarm was cancelled.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Test timer stopped." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証タイマーを停止しました。" } }
+      }
+    },
+    "settings.alarmkit-trial.status.denied": {
+      "comment": "Alarm permission was not granted.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Alarm permission is required. You can allow it in Settings." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "アラームの使用許可が必要です。 設定アプリで許可できます。" } }
+      }
+    },
+    "settings.alarmkit-trial.status.invalid-input": {
+      "comment": "Trial alarm input was invalid.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enter a message and choose a countdown duration." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "メッセージと表示までの時間を指定してください。" } }
+      }
+    },
+    "settings.alarmkit-trial.status.failed": {
+      "comment": "Trial alarm operation failed.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The test timer could not be changed. Try again." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証タイマーを変更できませんでした。 もう一度お試しください。" } }
+      }
+    },
     "privacy.data.foundation-models-on-device": {
       "comment": "Complete About and Privacy disclosure. Keep this limitation explicit and do not shorten it into a guarantee.",
       "extractionState": "manual",
