@@ -7,6 +7,7 @@ repository_root=$(CDPATH= cd -- "$script_directory/../.." && pwd)
 temporary_directory=$(mktemp -d)
 fixture_root="$temporary_directory/project"
 fixture_project="$fixture_root/NotificationManager.xcodeproj/project.pbxproj"
+fixture_info="$fixture_root/NotificationManager/SupportingFiles/Info.plist"
 validator="$fixture_root/Scripts/validate-testflight-configuration.sh"
 output_file="$temporary_directory/validator-output.txt"
 
@@ -24,6 +25,7 @@ cp -R "$repository_root/Packages/NotificationManagerCore/Sources" \
     "$fixture_root/Packages/NotificationManagerCore/Sources"
 cp "$repository_root/NotificationManager.xcodeproj/project.pbxproj" "$fixture_project"
 cp "$fixture_project" "$temporary_directory/original.pbxproj"
+cp "$fixture_info" "$temporary_directory/original.plist"
 plutil -convert json -o "$temporary_directory/original.json" "$fixture_project"
 
 configuration_ids() {
@@ -44,6 +46,7 @@ widget_release_id=$(printf '%s\n' "$widget_ids" | tail -n 1)
 
 reset_project() {
     cp "$temporary_directory/original.pbxproj" "$fixture_project"
+    cp "$temporary_directory/original.plist" "$fixture_info"
 }
 
 mutate_setting() {
@@ -90,6 +93,30 @@ build_diagnostic="build numbers must be matching positive integers"
 marketing_diagnostic="marketing versions must match"
 
 expect_success "current project"
+
+# Background modes are unordered, but both capabilities and the exact registered
+# cleanup identifier are required. Extra modes or tasks must still be rejected.
+plutil -replace UIBackgroundModes -json '["remote-notification", "fetch"]' "$fixture_info"
+expect_success "background modes in reversed order"
+
+for modes in '["remote-notification"]' '["fetch"]' '["fetch", "remote-notification", "audio"]'; do
+    reset_project
+    plutil -replace UIBackgroundModes -json "$modes" "$fixture_info"
+    expect_failure "invalid background modes $modes" "UIBackgroundModes must contain only"
+done
+
+reset_project
+plutil -remove BGTaskSchedulerPermittedIdentifiers "$fixture_info"
+expect_failure "missing cleanup task identifier" "BGTaskSchedulerPermittedIdentifiers must contain only"
+
+for identifiers in '[]' '["org.tknw.punctual.wrong-task"]' \
+    '["org.tknw.punctual.live-activity-expiration", "org.tknw.punctual.extra-task"]'; do
+    reset_project
+    plutil -replace BGTaskSchedulerPermittedIdentifiers -json "$identifiers" "$fixture_info"
+    expect_failure "invalid cleanup task identifiers $identifiers" \
+        "BGTaskSchedulerPermittedIdentifiers must contain only"
+done
+reset_project
 
 # Select valid values that differ from the source project after version bumps.
 mismatched_build_number=$(jq -r --arg configuration_id "$app_debug_id" '
@@ -142,4 +169,4 @@ for configuration_id in "$app_debug_id" "$widget_release_id"; do
     expect_failure "missing configuration $configuration_id" "TestFlight configuration error:"
 done
 
-echo "TestFlight build-number and marketing-version mutation tests passed."
+echo "TestFlight background-capability, build-number, and marketing-version mutation tests passed."
