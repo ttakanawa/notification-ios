@@ -21,6 +21,43 @@ struct LiveActivityTimePresentationTests {
     }
 
     @Test(arguments: ["en_US", "ja_JP"])
+    func pairedCountersAdvanceAcrossTheNotification(localeIdentifier: String) throws {
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Paired counters",
+            startDate: notificationDate.addingTimeInterval(-300),
+            endDate: notificationDate.addingTimeInterval(180), notificationDate: notificationDate)
+        let state = ReminderActivityAttributes.ContentState(
+            event: event, notificationHasOccurred: false)
+        let locale = Locale(identifier: localeIdentifier)
+        let countdown = ReminderLiveActivityTimePresentation.countdown(
+            startDate: state.startDate, notificationDate: state.notificationDate
+        ).locale(locale)
+        let elapsed = ReminderLiveActivityTimePresentation.elapsed(
+            since: state.notificationDate, until: state.activityEndDate
+        ).locale(locale)
+        let samples: [(offset: TimeInterval, countdown: String, elapsed: String)] = [
+            (-80, "1:20", "0:00"),
+            (-1, "0:01", "0:00"),
+            (0, "0:00", "0:00"),
+            (1, "0:00", "0:01"),
+            (80, "0:00", "1:20"),
+            (81, "0:00", "1:21"),
+            (360, "0:00", "3:00")
+        ]
+
+        // Both native styles are created before the notification and reused across
+        // the boundary; no phase flag or replacement content starts the elapsed row.
+        for sample in samples {
+            let date = state.notificationDate.addingTimeInterval(sample.offset)
+            #expect(String(countdown.format(date).characters) == sample.countdown)
+            #expect(String(elapsed.format(date).characters) == sample.elapsed)
+        }
+        let eightySecondsAfter = state.notificationDate.addingTimeInterval(80)
+        let nextUpdate = try #require(elapsed.discreteInput(after: eightySecondsAfter))
+        #expect(nextUpdate == state.notificationDate.addingTimeInterval(81))
+    }
+
+    @Test(arguments: ["en_US", "ja_JP"])
     func threeMinuteWindowStopsAtItsExactEnd(localeIdentifier: String) throws {
         let endDate = notificationDate.addingTimeInterval(180)
         let timer = ReminderLiveActivityTimePresentation.elapsed(
@@ -81,9 +118,9 @@ struct LiveActivityTimePresentationTests {
                 == "3:00")
     }
 
-    @Test(arguments: [("en", " before", " elapsed"), ("ja", "前", "経過")])
-    func widgetSuffixesDistinguishUpcomingFromElapsedTime(
-        language: String, before: String, elapsed: String
+    @Test(arguments: [("en", "Due in ", " elapsed"), ("ja", "通知まで ", "経過")])
+    func widgetLabelsIdentifyCountdownAndElapsedCounters(
+        language: String, countdownPrefix: String, elapsed: String
     ) throws {
         let pluginsURL = try #require(Bundle.main.builtInPlugInsURL)
         let widgetBundle = try #require(
@@ -94,7 +131,8 @@ struct LiveActivityTimePresentationTests {
 
         #expect(
             localization.localizedString(
-                forKey: "widget.live-activity.before", value: nil, table: "Widget") == before)
+                forKey: "widget.live-activity.countdown-prefix", value: nil, table: "Widget")
+                == countdownPrefix)
         #expect(
             localization.localizedString(
                 forKey: "widget.live-activity.after", value: nil, table: "Widget") == elapsed)

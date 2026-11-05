@@ -26,7 +26,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(legacy.client.scheduled == [false])
     }
 
-    @Test func aNewBeforeActivityUsesTheNotificationAsItsFuturePhaseBoundary() {
+    @Test func aNewBeforeActivityStaysFreshUntilTheDisplayWindowEnds() {
         let notification = now.addingTimeInterval(300)
         let event = ReminderLiveActivityEvent(
             reminderID: UUID(), title: "Before", startDate: now,
@@ -34,11 +34,11 @@ struct ReminderLiveActivityServiceTests {
         let content = SystemReminderLiveActivityClient.content(for: event, at: now)
 
         #expect(!content.state.notificationHasOccurred)
-        #expect(content.staleDate == notification)
+        #expect(content.staleDate == event.activityEndDate)
         #expect(content.staleDate.map { $0 > now } == true)
     }
 
-    @Test func aNewAfterActivityStartsFreshInsteadOfRequestingInitiallyStaleContent() {
+    @Test func aNewAfterActivityUsesTheSameDisplayEndDeadline() {
         let notification = now.addingTimeInterval(-360)
         let event = ReminderLiveActivityEvent(
             reminderID: UUID(), title: "After", startDate: notification.addingTimeInterval(-300),
@@ -51,21 +51,19 @@ struct ReminderLiveActivityServiceTests {
         #expect(content.staleDate.map { $0 > now } == true)
     }
 
-    @Test func initialPhaseTreatsTheNotificationInstantAsAfter() {
+    @Test func initialContentKeepsItsDisplayEndDeadlineAcrossTheNotificationInstant() {
         let event = ReminderLiveActivityEvent(
             reminderID: UUID(), title: "Boundary", startDate: now.addingTimeInterval(-300),
             endDate: now.addingTimeInterval(600), notificationDate: now)
 
-        #expect(
-            !SystemReminderLiveActivityClient.content(
-                for: event, at: now.addingTimeInterval(-1)
-            ).state.notificationHasOccurred)
-        #expect(
-            SystemReminderLiveActivityClient.content(for: event, at: now)
-                .state.notificationHasOccurred)
-        #expect(
-            SystemReminderLiveActivityClient.content(for: event, at: now).staleDate == event.endDate
-        )
+        let before = SystemReminderLiveActivityClient.content(
+            for: event, at: now.addingTimeInterval(-1))
+        let atNotification = SystemReminderLiveActivityClient.content(for: event, at: now)
+
+        #expect(!before.state.notificationHasOccurred)
+        #expect(atNotification.state.notificationHasOccurred)
+        #expect(before.staleDate == event.activityEndDate)
+        #expect(atNotification.staleDate == event.activityEndDate)
     }
 
     @Test func anExistingAfterPhaseDoesNotCauseRepeatedContentUpdates() async throws {
@@ -88,7 +86,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.records.first?.content.notificationHasOccurred == true)
     }
 
-    @Test(arguments: [2, 3, 4])
+    @Test(arguments: [2, 3, 4, 5])
     func legacyPhaseMetadataIsRefreshedOnceWithoutRecreatingTheActivity(displayVersion: Int)
         async throws
     {
@@ -114,7 +112,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.requested == [event])
         #expect(context.client.updated == [event])
         #expect(context.client.ended.isEmpty)
-        #expect(context.client.records.first?.content.displayVersion == 5)
+        #expect(context.client.records.first?.content.displayVersion == 6)
     }
 
     @Test func editsUpdateExistingActivityAndDeletionEndsIt() async throws {
@@ -230,7 +228,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(decoded.startDate == original.startDate)
         #expect(decoded.activityEndDate == original.activityEndDate)
         #expect(decoded.displayVersion == 1)
-        #expect(content.displayVersion == 5)
+        #expect(content.displayVersion == 6)
         #expect(!decoded.notificationHasOccurred)
         #expect(decoded != content)
     }

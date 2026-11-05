@@ -4,7 +4,7 @@
 
     public struct ReminderActivityAttributes: ActivityAttributes, Sendable {
         public struct ContentState: Codable, Hashable, Sendable {
-            public static let currentDisplayVersion = 5
+            public static let currentDisplayVersion = 6
             public let title: String
             public let startDate: Date
             public let endDate: Date

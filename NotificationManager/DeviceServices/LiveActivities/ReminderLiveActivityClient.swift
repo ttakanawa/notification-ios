@@ -113,11 +113,10 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
         return ActivityContent(
             state: ReminderActivityAttributes.ContentState(
                 event: event, notificationHasOccurred: notificationHasOccurred),
-            // Native staleness is the phase boundary: it switches the widget from
-            // "before" to "after" without requiring the app to execute at this time.
-            // If the notification already fired, start with fresh content and an explicit
-            // after-phase rather than creating an initially stale, potentially hidden card.
-            staleDate: notificationHasOccurred ? event.activityEndDate : event.notificationDate,
+            // Both counters render independently throughout the display window.
+            // The schedule becomes stale at its display end, not at notification time.
+            // This is a freshness boundary, not a scheduled dismissal.
+            staleDate: event.activityEndDate,
             relevanceScore: 1
         )
     }

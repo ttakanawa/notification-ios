@@ -19,7 +19,7 @@ struct ReminderLiveActivityWidget: Widget {
                         .accessibilityHidden(true)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    ReminderLiveActivityRelativeTime(context: context)
+                    ReminderLiveActivityCounters(state: context.state, alignment: .trailing)
                         .font(.headline.monospacedDigit())
                         .frame(maxWidth: 110, alignment: .trailing)
                 }
@@ -40,7 +40,7 @@ struct ReminderLiveActivityWidget: Widget {
                 ReminderLiveActivityAppIcon(size: 20)
                     .accessibilityLabel(Text(verbatim: context.state.title))
             } compactTrailing: {
-                ReminderLiveActivityRelativeTime(context: context)
+                ReminderLiveActivityCounters(state: context.state, alignment: .trailing)
                     .font(.caption.monospacedDigit())
                     .frame(width: 90)
                     .minimumScaleFactor(0.7)
@@ -77,11 +77,11 @@ private struct ReminderLiveActivityContent: View {
             VStack(alignment: .leading, spacing: 6) {
                 Text(verbatim: context.state.title)
                     .font(.headline)
-                    .lineLimit(3)
+                    .lineLimit(2)
                 ReminderLiveActivityRange(state: context.state)
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                ReminderLiveActivityRelativeTime(context: context)
+                ReminderLiveActivityCounters(state: context.state)
                     .font(.title3.monospacedDigit())
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -109,30 +109,38 @@ private struct ReminderLiveActivityRange: View {
     }
 }
 
-private struct ReminderLiveActivityRelativeTime: View {
-    let context: ActivityViewContext<ReminderActivityAttributes>
+private struct ReminderLiveActivityCounters: View {
+    let state: ReminderActivityAttributes.ContentState
+    var alignment: HorizontalAlignment = .leading
     @Environment(\.locale) private var locale
 
     var body: some View {
-        relativeTime
-            .monospacedDigit()
-            .lineLimit(1)
-            .minimumScaleFactor(0.65)
+        // Both native timers must be in the archived view before the app exits.
+        // Choosing a single row from isStale or a phase flag can leave the elapsed
+        // timer absent until the system eventually asks the widget to render again.
+        VStack(alignment: alignment, spacing: 2) {
+            countdown
+            elapsed
+        }
+        .monospacedDigit()
+        .lineLimit(1)
+        .minimumScaleFactor(0.65)
     }
 
-    private var relativeTime: Text {
-        let afterNotification = context.state.notificationHasOccurred || context.isStale
-        if afterNotification {
-            let elapsed = ReminderLiveActivityTimePresentation.elapsed(
-                since: context.state.notificationDate, until: context.state.activityEndDate
-            ).locale(locale)
-            return Text(.currentDate, format: elapsed)
-                + Text(LocalizedStringResource("widget.live-activity.after", table: "Widget"))
-        }
-        let countdown = ReminderLiveActivityTimePresentation.countdown(
-            startDate: context.state.startDate, notificationDate: context.state.notificationDate
+    private var countdown: Text {
+        let format = ReminderLiveActivityTimePresentation.countdown(
+            startDate: state.startDate, notificationDate: state.notificationDate
         ).locale(locale)
-        return Text(.currentDate, format: countdown)
-            + Text(LocalizedStringResource("widget.live-activity.before", table: "Widget"))
+        return Text(
+            LocalizedStringResource("widget.live-activity.countdown-prefix", table: "Widget"))
+            + Text(.currentDate, format: format)
+    }
+
+    private var elapsed: Text {
+        let format = ReminderLiveActivityTimePresentation.elapsed(
+            since: state.notificationDate, until: state.activityEndDate
+        ).locale(locale)
+        return Text(.currentDate, format: format)
+            + Text(LocalizedStringResource("widget.live-activity.after", table: "Widget"))
     }
 }

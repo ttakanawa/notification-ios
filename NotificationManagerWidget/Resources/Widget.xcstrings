@@ -1,8 +1,16 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "widget.live-activity.countdown-prefix": {
+      "comment": "Prefix on the countdown row of the two-row Live Activity. Preserve the trailing space.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Due in " } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知まで " } }
+      }
+    },
     "widget.live-activity.before": {
-      "comment": "Suffix appended to the system-formatted duration before the notification time. Preserve the leading space in English.",
+      "comment": "Legacy suffix kept for Live Activity cards archived before the two-row display. Preserve the leading space in English.",
       "extractionState": "manual",
       "localizations": {
         "en": { "stringUnit": { "state": "translated", "value": " before" } },
