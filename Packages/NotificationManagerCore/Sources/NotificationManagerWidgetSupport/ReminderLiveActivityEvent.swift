@@ -43,8 +43,7 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
 }
 
 #if canImport(SwiftUI)
-    /// Returns system-defined format styles that the Live Activity renderer can decode
-    /// and update without the app running.
+    /// Timing inputs for system-rendered Live Activity text.
     public enum ReminderLiveActivityTimePresentation {
         public static func countdown(
             startDate: Date, notificationDate: Date
@@ -54,14 +53,12 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
                 maxFieldCount: 2, maxPrecision: .seconds(1))
         }
 
-        public static func elapsed(
+        public static func elapsedInterval(
             since notificationDate: Date, until endDate: Date
-        ) -> SystemFormatStyle.Timer {
+        ) -> ClosedRange<Date> {
             // The system may retain the activity after its display window. Freeze the
             // elapsed time at that window's end rather than counting indefinitely.
-            .init(
-                countingUpIn: notificationDate..<max(notificationDate, endDate), showsHours: false,
-                maxFieldCount: 2, maxPrecision: .seconds(1))
+            notificationDate...max(notificationDate, endDate)
         }
     }
 #endif

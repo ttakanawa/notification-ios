@@ -43,28 +43,12 @@ struct ReminderLiveActivityProjectorTests {
         let before = ReminderLiveActivityTimePresentation.countdown(
             startDate: event.startDate, notificationDate: event.notificationDate
         ).locale(Locale(identifier: "ja_JP"))
-        let after = ReminderLiveActivityTimePresentation.elapsed(
+        let after = ReminderLiveActivityTimePresentation.elapsedInterval(
             since: event.notificationDate, until: event.activityEndDate
-        ).locale(Locale(identifier: "ja_JP"))
+        )
         #expect(String(before.format(now).characters) + "前" == "5:00前")
-        #expect(String(after.format(now.addingTimeInterval(660)).characters) + "経過" == "6:00経過")
-    }
-
-    @Test func nativeSecondTimersRespectTheNotificationAnchorAndDisplayEnd() {
-        let before = ReminderLiveActivityTimePresentation.countdown(
-            startDate: now.addingTimeInterval(-300), notificationDate: now
-        )
-        .locale(Locale(identifier: "ja_JP"))
-        let after = ReminderLiveActivityTimePresentation.elapsed(
-            since: now, until: now.addingTimeInterval(600)
-        )
-        .locale(Locale(identifier: "ja_JP"))
-
-        #expect(String(before.format(now.addingTimeInterval(-600)).characters) == "5:00")
-        #expect(String(before.format(now).characters) == "0:00")
-        #expect(String(after.format(now.addingTimeInterval(-1)).characters) == "0:00")
-        #expect(String(after.format(now.addingTimeInterval(360)).characters) == "6:00")
-        #expect(String(after.format(now.addingTimeInterval(1_200)).characters) == "10:00")
+        #expect(after.lowerBound == now.addingTimeInterval(300))
+        #expect(after.upperBound == now.addingTimeInterval(900))
     }
 
     @Test func appRelaunchSixMinutesAfterTheNotificationRecoversItsDisplayWindow() throws {

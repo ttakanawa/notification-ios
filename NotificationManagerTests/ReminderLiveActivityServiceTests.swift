@@ -86,7 +86,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.records.first?.content.notificationHasOccurred == true)
     }
 
-    @Test(arguments: [2, 3, 4, 5])
+    @Test(arguments: [2, 3, 4, 5, 6])
     func legacyPhaseMetadataIsRefreshedOnceWithoutRecreatingTheActivity(displayVersion: Int)
         async throws
     {
@@ -112,7 +112,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.requested == [event])
         #expect(context.client.updated == [event])
         #expect(context.client.ended.isEmpty)
-        #expect(context.client.records.first?.content.displayVersion == 6)
+        #expect(context.client.records.first?.content.displayVersion == 7)
     }
 
     @Test func editsUpdateExistingActivityAndDeletionEndsIt() async throws {
@@ -228,7 +228,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(decoded.startDate == original.startDate)
         #expect(decoded.activityEndDate == original.activityEndDate)
         #expect(decoded.displayVersion == 1)
-        #expect(content.displayVersion == 6)
+        #expect(content.displayVersion == 7)
         #expect(!decoded.notificationHasOccurred)
         #expect(decoded != content)
     }
