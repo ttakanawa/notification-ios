@@ -140,7 +140,7 @@ private struct ReminderLiveActivityCounters: View {
         // Archive a native timer rather than a currentDate format subscription.
         // The system owns its ticking even when the app cannot update the activity.
         let interval = ReminderLiveActivityTimePresentation.elapsedInterval(
-            since: state.notificationDate, until: state.activityEndDate)
+            since: state.notificationDate)
         return Text(timerInterval: interval, countsDown: false, showsHours: false)
             + Text(LocalizedStringResource("widget.live-activity.after", table: "Widget"))
     }

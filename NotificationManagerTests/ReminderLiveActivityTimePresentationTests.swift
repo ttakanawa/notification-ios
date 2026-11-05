@@ -38,17 +38,40 @@ struct LiveActivityTimePresentationTests {
         #expect(restoredCountdown == countdown)
     }
 
-    @Test func anEightHourCapBeforeTheNotificationCannotCreateAnInvertedTimerInterval() {
+    @Test(arguments: [0.0, 60.0, 180.0])
+    func elapsedTimerOutlastsCleanupWithoutExtendingTheActivityWindow(afterSeconds: TimeInterval) {
         let event = ReminderLiveActivityEvent(
-            reminderID: UUID(), title: "Long lead time",
-            startDate: notificationDate.addingTimeInterval(-9 * 3_600),
-            endDate: notificationDate.addingTimeInterval(180), notificationDate: notificationDate)
+            reminderID: UUID(), title: "Continued elapsed display",
+            startDate: notificationDate.addingTimeInterval(-300),
+            endDate: notificationDate.addingTimeInterval(afterSeconds),
+            notificationDate: notificationDate)
         let state = ReminderActivityAttributes.ContentState(event: event)
-        #expect(state.activityEndDate < state.notificationDate)
         let interval = ReminderLiveActivityTimePresentation.elapsedInterval(
-            since: state.notificationDate, until: state.activityEndDate)
+            since: state.notificationDate)
         #expect(interval.lowerBound == notificationDate)
-        #expect(interval.upperBound == notificationDate)
+        #expect(interval.contains(state.activityEndDate.addingTimeInterval(1)))
+        #expect(interval.contains(state.activityEndDate.addingTimeInterval(80)))
+        #expect(state.activityEndDate == notificationDate.addingTimeInterval(afterSeconds))
+        #expect(
+            ReminderLiveActivitySelection.select(
+                events: [event], at: state.activityEndDate, supportsScheduling: true
+            ).isEmpty)
+    }
+
+    @Test func elapsedTimerCoversLateRecoveryAndTheSystemLockScreenLifetime() {
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "Late recovery", startDate: notificationDate,
+            endDate: notificationDate.addingTimeInterval(8 * 3_600),
+            notificationDate: notificationDate)
+        let lastRecovery = event.activityEndDate.addingTimeInterval(-1)
+        #expect(
+            ReminderLiveActivitySelection.select(
+                events: [event], at: lastRecovery, supportsScheduling: true
+            ) == [event])
+        let interval = ReminderLiveActivityTimePresentation.elapsedInterval(
+            since: notificationDate)
+        #expect(interval.contains(lastRecovery.addingTimeInterval(12 * 3_600)))
+        #expect(interval.upperBound.timeIntervalSince1970.isFinite)
     }
 
     @Test(arguments: [("en", "Due in ", " elapsed"), ("ja", "通知まで ", "経過")])

@@ -44,11 +44,12 @@ struct ReminderLiveActivityProjectorTests {
             startDate: event.startDate, notificationDate: event.notificationDate
         ).locale(Locale(identifier: "ja_JP"))
         let after = ReminderLiveActivityTimePresentation.elapsedInterval(
-            since: event.notificationDate, until: event.activityEndDate
+            since: event.notificationDate
         )
         #expect(String(before.format(now).characters) + "前" == "5:00前")
         #expect(after.lowerBound == now.addingTimeInterval(300))
-        #expect(after.upperBound == now.addingTimeInterval(900))
+        #expect(after.contains(event.activityEndDate.addingTimeInterval(60)))
+        #expect(event.activityEndDate == now.addingTimeInterval(900))
     }
 
     @Test func appRelaunchSixMinutesAfterTheNotificationRecoversItsDisplayWindow() throws {

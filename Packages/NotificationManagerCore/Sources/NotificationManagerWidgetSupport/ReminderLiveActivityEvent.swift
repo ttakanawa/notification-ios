@@ -54,11 +54,13 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
         }
 
         public static func elapsedInterval(
-            since notificationDate: Date, until endDate: Date
+            since notificationDate: Date
         ) -> ClosedRange<Date> {
-            // The system may retain the activity after its display window. Freeze the
-            // elapsed time at that window's end rather than counting indefinitely.
-            notificationDate...max(notificationDate, endDate)
+            // Keep counting if the app cannot execute its scheduled cleanup. This
+            // finite span covers ActivityKit's 8h activity + 4h Lock Screen lifetime,
+            // even for an activity recovered late within its 8h display window.
+            // The service still removes the activity at its configured activityEndDate.
+            notificationDate...notificationDate.addingTimeInterval(24 * 60 * 60)
         }
     }
 #endif

@@ -86,7 +86,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.records.first?.content.notificationHasOccurred == true)
     }
 
-    @Test(arguments: [2, 3, 4, 5, 6])
+    @Test(arguments: [2, 3, 4, 5, 6, 7])
     func legacyPhaseMetadataIsRefreshedOnceWithoutRecreatingTheActivity(displayVersion: Int)
         async throws
     {
@@ -112,7 +112,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(context.client.requested == [event])
         #expect(context.client.updated == [event])
         #expect(context.client.ended.isEmpty)
-        #expect(context.client.records.first?.content.displayVersion == 7)
+        #expect(context.client.records.first?.content.displayVersion == 8)
     }
 
     @Test func editsUpdateExistingActivityAndDeletionEndsIt() async throws {
@@ -228,7 +228,7 @@ struct ReminderLiveActivityServiceTests {
         #expect(decoded.startDate == original.startDate)
         #expect(decoded.activityEndDate == original.activityEndDate)
         #expect(decoded.displayVersion == 1)
-        #expect(content.displayVersion == 7)
+        #expect(content.displayVersion == 8)
         #expect(!decoded.notificationHasOccurred)
         #expect(decoded != content)
     }
@@ -299,6 +299,54 @@ struct ReminderLiveActivityServiceTests {
         await context.service.reconcile(events: [event], now: now)
         await context.service.reconcile(events: [], now: now, allowStarts: false)
         #expect(context.client.ended == ["activity-1"])
+    }
+
+    @Test func backgroundExpirationKeepsTheConfiguredOneMinuteDeadline() async throws {
+        let context = try makeContext()
+        let (wakeups, wakeupContinuation) = AsyncStream<Void>.makeStream()
+        let (delays, delayContinuation) = AsyncStream<TimeInterval>.makeStream()
+        let (endings, endingContinuation) = AsyncStream<String>.makeStream()
+        defer {
+            wakeupContinuation.finish()
+            delayContinuation.finish()
+            endingContinuation.finish()
+        }
+        context.client.beforeEnding = { endingContinuation.yield($0) }
+        var clock = now
+        var isForeground = true
+        let service = ReminderLiveActivityService(
+            defaults: context.defaults, client: context.client, canStart: { isForeground },
+            currentDate: { clock },
+            sleep: { delay in
+                delayContinuation.yield(delay)
+                var iterator = wakeups.makeAsyncIterator()
+                _ = await iterator.next()
+            }
+        )
+        let event = ReminderLiveActivityEvent(
+            reminderID: UUID(), title: "One minute after notification",
+            startDate: now.addingTimeInterval(-300), endDate: now.addingTimeInterval(60),
+            notificationDate: now)
+        var delayIterator = delays.makeAsyncIterator()
+        var endingIterator = endings.makeAsyncIterator()
+
+        await service.reconcile(events: [event], now: now)
+        #expect(await delayIterator.next() == 60)
+        #expect(context.client.ended.isEmpty)
+        #expect(
+            ReminderLiveActivityTimePresentation.elapsedInterval(since: event.notificationDate)
+                .contains(now.addingTimeInterval(80)))
+
+        isForeground = false
+        clock = event.activityEndDate
+        wakeupContinuation.yield(())
+
+        #expect(await endingIterator.next() == "activity-1")
+        #expect(context.client.ended == ["activity-1"])
+        #expect(context.client.requested == [event])
+        await service.reconcile(events: [event], now: clock, allowStarts: false)
+        #expect(context.client.records.isEmpty)
+        #expect(context.client.requested == [event])
     }
 
     @Test func deniedAuthorizationEndsExistingActivities() async throws {
