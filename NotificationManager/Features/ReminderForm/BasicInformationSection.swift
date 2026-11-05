@@ -113,6 +113,11 @@ extension ReminderFormFieldIssue {
                 "reminder.form.error.repeat-end-before-start",
                 table: "ReminderForm"
             )
+        case .liveActivityWindowInvalid:
+            LocalizedStringResource(
+                "reminder.form.error.live-activity-window-invalid",
+                table: "ReminderForm"
+            )
         }
     }
 }

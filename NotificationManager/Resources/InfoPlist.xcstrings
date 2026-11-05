@@ -1,0 +1,14 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "NSAlarmKitUsageDescription": {
+      "comment": "System permission prompt for the opt-in AlarmKit trial timer.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Allow alarms to show a test countdown and display your message at the chosen time." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "検証用タイマーのカウントダウンと、 指定した時刻のメッセージ表示にアラームを使用します。" } }
+      }
+    }
+  },
+  "version": "1.0"
+}

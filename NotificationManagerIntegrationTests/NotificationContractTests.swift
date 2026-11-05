@@ -13,7 +13,7 @@ struct NotificationContractTests {
         let result = try await NotificationContractHarness().payloadAndCleanupContract()
 
         #expect(result.payloadFormat == "notification-manager.schedule")
-        #expect(result.payloadVersion == 2)
+        #expect(result.payloadVersion == SchedulePayloadCodec.currentVersion)
         #expect(result.directRequestsAreRepeating)
         #expect(result.rollingRequestsAreOneShot)
         #expect(result.identifierClassificationsAreCurrent)
@@ -46,7 +46,7 @@ struct NotificationContractTests {
     @Test func secondsPersistPlanValidateAndMaterializeAsARepeatingCalendarTrigger() throws {
         let result = try NotificationContractHarness().secondEarlyReminderContract()
 
-        #expect(result.payloadVersion == 2)
+        #expect(result.payloadVersion == SchedulePayloadCodec.currentVersion)
         #expect(result.dateComponents.hour == 9)
         #expect(result.dateComponents.minute == 29)
         #expect(result.dateComponents.second == 30)

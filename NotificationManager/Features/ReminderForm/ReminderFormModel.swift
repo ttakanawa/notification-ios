@@ -90,6 +90,7 @@ enum ReminderFormFieldIssue: Sendable, Equatable {
     case timeZoneInvalid
     case repeatEndInvalid
     case repeatEndBeforeStart
+    case liveActivityWindowInvalid
 }
 
 enum EarlyReminderChoice: String, Sendable, Equatable, CaseIterable, Identifiable {
@@ -131,6 +132,9 @@ final class ReminderFormModel {
     private(set) var currentRepeatWasCustom = false
     private(set) var canonicalEnglishDisclosure: String?
     private(set) var repeatEndsOnDate = false
+    private(set) var liveActivityEnabled = false
+    private(set) var liveActivityBeforeMinutes = 5
+    private(set) var liveActivityAfterMinutes = 10
     private(set) var earlyReminderChoice: EarlyReminderChoice = .none
     private(set) var customRepeatText = ""
     private(set) var isReplacingCustomRepeat = false
@@ -237,6 +241,19 @@ final class ReminderFormModel {
             currentRepeatWasCustom = true
         }
         canonicalEnglishDisclosure = savedRepeatPresentation?.canonicalEnglishDisclosure
+
+        if let window = initialDraft.liveActivityWindow
+            ?? initialDraft.durationSeconds.map({
+                LiveActivityWindow(beforeSeconds: 0, afterSeconds: min($0, 28_800))
+            })
+        {
+            liveActivityEnabled = true
+            let maximum = LiveActivityWindow.maximumDurationSeconds
+            let beforeSeconds = min(max(window.beforeSeconds, 0), maximum)
+            let afterSeconds = min(max(window.afterSeconds, 0), maximum)
+            liveActivityBeforeMinutes = (beforeSeconds + 59) / 60
+            liveActivityAfterMinutes = (afterSeconds + 59) / 60
+        }
 
         switch snapshot.schedule {
         case .valid:
@@ -503,6 +520,17 @@ final class ReminderFormModel {
             : nil
     }
 
+    var liveActivityWindowFieldIssue: ReminderFormFieldIssue? {
+        guard canEditSchedule, liveActivityEnabled else { return nil }
+        let window =
+            detachedDraft.liveActivityWindow
+            ?? detachedDraft.durationSeconds.map {
+                LiveActivityWindow(beforeSeconds: 0, afterSeconds: min($0, 28_800))
+            }
+        guard window?.isValid == true else { return .liveActivityWindowInvalid }
+        return nil
+    }
+
     var canSaveWithoutReplacingSchedule: Bool {
         guard detachedDraft.originalScheduleData != nil,
             !requiresReplacementBeforeSave,
@@ -547,6 +575,36 @@ final class ReminderFormModel {
         repeatEnd = .onDate(
             SourceWallClockDateAdapter(timeZone: pickerTimeZone).sourceDate(from: value)
         )
+    }
+
+    func setLiveActivityEnabled(_ enabled: Bool) {
+        guard canEditSchedule, enabled != liveActivityEnabled else { return }
+        liveActivityEnabled = enabled
+        if !enabled {
+            // A v3 duration also enabled Live Activities. Clear it on an explicit
+            // disable so the compatibility fallback cannot turn the activity back on.
+            detachedDraft.durationSeconds = nil
+        }
+        updateLiveActivityWindow()
+        scheduleFieldChanged()
+    }
+
+    func updateLiveActivityBeforeMinutes(_ value: Int) {
+        guard canEditSchedule, liveActivityEnabled,
+            (0...480).contains(value), value != liveActivityBeforeMinutes
+        else { return }
+        liveActivityBeforeMinutes = value
+        updateLiveActivityWindow()
+        scheduleFieldChanged()
+    }
+
+    func updateLiveActivityAfterMinutes(_ value: Int) {
+        guard canEditSchedule, liveActivityEnabled,
+            (0...480).contains(value), value != liveActivityAfterMinutes
+        else { return }
+        liveActivityAfterMinutes = value
+        updateLiveActivityWindow()
+        scheduleFieldChanged()
     }
 
     func updateEarlyReminderAmount(_ amount: Int) {
@@ -742,6 +800,8 @@ final class ReminderFormModel {
                 source: source,
                 end: detachedDraft.end,
                 early: detachedDraft.early,
+                durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow,
                 assistedInterpreter: assistedRepeatInterpreter
             ),
             reminderID: detachedDraft.id,
@@ -791,7 +851,15 @@ final class ReminderFormModel {
         case .onDate:
             repeatEndsOnDate = true
         }
-        detachedDraft.scheduleChange = .replace(schedule)
+        detachedDraft.scheduleChange = .replace(
+            ScheduleDefinition(
+                source: schedule.source,
+                rule: schedule.rule,
+                end: schedule.end,
+                early: schedule.early,
+                durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow
+            ))
         customRepeatState = .confirmed(preview)
         isReplacingCustomRepeat = false
         currentLocalizedRepeatSummary = localizedRepeatSummary(schedule)
@@ -906,6 +974,9 @@ final class ReminderFormModel {
         customRepeatState = .idle
         detachedDraft = baseline.draft
         repeatEndsOnDate = baseline.editableContent.repeatEndsOnDate
+        liveActivityEnabled = baseline.editableContent.liveActivityEnabled
+        liveActivityBeforeMinutes = baseline.editableContent.liveActivityBeforeMinutes
+        liveActivityAfterMinutes = baseline.editableContent.liveActivityAfterMinutes
         earlyReminderChoice = baseline.editableContent.earlyReminderChoice
         isReplacingCustomRepeat = baseline.editableContent.isReplacingCustomRepeat
         customRepeatText = baseline.editableContent.customRepeatText
@@ -939,6 +1010,10 @@ final class ReminderFormModel {
             repeatRule: detachedDraft.rule,
             repeatEnd: detachedDraft.end,
             repeatEndsOnDate: repeatEndsOnDate,
+            liveActivityEnabled: liveActivityEnabled,
+            liveActivityBeforeMinutes: liveActivityEnabled ? liveActivityBeforeMinutes : 5,
+            liveActivityAfterMinutes: liveActivityEnabled ? liveActivityAfterMinutes : 10,
+            legacyDurationSeconds: detachedDraft.durationSeconds,
             earlyReminder: detachedDraft.early,
             earlyReminderChoice: earlyReminderChoice,
             isReplacingCustomRepeat: isReplacingCustomRepeat,
@@ -961,7 +1036,7 @@ final class ReminderFormModel {
 
     private var scheduleInputFieldsAreValid: Bool {
         guard canEditSchedule else { return true }
-        return repeatEndDateFieldIssue == nil
+        return repeatEndDateFieldIssue == nil && liveActivityWindowFieldIssue == nil
     }
 
     private func refreshAnchorDependentPreset() {
@@ -1001,7 +1076,9 @@ final class ReminderFormModel {
                 source: source,
                 rule: detachedDraft.rule,
                 end: detachedDraft.end,
-                early: detachedDraft.early
+                early: detachedDraft.early,
+                durationSeconds: detachedDraft.durationSeconds,
+                liveActivityWindow: detachedDraft.liveActivityWindow
             ))
         if currentRepeatWasCustom { canonicalEnglishDisclosure = nil }
     }
@@ -1020,13 +1097,28 @@ final class ReminderFormModel {
                     source: source,
                     rule: detachedDraft.rule,
                     end: detachedDraft.end,
-                    early: detachedDraft.early
+                    early: detachedDraft.early,
+                    durationSeconds: detachedDraft.durationSeconds,
+                    liveActivityWindow: detachedDraft.liveActivityWindow
                 ))
         } else {
             detachedDraft.scheduleChange = .preserveOriginal
         }
         refreshPreview()
         resetSaveStateAfterEdit()
+    }
+
+    private func updateLiveActivityWindow() {
+        if let duration = detachedDraft.durationSeconds, duration < 60 || duration % 60 != 0 {
+            // Explicitly repairing the display window also replaces an invalid v3 range.
+            detachedDraft.durationSeconds = nil
+        }
+        detachedDraft.liveActivityWindow =
+            liveActivityEnabled
+            ? LiveActivityWindow(
+                beforeSeconds: liveActivityBeforeMinutes * 60,
+                afterSeconds: liveActivityAfterMinutes * 60
+            ) : nil
     }
 
     private func refreshPreview() {
@@ -1049,7 +1141,9 @@ final class ReminderFormModel {
                     source: source,
                     rule: detachedDraft.rule,
                     end: detachedDraft.end,
-                    early: detachedDraft.early
+                    early: detachedDraft.early,
+                    durationSeconds: detachedDraft.durationSeconds,
+                    liveActivityWindow: detachedDraft.liveActivityWindow
                 )
             } else {
                 schedule = nil
@@ -1164,6 +1258,10 @@ private struct ReminderFormEditableContent: Equatable {
     let repeatRule: RepeatRule
     let repeatEnd: RepeatEnd
     let repeatEndsOnDate: Bool
+    let liveActivityEnabled: Bool
+    let liveActivityBeforeMinutes: Int
+    let liveActivityAfterMinutes: Int
+    let legacyDurationSeconds: Int?
     let earlyReminder: EarlyReminder?
     let earlyReminderChoice: EarlyReminderChoice
     let isReplacingCustomRepeat: Bool

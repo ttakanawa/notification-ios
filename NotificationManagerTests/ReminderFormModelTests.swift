@@ -457,6 +457,74 @@ struct ReminderFormModelTests {
         #expect(!model.canSave)
     }
 
+    @Test func malformedLiveActivityOffsetsCanBeRepairedWithoutOverflow() {
+        let invalid = LiveActivityWindow(beforeSeconds: Int.max, afterSeconds: Int.min)
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .domainInvalid(
+                    repairSeed: ScheduleRepairSeed(
+                        source: SourceWallClock(
+                            year: 2040, month: 9, day: 1, hour: 10, minute: 0,
+                            timeZoneIdentifier: "Asia/Tokyo"
+                        ),
+                        rule: .none,
+                        end: .never,
+                        liveActivityWindow: invalid
+                    ),
+                    originalData: Data([4]),
+                    issues: [.invalidLiveActivityWindow]
+                )),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.liveActivityBeforeMinutes == 480)
+        #expect(model.liveActivityAfterMinutes == 0)
+        #expect(model.detachedDraft.liveActivityWindow == invalid)
+        #expect(!model.canSave)
+
+        model.updateLiveActivityAfterMinutes(10)
+        #expect(model.liveActivityWindowFieldIssue != nil)
+        model.updateLiveActivityBeforeMinutes(5)
+
+        #expect(
+            model.detachedDraft.liveActivityWindow
+                == LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600))
+        #expect(model.canSave)
+    }
+
+    @Test(arguments: [-60, 61])
+    func invalidLegacyDurationCanBeRepairedByEditingLiveActivityOffsets(duration: Int) {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .domainInvalid(
+                    repairSeed: ScheduleRepairSeed(
+                        source: SourceWallClock(
+                            year: 2040, month: 9, day: 1, hour: 10, minute: 0,
+                            timeZoneIdentifier: "Asia/Tokyo"
+                        ),
+                        rule: .none,
+                        end: .never,
+                        durationSeconds: duration
+                    ),
+                    originalData: Data([3]),
+                    issues: [.invalidDuration]
+                )),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.detachedDraft.durationSeconds == duration)
+        #expect(!model.canSave)
+        model.updateLiveActivityAfterMinutes(10)
+
+        #expect(model.detachedDraft.durationSeconds == nil)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+    }
+
     @Test func previewUsesFixedDraftIDAndShowsThreePhysicalNotifications() {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
         let model = ReminderFormModel(
@@ -1325,6 +1393,255 @@ struct ReminderFormModelTests {
         #expect(!model.canSave)
     }
 
+}
+
+extension ReminderFormModelTests {
+    @Test func liveActivityIsOptionalAndDefaultsToFiveMinutesBeforeAndTenAfter() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        let notification = model.previewNotifications.first?.alertInstant
+        #expect(!model.liveActivityEnabled)
+        #expect(model.detachedDraft.liveActivityWindow == nil)
+        #expect(model.detachedDraft.durationSeconds == nil)
+
+        model.setLiveActivityEnabled(true)
+
+        #expect(model.liveActivityEnabled)
+        #expect(model.liveActivityBeforeMinutes == 5)
+        #expect(model.liveActivityAfterMinutes == 10)
+        #expect(
+            model.detachedDraft.liveActivityWindow
+                == LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600))
+        #expect(model.detachedDraft.durationSeconds == nil)
+        #expect(model.previewNotifications.first?.alertInstant == notification)
+        #expect(model.canSave)
+    }
+
+    @Test func notificationEditsKeepLiveActivityOffsetsIndependentAcrossMidnightAndTimeZones() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.setLiveActivityEnabled(true)
+        model.updateLiveActivityBeforeMinutes(15)
+        model.updateLiveActivityAfterMinutes(30)
+        model.sourceTime = SourceTime(hour: 0, minute: 0)
+        model.sourceDate = SourceDate(year: 2040, month: 9, day: 2)
+        model.timeZoneIdentifier = "Asia/Tokyo"
+
+        #expect(model.sourceDate == SourceDate(year: 2040, month: 9, day: 2))
+        #expect(model.sourceTime == SourceTime(hour: 0, minute: 0))
+        #expect(
+            model.detachedDraft.liveActivityWindow
+                == LiveActivityWindow(beforeSeconds: 900, afterSeconds: 1_800))
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+    }
+
+    @Test func liveActivityWindowRejectsZeroAndMoreThanEightHoursButAllowsEitherSideToBeZero() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.setLiveActivityEnabled(true)
+        model.updateLiveActivityBeforeMinutes(0)
+        model.updateLiveActivityAfterMinutes(0)
+
+        #expect(model.liveActivityWindowFieldIssue == .liveActivityWindowInvalid)
+        #expect(!model.canSave)
+        #expect(model.previewNotifications.isEmpty)
+
+        model.updateLiveActivityAfterMinutes(480)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+
+        model.updateLiveActivityBeforeMinutes(1)
+        #expect(model.liveActivityWindowFieldIssue == .liveActivityWindowInvalid)
+        #expect(!model.canSave)
+
+        model.updateLiveActivityAfterMinutes(0)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+
+        model.updateLiveActivityBeforeMinutes(-1)
+        model.updateLiveActivityAfterMinutes(481)
+        #expect(model.liveActivityBeforeMinutes == 1)
+        #expect(model.liveActivityAfterMinutes == 0)
+    }
+
+    @Test func disablingLiveActivityClearsTheWindowWithoutChangingNotificationTime() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.setLiveActivityEnabled(true)
+        model.updateLiveActivityBeforeMinutes(480)
+        #expect(!model.canSave)
+
+        model.setLiveActivityEnabled(false)
+
+        #expect(model.detachedDraft.liveActivityWindow == nil)
+        #expect(model.detachedDraft.durationSeconds == nil)
+        #expect(model.sourceTime == SourceTime(hour: 9, minute: 30))
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+        guard case .replace(let schedule) = model.detachedDraft.scheduleChange else {
+            Issue.record("Expected a replacement schedule")
+            return
+        }
+        #expect(schedule.liveActivityWindow == nil)
+        #expect(schedule.durationSeconds == nil)
+    }
+
+    @Test func existingWindowLoadsAndDiscardRestoresTheOriginalOffsets() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                liveActivityWindow: LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.liveActivityEnabled)
+        #expect(model.liveActivityBeforeMinutes == 5)
+        #expect(model.liveActivityAfterMinutes == 10)
+        #expect(!model.hasChanges)
+        #expect(model.canSaveWithoutReplacingSchedule)
+
+        model.updateLiveActivityBeforeMinutes(7)
+        #expect(model.hasChanges)
+        model.setLiveActivityEnabled(false)
+        model.discardChanges()
+
+        #expect(model.liveActivityEnabled)
+        #expect(model.liveActivityBeforeMinutes == 5)
+        #expect(model.liveActivityAfterMinutes == 10)
+        #expect(
+            model.detachedDraft.liveActivityWindow
+                == LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600))
+        #expect(!model.hasChanges)
+        #expect(model.canSaveWithoutReplacingSchedule)
+    }
+
+    @Test func changingRepeatAndEarlyReminderPreservesLiveActivityWindowOnSave() async {
+        let window = LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(liveActivityWindow: window),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: ReminderFormActions(
+                save: { draft, _, _ in
+                    #expect(draft.liveActivityWindow == window)
+                    guard case .replace(let schedule) = draft.scheduleChange else {
+                        Issue.record("Expected the edited schedule")
+                        return .saved(draft.id)
+                    }
+                    #expect(schedule.liveActivityWindow == window)
+                    #expect(schedule.source.hour == 9 && schedule.source.minute == 30)
+                    #expect(schedule.rule == .daily(interval: 1))
+                    #expect(schedule.early == EarlyReminder(value: 2, unit: .minutes))
+                    return .saved(draft.id)
+                },
+                delete: { _ in }
+            )
+        )
+        model.repeatRule = .daily(interval: 1)
+        model.earlyReminder = EarlyReminder(value: 2, unit: .minutes)
+
+        #expect(await model.save())
+    }
+
+    @Test func liveActivityWindowKeepsElapsedOffsetsAcrossDaylightSavingTransition() {
+        let model = configuredNewModel(recorder: SaveActionRecorder(outcomes: []))
+        model.sourceDate = SourceDate(year: 2040, month: 3, day: 11)
+        model.sourceTime = SourceTime(hour: 1, minute: 30)
+        model.setLiveActivityEnabled(true)
+
+        #expect(
+            model.detachedDraft.liveActivityWindow
+                == LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600))
+        #expect(model.canSave)
+    }
+
+    @Test func readOnlyScheduleDoesNotAllowLiveActivityEdits() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .unsupportedFuture(version: 5, originalData: Data([1]))
+            ),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        model.setLiveActivityEnabled(true)
+        model.updateLiveActivityBeforeMinutes(60)
+        #expect(!model.liveActivityEnabled)
+        #expect(!model.hasChanges)
+        #expect(model.canSaveWithoutReplacingSchedule)
+    }
+
+    @Test func unrelatedScheduleEditsPreserveLegacyRangeDataAndItsCompatibilityWindow() {
+        let schedule = ScheduleDefinition(
+            source: SourceWallClock(
+                year: 2040, month: 11, day: 4, hour: 1, minute: 45,
+                timeZoneIdentifier: "America/New_York"
+            ),
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 2_700
+        )
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(
+                schedule: .valid(schedule, sourceVersion: 3, originalData: Data([1]))
+            ),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        #expect(model.liveActivityBeforeMinutes == 0)
+        #expect(model.liveActivityAfterMinutes == 45)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSaveWithoutReplacingSchedule)
+
+        model.repeatRule = .daily(interval: 1)
+        model.earlyReminder = EarlyReminder(value: 5, unit: .minutes)
+
+        #expect(model.detachedDraft.durationSeconds == 2_700)
+        #expect(model.detachedDraft.liveActivityWindow == nil)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSave)
+    }
+
+    @Test func disablingLegacyLiveActivityClearsItsFallbackAndDiscardRestoresIt() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(durationSeconds: 5_400),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+        #expect(model.liveActivityEnabled)
+        #expect(model.liveActivityBeforeMinutes == 0)
+        #expect(model.liveActivityAfterMinutes == 90)
+
+        model.setLiveActivityEnabled(false)
+
+        #expect(model.detachedDraft.durationSeconds == nil)
+        #expect(model.detachedDraft.liveActivityWindow == nil)
+        #expect(model.hasChanges)
+        #expect(model.canSave)
+
+        model.discardChanges()
+        #expect(model.liveActivityEnabled)
+        #expect(model.liveActivityAfterMinutes == 90)
+        #expect(model.detachedDraft.durationSeconds == 5_400)
+        #expect(!model.hasChanges)
+    }
+
+    @Test func legacySubMinuteDisplayWindowDoesNotBlockUnrelatedMetadataSaves() {
+        let model = ReminderFormModel(
+            snapshot: validSnapshot(durationSeconds: 30),
+            savedRepeatPresentation: nil,
+            now: date("2040-08-01T00:00:00Z"),
+            actions: .inert
+        )
+
+        #expect(model.liveActivityBeforeMinutes == 0)
+        #expect(model.liveActivityAfterMinutes == 1)
+        #expect(model.liveActivityWindowFieldIssue == nil)
+        #expect(model.canSaveWithoutReplacingSchedule)
+        #expect(model.detachedDraft.durationSeconds == 30)
+    }
+
     private func configuredNewModel(recorder: SaveActionRecorder) -> ReminderFormModel {
         let model = ReminderFormModel(
             newReminderID: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -1369,6 +1686,8 @@ struct ReminderFormModelTests {
             weekdays: [.monday]
         ),
         early: EarlyReminder? = nil,
+        durationSeconds: Int? = nil,
+        liveActivityWindow: LiveActivityWindow? = nil,
         tagIDs: Set<UUID> = []
     ) -> ReminderSnapshot {
         let definition = ScheduleDefinition(
@@ -1382,7 +1701,9 @@ struct ReminderFormModelTests {
             ),
             rule: rule,
             end: .never,
-            early: early
+            early: early,
+            durationSeconds: durationSeconds,
+            liveActivityWindow: liveActivityWindow
         )
         return ReminderSnapshot(
             id: UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!,
@@ -1411,7 +1732,7 @@ enum OpaqueScheduleFixture: Sendable, CaseIterable {
 
     func schedule(raw: Data) -> ScheduleReadState {
         switch self {
-        case .unsupported: .unsupportedFuture(version: 3, originalData: raw)
+        case .unsupported: .unsupportedFuture(version: 4, originalData: raw)
         case .corrupt: .corrupt(originalData: raw)
         }
     }

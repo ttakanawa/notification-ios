@@ -1,6 +1,78 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "reminder.form.duration.hours": {
+      "comment": "Hour column label in the Live Activity display duration wheel picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Hours" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "時間" } }
+      }
+    },
+    "reminder.form.duration.minutes": {
+      "comment": "Minute column label in the Live Activity display duration wheel picker.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Minutes" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "分" } }
+      }
+    },
+    "reminder.field.live-activity-enabled": {
+      "comment": "Enables a Live Activity around the reminder notification time.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show Live Activity" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "Live Activity を表示" } }
+      }
+    },
+    "reminder.field.live-activity-before": {
+      "comment": "Label for the number of minutes before notification when a Live Activity starts.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Before notification" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前の表示時間" } }
+      }
+    },
+    "reminder.field.live-activity-after": {
+      "comment": "Label for the number of minutes after notification when a Live Activity ends.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "After notification" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知後の表示時間" } }
+      }
+    },
+    "reminder.form.live-activity.minutes-before": {
+      "comment": "Live Activity display start offset. The placeholder is the number of minutes before the notification.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld min before" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "%lld分前" } }
+      }
+    },
+    "reminder.form.live-activity.minutes-after": {
+      "comment": "Live Activity display end offset. The placeholder is the number of minutes after the notification.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "%lld min after" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "%lld分後" } }
+      }
+    },
+    "reminder.form.error.live-activity-window-invalid": {
+      "comment": "Error for a zero-length or over-eight-hour Live Activity display window.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "The total time before and after the notification must be between 1 and 480 minutes." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前と通知後の表示時間の合計を1分〜480分にしてください。" } }
+      }
+    },
+    "reminder.form.live-activity-help": {
+      "comment": "Explains the notification-relative Live Activity display window and device-only start limitations.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Show the time until the notification, then the time elapsed after it. The display window can total up to 8 hours. iOS 26 or later starts automatically; earlier versions start when you open the app. Removal may wait until the app runs again." } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知前は通知までの時間、 通知後は通知からの経過時間を表示します。 表示時間は前後の合計で最大8時間です。 iOS 26以降は自動で、 それ以前はアプリを開くと開始します。 消去は次回のアプリ動作時になる場合があります。" } }
+      }
+    },
     "reminder.custom.error.assistance-unavailable": {
       "comment": "User-facing error text announced by VoiceOver and also shown visually.",
       "extractionState": "manual",

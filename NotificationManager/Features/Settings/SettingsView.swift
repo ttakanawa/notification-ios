@@ -132,6 +132,20 @@ struct SettingsView: View {
                 .accessibilityIdentifier("settings.about-privacy")
             }
 
+            if #available(iOS 26.0, *) {
+                Section {
+                    NavigationLink {
+                        AlarmKitTrialView()
+                    } label: {
+                        Label(
+                            LocalizedStringResource(
+                                "settings.alarmkit-trial.link", table: "Settings"),
+                            systemImage: "alarm")
+                    }
+                    .accessibilityIdentifier("settings.alarmkit-trial")
+                }
+            }
+
             Section {
                 LabeledContent {
                     accountStatusValue

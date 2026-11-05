@@ -35,6 +35,10 @@
     <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>ITSAppUsesNonExemptEncryption</key>
     <false/>
+    <key>NSSupportsLiveActivities</key>
+    <true/>
+    <key>NSAlarmKitUsageDescription</key>
+    <string>Allow alarms to show a test countdown and display your message at the chosen time.</string>
     <key>UIBackgroundModes</key>
     <array>
         <string>remote-notification</string>

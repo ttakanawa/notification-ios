@@ -135,7 +135,9 @@ public struct NextNotificationProvider: Sendable {
                 source: schedule.source,
                 rule: schedule.rule,
                 end: schedule.end,
-                early: nil
+                early: nil,
+                durationSeconds: schedule.durationSeconds,
+                liveActivityWindow: schedule.liveActivityWindow
             )
             if let stream = try alertStream(
                 schedule: mainSchedule,
@@ -156,7 +158,9 @@ public struct NextNotificationProvider: Sendable {
                     value: early.value,
                     unit: early.unit,
                     mainEnabled: false
-                )
+                ),
+                durationSeconds: schedule.durationSeconds,
+                liveActivityWindow: schedule.liveActivityWindow
             )
             if let stream = try alertStream(
                 schedule: earlySchedule,

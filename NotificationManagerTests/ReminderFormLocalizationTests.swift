@@ -16,7 +16,8 @@ struct ReminderFormLocalizationTests {
             (.timeZoneRequired, "reminder.form.error.time-zone-required"),
             (.timeZoneInvalid, "reminder.form.error.time-zone-invalid"),
             (.repeatEndInvalid, "reminder.form.error.invalid-repeat-end-date"),
-            (.repeatEndBeforeStart, "reminder.form.error.repeat-end-before-start")
+            (.repeatEndBeforeStart, "reminder.form.error.repeat-end-before-start"),
+            (.liveActivityWindowInvalid, "reminder.form.error.live-activity-window-invalid")
         ]
 
         for (issue, key) in fixtures {

@@ -78,6 +78,107 @@ final class ReminderFlowUITests: XCTestCase {
     }
 
     @MainActor
+    func testLiveActivityOffsetsValidateTheDisplayWindowAndCanBeDisabled() {
+        let app = launch(
+            scenario: "empty-list",
+            extraArguments: deterministicEnglish24HourArguments
+        )
+        app.buttons["reminder-list.add"].tap()
+
+        let title = app.textFields["reminder-form.title"]
+        XCTAssertTrue(title.waitForExistence(timeout: 2))
+        title.tap()
+        title.typeText("Notification window")
+        app.keyboards.buttons["Return"].tap()
+
+        let save = app.buttons["reminder-form.save"]
+        let before = app.buttons["reminder-form.live-activity-before-minutes"]
+        let after = app.buttons["reminder-form.live-activity-after-minutes"]
+        let activityToggle = app.switches["reminder-form.live-activity-enabled"]
+        XCTAssertTrue(save.isEnabled)
+        XCTAssertFalse(before.exists)
+        XCTAssertFalse(after.exists)
+
+        scrollToHittable(activityToggle, in: app)
+        activityToggle.switches.firstMatch.tap()
+        XCTAssertEqual(activityToggle.value as? String, "1")
+        scrollToHittable(after, in: app)
+        XCTAssertTrue(before.waitForExistence(timeout: 1))
+        XCTAssertTrue(after.exists)
+        XCTAssertEqual(before.value as? String, "5")
+        XCTAssertEqual(after.value as? String, "10")
+        XCTAssertTrue(save.isEnabled)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "live-activity-five-before-ten-after"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+
+        selectLiveActivityDuration(before, hours: "1", minutes: "0", in: app)
+        XCTAssertEqual(before.value as? String, "60")
+        before.tap()
+        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertEqual(app.pickerWheels.element(boundBy: 0).value as? String, "1")
+        let wheelScreenshot = XCTAttachment(screenshot: app.screenshot())
+        wheelScreenshot.name = "live-activity-one-hour-wheel"
+        wheelScreenshot.lifetime = .keepAlways
+        add(wheelScreenshot)
+        app.pickerWheels.element(boundBy: 0).adjust(toPickerWheelValue: "2")
+        app.buttons["reminder-form.live-activity-duration.cancel"].tap()
+        XCTAssertEqual(before.value as? String, "60")
+
+        selectLiveActivityDuration(before, hours: "0", minutes: "0", in: app)
+        XCTAssertEqual(before.value as? String, "0")
+        selectLiveActivityDuration(after, hours: "0", minutes: "0", in: app)
+        XCTAssertEqual(after.value as? String, "0")
+
+        XCTAssertTrue(
+            app.descendants(matching: .any)["reminder-form.live-activity-error"].exists)
+        XCTAssertFalse(save.isEnabled)
+
+        selectLiveActivityDuration(after, hours: "0", minutes: "1", in: app)
+        XCTAssertTrue(save.isEnabled)
+
+        selectLiveActivityDuration(after, hours: "8", minutes: "0", in: app)
+        XCTAssertEqual(after.value as? String, "480")
+        XCTAssertTrue(save.isEnabled)
+        selectLiveActivityDuration(before, hours: "0", minutes: "1", in: app)
+        XCTAssertFalse(save.isEnabled)
+
+        for _ in 0..<3 where !activityToggle.isHittable {
+            app.swipeDown()
+        }
+        activityToggle.switches.firstMatch.tap()
+        XCTAssertTrue(before.waitForNonExistence(timeout: 1))
+        XCTAssertFalse(after.exists)
+        XCTAssertTrue(save.isEnabled)
+    }
+
+    @MainActor
+    func testLiveActivityDurationWheelUsesJapaneseLabels() {
+        let app = launch(
+            scenario: "empty-list",
+            extraArguments: ["-AppleLanguages", "(ja)", "-AppleLocale", "ja_JP"])
+        app.buttons["reminder-list.add"].tap()
+        let toggle = app.switches["reminder-form.live-activity-enabled"]
+        scrollToHittable(toggle, in: app)
+        toggle.switches.firstMatch.tap()
+        let before = app.buttons["reminder-form.live-activity-before-minutes"]
+        scrollToHittable(before, in: app)
+        before.tap()
+        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 2))
+        XCTAssertTrue(app.staticTexts["時間"].exists)
+        XCTAssertTrue(app.staticTexts["分"].exists)
+        app.pickerWheels.element(boundBy: 0).adjust(toPickerWheelValue: "1")
+        app.pickerWheels.element(boundBy: 1).adjust(toPickerWheelValue: "0")
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "live-activity-japanese-one-hour-wheel"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        app.buttons["reminder-form.live-activity-duration.done"].tap()
+        XCTAssertEqual(before.value as? String, "60")
+    }
+
+    @MainActor
     func testRepeatEndDateCanBeSelectedFromTheMissingValueSheet() {
         let app = launch(
             scenario: "empty-list",
@@ -566,6 +667,18 @@ final class ReminderFlowUITests: XCTestCase {
         unitPicker.tap()
         XCTAssertTrue(app.buttons["reminder.early-unit.seconds"].exists)
         XCTAssertTrue(app.switches["reminder-form.main-enabled"].exists)
+    }
+
+    @MainActor
+    private func selectLiveActivityDuration(
+        _ row: XCUIElement, hours: String, minutes: String, in app: XCUIApplication
+    ) {
+        scrollToHittable(row, in: app)
+        row.tap()
+        XCTAssertTrue(app.pickerWheels.firstMatch.waitForExistence(timeout: 2))
+        app.pickerWheels.element(boundBy: 0).adjust(toPickerWheelValue: hours)
+        app.pickerWheels.element(boundBy: 1).adjust(toPickerWheelValue: minutes)
+        app.buttons["reminder-form.live-activity-duration.done"].tap()
     }
 
     @MainActor

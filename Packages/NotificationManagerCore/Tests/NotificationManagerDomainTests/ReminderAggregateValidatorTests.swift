@@ -138,6 +138,210 @@ struct ReminderAggregateValidatorTests {
         }
     }
 
+    @Test func replacementRejectsDurationThatDivergesAfterEditing() {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        var replacementDraft = draft(scheduleChange: .replace(schedule))
+        #expect(replacementDraft.durationSeconds == 3_600)
+        replacementDraft.durationSeconds = nil
+
+        #expect(throws: ReminderValidationIssue.scheduleFieldsDoNotMatchReplacement) {
+            try validator.validate(replacementDraft, replacementScheduleData: Data())
+        }
+    }
+
+    @Test func replacementRejectsLiveActivityWindowThatDivergesAfterEditing() {
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .none, end: .never, early: nil,
+            liveActivityWindow: LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
+        )
+        var replacementDraft = draft(scheduleChange: .replace(schedule))
+        #expect(replacementDraft.liveActivityWindow == schedule.liveActivityWindow)
+        replacementDraft.liveActivityWindow = LiveActivityWindow(
+            beforeSeconds: 0, afterSeconds: 600)
+
+        #expect(throws: ReminderValidationIssue.scheduleFieldsDoNotMatchReplacement) {
+            try validator.validate(replacementDraft, replacementScheduleData: Data())
+        }
+    }
+
+    @Test(arguments: [
+        LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600),
+        LiveActivityWindow(beforeSeconds: 0, afterSeconds: 1),
+        LiveActivityWindow(beforeSeconds: 1, afterSeconds: 0),
+        LiveActivityWindow(beforeSeconds: 28_800, afterSeconds: 0),
+        LiveActivityWindow(beforeSeconds: 0, afterSeconds: 28_800),
+        LiveActivityWindow(beforeSeconds: 14_400, afterSeconds: 14_400)
+    ])
+    func acceptsBoundedLiveActivityWindows(_ window: LiveActivityWindow) {
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .none, end: .never, early: nil,
+            liveActivityWindow: window
+        )
+        #expect(window.isValid)
+        #expect(validator.scheduleIssues(for: schedule).isEmpty)
+        #expect(schedule.effectiveLiveActivityWindow == window)
+    }
+
+    @Test(arguments: [
+        LiveActivityWindow(beforeSeconds: -1, afterSeconds: 600),
+        LiveActivityWindow(beforeSeconds: 300, afterSeconds: -1),
+        LiveActivityWindow(beforeSeconds: 0, afterSeconds: 0),
+        LiveActivityWindow(beforeSeconds: 28_800, afterSeconds: 1),
+        LiveActivityWindow(beforeSeconds: 1, afterSeconds: 28_800),
+        LiveActivityWindow(beforeSeconds: Int.max, afterSeconds: Int.max),
+        LiveActivityWindow(beforeSeconds: Int.min, afterSeconds: 600)
+    ])
+    func rejectsInvalidLiveActivityWindowsWithoutOverflow(_ window: LiveActivityWindow) {
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .none, end: .never, early: nil,
+            liveActivityWindow: window
+        )
+        #expect(!window.isValid)
+        #expect(validator.scheduleIssues(for: schedule) == [.invalidLiveActivityWindow])
+    }
+
+    @Test func explicitLiveActivityWindowOverridesLegacyRangeDuration() {
+        let window = LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .none, end: .never, early: nil,
+            durationSeconds: 3_600, liveActivityWindow: window
+        )
+        #expect(schedule.durationSeconds == 3_600)
+        #expect(schedule.effectiveLiveActivityWindow == window)
+    }
+
+    @Test func legacyLiveActivityWindowDoesNotConcealInvalidDuration() {
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .none, end: .never, early: nil,
+            durationSeconds: -60
+        )
+        #expect(schedule.effectiveLiveActivityWindow?.isValid == false)
+        #expect(validator.scheduleIssues(for: schedule) == [.invalidDuration])
+    }
+
+    @Test func editingDraftCarriesLiveActivityWindowFromValidAndRepairableSchedules() {
+        let window = LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
+        let schedule = ScheduleDefinition(
+            source: validSource, rule: .daily(interval: 1), end: .never, early: nil,
+            liveActivityWindow: window
+        )
+        let original = Data([4, 3, 2, 1])
+        let states: [ScheduleReadState] = [
+            .valid(schedule, sourceVersion: 4, originalData: original),
+            .domainInvalid(
+                repairSeed: ScheduleRepairSeed(
+                    source: validSource, rule: .daily(interval: 1), end: .never,
+                    liveActivityWindow: window
+                ),
+                originalData: original, issues: [.earlyValueOutOfRange]
+            )
+        ]
+        for state in states {
+            let snapshot = ReminderSnapshot(
+                id: UUID(), title: "Meeting", notes: nil, urlString: nil, enabled: true,
+                schedule: state, tagIDs: [],
+                createdAt: Date(timeIntervalSince1970: 1_786_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_786_000_000)
+            )
+            let editingDraft = ReminderDraft(snapshot: snapshot)
+            #expect(editingDraft.liveActivityWindow == window)
+            #expect(editingDraft.scheduleChange == .preserveOriginal)
+            #expect(editingDraft.originalScheduleData == original)
+        }
+    }
+
+    @Test func liveActivityWindowDoesNotMoveMainOrEarlyNotifications() throws {
+        let early = EarlyReminder(value: 2, unit: .minutes)
+        let withoutWindow = ScheduleDefinition(
+            source: validSource, rule: .daily(interval: 1), end: .never, early: early
+        )
+        let withWindow = ScheduleDefinition(
+            source: validSource, rule: .daily(interval: 1), end: .never, early: early,
+            liveActivityWindow: LiveActivityWindow(beforeSeconds: 300, afterSeconds: 600)
+        )
+        let provider = NextNotificationProvider()
+        let reminderID = UUID()
+        let evaluationDate = Date(timeIntervalSince1970: 1_785_715_200)
+        let baseline = try provider.nextPhysicalNotifications(
+            for: reminderID, schedule: withoutWindow, after: evaluationDate, limit: 3,
+            environment: FoundationRecurrenceEnvironment())
+        let updated = try provider.nextPhysicalNotifications(
+            for: reminderID, schedule: withWindow, after: evaluationDate, limit: 3,
+            environment: FoundationRecurrenceEnvironment())
+
+        #expect(baseline.notifications.count == 3)
+        #expect(updated.notifications == baseline.notifications)
+    }
+
+    @Test(arguments: [60, 3_600, 86_400])
+    func acceptsWholeMinuteRangeDurationsIncludingLongRanges(_ duration: Int) throws {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: duration
+        )
+        try validator.validate(
+            draft(scheduleChange: .replace(schedule)),
+            replacementScheduleData: Data()
+        )
+    }
+
+    @Test(arguments: [0, -60, 1, 59, 61])
+    func rejectsNonpositiveAndPartialMinuteDurations(_ duration: Int) {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .none,
+            end: .never,
+            early: nil,
+            durationSeconds: duration
+        )
+        #expect(validator.scheduleIssues(for: schedule) == [.invalidDuration])
+    }
+
+    @Test func editingDraftCarriesRangeFromValidAndRepairableSchedules() {
+        let schedule = ScheduleDefinition(
+            source: validSource,
+            rule: .daily(interval: 1),
+            end: .never,
+            early: nil,
+            durationSeconds: 3_600
+        )
+        let original = Data([1, 2, 3])
+        let states: [ScheduleReadState] = [
+            .valid(schedule, sourceVersion: 3, originalData: original),
+            .domainInvalid(
+                repairSeed: ScheduleRepairSeed(
+                    source: validSource,
+                    rule: .daily(interval: 1),
+                    end: .never,
+                    durationSeconds: 3_600
+                ),
+                originalData: original,
+                issues: [.earlyValueOutOfRange]
+            )
+        ]
+        for state in states {
+            let snapshot = ReminderSnapshot(
+                id: UUID(), title: "Meeting", notes: nil, urlString: nil, enabled: true,
+                schedule: state, tagIDs: [],
+                createdAt: Date(timeIntervalSince1970: 1_786_000_000),
+                updatedAt: Date(timeIntervalSince1970: 1_786_000_000)
+            )
+            let editingDraft = ReminderDraft(snapshot: snapshot)
+            #expect(editingDraft.durationSeconds == 3_600)
+            #expect(editingDraft.scheduleChange == .preserveOriginal)
+            #expect(editingDraft.originalScheduleData == original)
+        }
+    }
+
     @Test func newDraftWithoutACompleteScheduleCannotValidate() {
         #expect(throws: ReminderValidationIssue.missingScheduleData) {
             try validator.validate(draft(originalScheduleData: nil))
@@ -211,6 +415,7 @@ struct ReminderAggregateValidatorTests {
         #expect(draft.rule == .none)
         #expect(draft.end == .never)
         #expect(draft.early == nil)
+        #expect(draft.durationSeconds == nil)
         #expect(draft.scheduleChange == .preserveOriginal)
         #expect(draft.createdAt == Date(timeIntervalSince1970: 1_786_000_000))
         #expect(draft.updatedAt == Date(timeIntervalSince1970: 1_786_000_000))

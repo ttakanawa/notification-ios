@@ -29,6 +29,7 @@ private enum CatalogTable: String, CaseIterable {
     case tags = "Tags"
     case recovery = "Recovery"
     case widget = "Widget"
+    case infoPlist = "InfoPlist"
 
     init?(url: URL) {
         self.init(rawValue: url.deletingPathExtension().lastPathComponent)
@@ -61,11 +62,13 @@ private enum CatalogTable: String, CaseIterable {
                 || key.hasPrefix("recovery.")
         case .widget:
             key.hasPrefix("widget.")
+        case .infoPlist:
+            key == "NSAlarmKitUsageDescription"
         }
     }
 
     var isRequired: Bool {
-        self != .widget
+        self != .widget && self != .infoPlist
     }
 }
 
@@ -253,7 +256,7 @@ private struct LocalizationValidator {
         entry: CatalogEntry,
         failures: inout [String]
     ) {
-        if !Self.isSemanticKey(key) {
+        if !Self.isSemanticKey(key), !CatalogTable.infoPlist.owns(key) {
             failures.append("\(key): key is not a stable lowercase semantic key.")
         }
         guard let comment = entry.comment?.trimmingCharacters(in: .whitespacesAndNewlines),

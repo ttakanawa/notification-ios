@@ -1,6 +1,48 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "widget.live-activity.countdown-prefix": {
+      "comment": "Prefix on the countdown row of the two-row Live Activity. Preserve the trailing space.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Due in " } },
+        "ja": { "stringUnit": { "state": "translated", "value": "通知まで " } }
+      }
+    },
+    "widget.live-activity.before": {
+      "comment": "Legacy suffix kept for Live Activity cards archived before the two-row display. Preserve the leading space in English.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": " before" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "前" } }
+      }
+    },
+    "widget.live-activity.after": {
+      "comment": "Suffix indicating time elapsed since the notification. Preserve the leading space in English.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": " elapsed" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "経過" } }
+      }
+    },
+    "widget.live-activity.notification-time": {
+      "comment": "Label for the notification time anchoring the before/after Live Activity display.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notification"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知時刻"
+          }
+        }
+      }
+    },
     "widget.gallery.description": {
       "comment": "Description shown for the upcoming reminders widget in the widget gallery.",
       "extractionState": "manual",

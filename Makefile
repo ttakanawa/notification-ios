@@ -17,6 +17,7 @@ SWIFT_PATHS := \
 	Scripts/validate-localizations.swift
 
 LOCALIZATION_CATALOGS := \
+	NotificationManager/Resources/InfoPlist.xcstrings \
 	NotificationManager/Resources/Common.xcstrings \
 	NotificationManager/Resources/ReminderForm.xcstrings \
 	NotificationManager/Resources/Reminder.xcstrings \

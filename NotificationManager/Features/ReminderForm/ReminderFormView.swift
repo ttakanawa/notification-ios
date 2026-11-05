@@ -171,7 +171,8 @@ struct ReminderFormView: View {
             model.notesFieldIssue?.accessibilityIdentity,
             model.urlFieldIssue?.accessibilityIdentity,
             model.timeZoneFieldIssue?.accessibilityIdentity,
-            model.repeatEndDateFieldIssue?.accessibilityIdentity
+            model.repeatEndDateFieldIssue?.accessibilityIdentity,
+            model.liveActivityWindowFieldIssue?.accessibilityIdentity
         ].compactMap { $0 }
 
         if case .failed(let error) = model.customRepeatState {
@@ -196,6 +197,7 @@ extension ReminderFormFieldIssue {
         case .timeZoneInvalid: .reminderTimeZoneInvalid
         case .repeatEndInvalid: .reminderRepeatEndInvalid
         case .repeatEndBeforeStart: .reminderRepeatEndBeforeStart
+        case .liveActivityWindowInvalid: .reminderLiveActivityWindowInvalid
         }
     }
 }

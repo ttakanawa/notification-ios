@@ -96,6 +96,7 @@ run_validator() {
 
 run_validator_with_widget() {
     source_root=$1
+    shift
     swift "$validator" \
         "$catalog_root/Common.xcstrings" \
         "$catalog_root/ReminderForm.xcstrings" \
@@ -105,6 +106,7 @@ run_validator_with_widget() {
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
         "$catalog_root/Widget.xcstrings" \
+        "$@" \
         --source-root "$source_root"
 }
 
@@ -161,6 +163,21 @@ case "$widget_success_output" in
         exit 1
         ;;
 esac
+
+write_catalog "$catalog_root/InfoPlist.xcstrings" NSAlarmKitUsageDescription "Allow trial alarms"
+info_success_output=$(run_validator_with_widget "$valid_source_root" "$catalog_root/InfoPlist.xcstrings")
+case "$info_success_output" in
+    *"Validated 10 localization keys across 9 catalogs for English and Japanese."*) ;;
+    *)
+        echo "Optional InfoPlist-catalog success summary was not emitted." >&2
+        echo "$info_success_output" >&2
+        exit 1
+        ;;
+esac
+write_catalog "$catalog_root/InfoPlist.xcstrings" settings.wrong-info-key "Wrong table"
+expect_failure_containing \
+    "settings.wrong-info-key: owned by a different catalog, found in InfoPlist." \
+    run_validator_with_widget "$valid_source_root" "$catalog_root/InfoPlist.xcstrings"
 
 missing_app_source_root="$temporary_directory/missing-app-source"
 mkdir -p "$missing_app_source_root"

@@ -479,7 +479,7 @@ struct NotificationRequestMaterializerTests {
             repeatingRequest(components: source)
         ]
         let invalidSchedules: [ScheduleReadState] = [
-            .unsupportedFuture(version: 3, originalData: Data([3])),
+            .unsupportedFuture(version: 4, originalData: Data([4])),
             .corrupt(originalData: Data([0])),
             .domainInvalid(
                 repairSeed: ScheduleRepairSeed(),
