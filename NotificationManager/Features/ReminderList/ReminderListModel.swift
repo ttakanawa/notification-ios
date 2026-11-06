@@ -263,7 +263,7 @@ final class ReminderActionCoordinator {
         return latestSnapshotGeneration > completionGeneration ? nil : previousOverride
     }
 
-    private var isBusy: Bool {
+    var isBusy: Bool {
         switch state {
         case .working, .requiresCapacityConfirmation:
             true

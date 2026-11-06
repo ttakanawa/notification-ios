@@ -207,7 +207,7 @@ final class ReminderFormModel {
         refreshPreview()
     }
 
-    init(
+    convenience init(
         snapshot: ReminderSnapshot,
         savedRepeatPresentation: SavedRepeatPresentation?,
         now: Date,
@@ -220,13 +220,106 @@ final class ReminderFormModel {
             CanonicalRepeatFormatter().string(for: $0.rule)
         }
     ) {
-        let initialDraft = ReminderDraft(snapshot: snapshot)
-        detachedDraft = initialDraft
-        if case .onDate = initialDraft.end {
-            repeatEndsOnDate = true
+        let scheduleAccess: ReminderFormScheduleAccess
+        let requiresReplacementBeforeSave: Bool
+        switch snapshot.schedule {
+        case .valid:
+            scheduleAccess = .editable
+            requiresReplacementBeforeSave = false
+        case .domainInvalid(_, _, let issues):
+            scheduleAccess = .repair(issues: issues)
+            requiresReplacementBeforeSave = true
+        case .unsupportedFuture:
+            scheduleAccess = .readOnly(.updateRequired)
+            requiresReplacementBeforeSave = false
+        case .corrupt:
+            scheduleAccess = .readOnly(.invalidSchedule)
+            requiresReplacementBeforeSave = false
         }
-        earlyReminderChoice = Self.earlyReminderChoice(for: initialDraft.early)
-        canDelete = true
+
+        self.init(
+            initialDraft: ReminderDraft(snapshot: snapshot),
+            scheduleAccess: scheduleAccess,
+            canDelete: true,
+            requiresReplacementBeforeSave: requiresReplacementBeforeSave,
+            savedRepeatPresentation: savedRepeatPresentation,
+            now: now,
+            actions: actions,
+            availableTags: availableTags,
+            defaultTimeZone: defaultTimeZone,
+            recurrenceEnvironment: recurrenceEnvironment,
+            assistedRepeatInterpreter: assistedRepeatInterpreter,
+            localizedRepeatSummary: localizedRepeatSummary
+        )
+    }
+
+    convenience init?(
+        duplicating snapshot: ReminderSnapshot,
+        newReminderID: UUID = UUID(),
+        savedRepeatPresentation: SavedRepeatPresentation? = nil,
+        now: Date,
+        actions: ReminderFormActions,
+        availableTags: [ReminderTagPresentation] = [],
+        defaultTimeZone: TimeZone = .current,
+        recurrenceEnvironment: any RecurrenceEnvironment = FoundationRecurrenceEnvironment(),
+        assistedRepeatInterpreter: any AssistedRepeatInterpreting = NoAssistedRepeatInterpreter(),
+        localizedRepeatSummary: @escaping @Sendable (ScheduleDefinition) -> String = {
+            CanonicalRepeatFormatter().string(for: $0.rule)
+        }
+    ) {
+        guard case .valid(let schedule, _, _) = snapshot.schedule,
+            newReminderID != snapshot.id
+        else {
+            return nil
+        }
+        let timestamps = ReminderDraft(id: newReminderID, now: now)
+        let draft = ReminderDraft(
+            id: newReminderID,
+            title: snapshot.title,
+            notes: snapshot.notes,
+            urlString: snapshot.urlString,
+            enabled: snapshot.enabled,
+            scheduleChange: .replace(schedule),
+            tagIDs: snapshot.tagIDs,
+            createdAt: timestamps.createdAt,
+            updatedAt: timestamps.updatedAt
+        )
+        self.init(
+            initialDraft: draft,
+            scheduleAccess: .editable,
+            canDelete: false,
+            requiresReplacementBeforeSave: true,
+            savedRepeatPresentation: savedRepeatPresentation,
+            now: now,
+            actions: actions,
+            availableTags: availableTags,
+            defaultTimeZone: defaultTimeZone,
+            recurrenceEnvironment: recurrenceEnvironment,
+            assistedRepeatInterpreter: assistedRepeatInterpreter,
+            localizedRepeatSummary: localizedRepeatSummary
+        )
+    }
+
+    private init(
+        initialDraft: ReminderDraft,
+        scheduleAccess: ReminderFormScheduleAccess,
+        canDelete: Bool,
+        requiresReplacementBeforeSave: Bool,
+        savedRepeatPresentation: SavedRepeatPresentation?,
+        now: Date,
+        actions: ReminderFormActions,
+        availableTags: [ReminderTagPresentation] = [],
+        defaultTimeZone: TimeZone = .current,
+        recurrenceEnvironment: any RecurrenceEnvironment = FoundationRecurrenceEnvironment(),
+        assistedRepeatInterpreter: any AssistedRepeatInterpreting = NoAssistedRepeatInterpreter(),
+        localizedRepeatSummary: @escaping @Sendable (ScheduleDefinition) -> String = {
+            CanonicalRepeatFormatter().string(for: $0.rule)
+        }
+    ) {
+        detachedDraft = initialDraft
+        self.scheduleAccess = scheduleAccess
+        self.canDelete = canDelete
+        self.requiresReplacementBeforeSave = requiresReplacementBeforeSave
         self.availableTags = availableTags
         self.actions = actions
         previewNow = now
@@ -234,6 +327,10 @@ final class ReminderFormModel {
         self.assistedRepeatInterpreter = assistedRepeatInterpreter
         self.localizedRepeatSummary = localizedRepeatSummary
         pickerFallbackTimeZone = Self.validatedPickerFallbackTimeZone(defaultTimeZone)
+        if case .onDate = initialDraft.end {
+            repeatEndsOnDate = true
+        }
+        earlyReminderChoice = Self.earlyReminderChoice(for: initialDraft.early)
         currentLocalizedRepeatSummary = savedRepeatPresentation?.localizedSummary
         if case .custom = savedRepeatPresentation {
             currentRepeatWasCustom = true
@@ -255,22 +352,8 @@ final class ReminderFormModel {
             liveActivityAfterMinutes = (afterSeconds + 59) / 60
         }
 
-        switch snapshot.schedule {
-        case .valid:
-            scheduleAccess = .editable
-            requiresReplacementBeforeSave = false
-        case .domainInvalid(_, _, let issues):
-            scheduleAccess = .repair(issues: issues)
-            requiresReplacementBeforeSave = true
-        case .unsupportedFuture:
-            scheduleAccess = .readOnly(.updateRequired)
-            requiresReplacementBeforeSave = false
-        case .corrupt:
-            scheduleAccess = .readOnly(.invalidSchedule)
-            requiresReplacementBeforeSave = false
-        }
-
         refreshPreview()
+        guard canDelete else { return }
         baseline = ReminderFormBaseline(
             draft: detachedDraft,
             editableContent: currentEditableContent,

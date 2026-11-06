@@ -82,6 +82,43 @@ struct ReminderListView: View {
         .background {
             AccessibilityIdentifierContainer(identifier: "reminder-list.root")
         }
+        .alert(
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.delete-confirmation.title",
+                    table: "ReminderForm"
+                )),
+            isPresented: deleteConfirmationPresented,
+            presenting: actions.pendingDeleteID
+        ) { id in
+            Button(role: .destructive) {
+                guard actions.consumeDeleteConfirmation(id) else { return }
+                Task {
+                    await router.performReminderDeletion(id) {
+                        await actions.performConfirmedDelete(id)
+                    }
+                }
+            } label: {
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.delete-confirmation.confirm",
+                        table: "ReminderForm"
+                    ))
+            }
+            .accessibilityIdentifier("reminder-list.delete-confirm")
+            Button(role: .cancel) {
+                actions.cancelDelete(id)
+            } label: {
+                Text(LocalizedStringResource("reminder.action.cancel", table: "Reminder"))
+            }
+            .accessibilityIdentifier("reminder-list.delete-cancel")
+        } message: { _ in
+            Text(
+                LocalizedStringResource(
+                    "reminder.form.delete-confirmation.message",
+                    table: "ReminderForm"
+                ))
+        }
     }
 
     @ViewBuilder
@@ -99,6 +136,7 @@ struct ReminderListView: View {
                         ReminderRowView(item: item)
                     }
                     .buttonStyle(.plain)
+                    .disabled(actions.isBusy)
                     .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
                     .accessibilityAddTraits(
                         router.selectedReminderID == item.id ? .isSelected : []
@@ -116,6 +154,27 @@ struct ReminderListView: View {
                         )
                     }
                 }
+                .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                    if !actions.isBusy {
+                        enabledButton(for: item)
+                            .tint(
+                                actions.enabledValue(for: item.id, fallback: item.enabled)
+                                    ? .orange : .green
+                            )
+                    }
+                }
+                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                    if !actions.isBusy {
+                        deleteButton(for: item)
+                            .tint(.red)
+                        if router.canDuplicate(item.id) {
+                            duplicateButton(for: item)
+                                .tint(.indigo)
+                        }
+                        editButton(for: item)
+                            .tint(.blue)
+                    }
+                }
             }
         } header: {
             Text(title)
@@ -123,6 +182,78 @@ struct ReminderListView: View {
                     AccessibilityIdentifierContainer(identifier: identifier)
                 }
         }
+    }
+
+    private func editButton(for item: ReminderListItemPresentation) -> some View {
+        Button {
+            guard !actions.isBusy else { return }
+            router.showReminder(item.id)
+        } label: {
+            Label(
+                LocalizedStringResource("reminder.action.edit", table: "Reminder"),
+                systemImage: "pencil"
+            )
+        }
+        .disabled(actions.isBusy)
+        .accessibilityIdentifier("reminder-row.edit.\(item.id.uuidString.lowercased())")
+    }
+
+    private func duplicateButton(for item: ReminderListItemPresentation) -> some View {
+        Button {
+            guard !actions.isBusy else { return }
+            router.showDuplicate(item.id)
+        } label: {
+            Label(
+                LocalizedStringResource("reminder.action.duplicate", table: "Reminder"),
+                systemImage: "doc.on.doc"
+            )
+        }
+        .disabled(actions.isBusy)
+        .accessibilityIdentifier("reminder-row.duplicate.\(item.id.uuidString.lowercased())")
+    }
+
+    private func enabledButton(for item: ReminderListItemPresentation) -> some View {
+        let enabled = actions.enabledValue(for: item.id, fallback: item.enabled)
+        return Button {
+            let currentValue = actions.enabledValue(for: item.id, fallback: item.enabled)
+            Task {
+                await actions.setEnabled(!currentValue, for: item.id, fallback: item.enabled)
+            }
+        } label: {
+            Label(
+                LocalizedStringResource(
+                    enabled ? "reminder.action.disable" : "reminder.action.enable",
+                    table: "Reminder"
+                ),
+                systemImage: enabled ? "bell.slash" : "bell"
+            )
+        }
+        .disabled(actions.isBusy)
+        .accessibilityIdentifier("reminder-row.toggle-enabled.\(item.id.uuidString.lowercased())")
+    }
+
+    private func deleteButton(for item: ReminderListItemPresentation) -> some View {
+        Button {
+            actions.requestDelete(item.id)
+        } label: {
+            Label(
+                LocalizedStringResource("reminder.action.delete", table: "Reminder"),
+                systemImage: "trash"
+            )
+        }
+        .disabled(actions.isBusy)
+        .accessibilityIdentifier("reminder-row.delete.\(item.id.uuidString.lowercased())")
+    }
+
+    private var deleteConfirmationPresented: Binding<Bool> {
+        Binding(
+            get: { actions.pendingDeleteID != nil },
+            set: { presented in
+                if !presented, let id = actions.pendingDeleteID {
+                    actions.cancelDelete(id)
+                }
+            }
+        )
     }
 
     private var actionAccessibilityErrors: [AccessibilityErrorIdentity] {

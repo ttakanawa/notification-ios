@@ -29,6 +29,8 @@ final class AppRouter {
     private var formsByID: [UUID: ReminderFormModel] = [:]
     private var persistedReminderIDs: Set<UUID> = []
     @ObservationIgnored private let createForm: @MainActor () -> ReminderFormModel?
+    @ObservationIgnored private let canDuplicateReminder: @MainActor (UUID) -> Bool
+    @ObservationIgnored private let duplicateForm: @MainActor (UUID) -> ReminderFormModel?
     @ObservationIgnored private let reminderSaved: @MainActor @Sendable (UUID) async -> Void
 
     init(
@@ -38,6 +40,8 @@ final class AppRouter {
         tagManagementModel: TagManagementModel? = nil,
         appIconSelectionModel: AppIconSelectionModel? = nil,
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
+        canDuplicateReminder: @escaping @MainActor (UUID) -> Bool = { _ in false },
+        duplicateForm: @escaping @MainActor (UUID) -> ReminderFormModel? = { _ in nil },
         reminderSaved: @escaping @MainActor @Sendable (UUID) async -> Void = { _ in }
     ) {
         self.actions = actions
@@ -46,6 +50,8 @@ final class AppRouter {
         self.tagManagementModel = tagManagementModel
         self.appIconSelectionModel = appIconSelectionModel
         self.createForm = createForm
+        self.canDuplicateReminder = canDuplicateReminder
+        self.duplicateForm = duplicateForm
         self.reminderSaved = reminderSaved
     }
 
@@ -98,6 +104,23 @@ final class AppRouter {
     func showCreate() {
         guard let form = createForm() else { return }
         register(form: form)
+        route(to: .reminderCreate(form.detachedDraft.id))
+    }
+
+    func canDuplicate(_ reminderID: UUID) -> Bool {
+        persistedReminderIDs.contains(reminderID) && canDuplicateReminder(reminderID)
+    }
+
+    func showDuplicate(_ reminderID: UUID) {
+        guard canDuplicate(reminderID),
+            let form = duplicateForm(reminderID),
+            !form.canDelete,
+            formsByID[form.detachedDraft.id] == nil
+        else {
+            return
+        }
+        register(form: form)
+        selectedReminderID = nil
         route(to: .reminderCreate(form.detachedDraft.id))
     }
 
