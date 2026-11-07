@@ -221,6 +221,153 @@ struct ReminderDuplicationTests {
         }
     }
 
+    @Test(arguments: [AppRouterLayout.compact, .regular])
+    func discardingEditorRestoresLatestSavedStateWithoutAnotherPublication(
+        layout: AppRouterLayout
+    ) async throws {
+        let environment = AppEnvironment()
+        let deviceState = await DeviceSchedulingStateStore().snapshot()
+        let source = snapshot()
+        environment.publish(
+            CompleteReminderSnapshot(reminders: [source], tags: []),
+            deviceState: deviceState
+        )
+        environment.router.synchronizeLayout(layout)
+        environment.router.showReminder(source.id)
+        let editor = try #require(environment.router.formModel(for: source.id))
+        editor.title = "Unsaved edit"
+        environment.publish(
+            CompleteReminderSnapshot(reminders: [snapshot(enabled: true)], tags: []),
+            deviceState: deviceState
+        )
+        #expect(editor.hasChanges)
+        #expect(!editor.enabled)
+
+        let confirmations = ReminderFormConfirmationCoordinator()
+        confirmations.requestDiscard(model: editor, router: environment.router)
+        confirmations.confirmAlert()
+        environment.router.showReminder(source.id)
+
+        let reopened = try #require(environment.router.formModel(for: source.id))
+        #expect(!reopened.hasChanges)
+        #expect(reopened.title == source.title)
+        #expect(reopened.enabled)
+        reopened.title = "Only the title changes"
+        #expect(reopened.detachedDraft.enabled)
+    }
+
+    @Test func unchangedPublicationRefreshesEditorAfterRevertingChanges() async throws {
+        let environment = AppEnvironment()
+        let deviceState = await DeviceSchedulingStateStore().snapshot()
+        let source = snapshot()
+        environment.publish(
+            CompleteReminderSnapshot(reminders: [source], tags: []),
+            deviceState: deviceState
+        )
+        let editor = try #require(environment.router.formModel(for: source.id))
+        editor.title = "Unsaved edit"
+        let latest = CompleteReminderSnapshot(reminders: [snapshot(enabled: true)], tags: [])
+        environment.publish(latest, deviceState: deviceState)
+        editor.title = source.title
+        #expect(!editor.hasChanges)
+
+        environment.publish(latest, deviceState: deviceState)
+
+        let refreshed = try #require(environment.router.formModel(for: source.id))
+        #expect(refreshed.enabled)
+        #expect(!refreshed.hasChanges)
+    }
+
+    @Test func reopeningCleanEditorUsesNewestPendingStateWhenSaving() async throws {
+        let source = snapshot()
+        let recorder = DuplicationSaveRecorder()
+        let actions = ReminderFormActions(
+            save: { draft, _, _ in await recorder.save(draft) },
+            delete: { _ in }
+        )
+        let router = AppRouter(actions: actionCoordinator())
+        let editor = ReminderFormModel(
+            snapshot: source, savedRepeatPresentation: nil,
+            now: source.updatedAt, actions: actions
+        )
+        router.register(form: editor)
+        editor.title = "Unsaved edit"
+        for enabled in [false, true] {
+            router.refreshFormIfClean(
+                ReminderFormModel(
+                    snapshot: snapshot(enabled: enabled), savedRepeatPresentation: nil,
+                    now: source.updatedAt, actions: actions
+                ))
+        }
+        #expect(router.formModel(for: source.id) === editor)
+        #expect(editor.title == "Unsaved edit")
+        router.showReminder(source.id)
+        router.dismissReminder(source.id)
+        #expect(router.formModel(for: source.id) === editor)
+        #expect(editor.title == "Unsaved edit")
+        editor.discardChanges()
+
+        router.showReminder(source.id)
+        let reopened = try #require(router.formModel(for: source.id))
+        reopened.title = "Only the title changes"
+        #expect(await reopened.save())
+        let saved = try #require(await recorder.drafts.first)
+        #expect(saved.title == "Only the title changes")
+        #expect(saved.enabled)
+    }
+
+    @Test(arguments: [false, true])
+    func completingReminderClearsPendingEditorRefresh(isDeleted: Bool) {
+        let source = snapshot()
+        let router = AppRouter(actions: actionCoordinator())
+        let editor = ReminderFormModel(
+            snapshot: source, savedRepeatPresentation: nil,
+            now: source.updatedAt, actions: inertActions
+        )
+        router.register(form: editor)
+        editor.title = "Unsaved edit"
+        router.refreshFormIfClean(
+            ReminderFormModel(
+                snapshot: snapshot(enabled: true), savedRepeatPresentation: nil,
+                now: source.updatedAt, actions: inertActions
+            ))
+        if isDeleted {
+            router.reminderWasDeleted(source.id)
+        } else {
+            router.reminderFormWasSaved(source.id)
+        }
+
+        router.refreshPendingFormIfClean(source.id)
+        router.showReminder(source.id)
+        #expect(router.formModel(for: source.id) == nil)
+    }
+
+    @Test func registeringReminderSupersedesPendingEditorRefresh() {
+        let source = snapshot()
+        let router = AppRouter(actions: actionCoordinator())
+        let editor = ReminderFormModel(
+            snapshot: source, savedRepeatPresentation: nil,
+            now: source.updatedAt, actions: inertActions
+        )
+        router.register(form: editor)
+        editor.title = "Unsaved edit"
+        router.refreshFormIfClean(
+            ReminderFormModel(
+                snapshot: snapshot(enabled: true), savedRepeatPresentation: nil,
+                now: source.updatedAt, actions: inertActions
+            ))
+        let replacement = ReminderFormModel(
+            snapshot: source, savedRepeatPresentation: nil,
+            now: source.updatedAt, actions: inertActions
+        )
+        router.register(form: replacement)
+
+        router.showReminder(source.id)
+
+        #expect(router.formModel(for: source.id) === replacement)
+        #expect(!replacement.enabled)
+    }
+
     private var inertActions: ReminderFormActions {
         ReminderFormActions(save: { draft, _, _ in .saved(draft.id) }, delete: { _ in })
     }

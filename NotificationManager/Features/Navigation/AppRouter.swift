@@ -28,6 +28,7 @@ final class AppRouter {
     private(set) var layout: AppRouterLayout = .compact
     private var formsByID: [UUID: ReminderFormModel] = [:]
     private var persistedReminderIDs: Set<UUID> = []
+    @ObservationIgnored private var pendingFormRefreshes: [UUID: ReminderFormModel] = [:]
     @ObservationIgnored private let createForm: @MainActor () -> ReminderFormModel?
     @ObservationIgnored private let canDuplicateReminder: @MainActor (UUID) -> Bool
     @ObservationIgnored private let duplicateForm: @MainActor (UUID) -> ReminderFormModel?
@@ -57,6 +58,7 @@ final class AppRouter {
 
     func register(form: ReminderFormModel) {
         let id = form.detachedDraft.id
+        pendingFormRefreshes.removeValue(forKey: id)
         formsByID[id] = form
         if form.canDelete {
             persistedReminderIDs.insert(id)
@@ -69,10 +71,17 @@ final class AppRouter {
     }
 
     func refreshFormIfClean(_ form: ReminderFormModel) {
-        if let existing = formsByID[form.detachedDraft.id], existing.hasChanges {
+        let id = form.detachedDraft.id
+        if let existing = formsByID[id], existing.hasChanges {
+            pendingFormRefreshes[id] = form
             return
         }
         register(form: form)
+    }
+
+    func refreshPendingFormIfClean(_ reminderID: UUID) {
+        guard let form = pendingFormRefreshes[reminderID] else { return }
+        refreshFormIfClean(form)
     }
 
     func formModel(for reminderID: UUID) -> ReminderFormModel? {
@@ -87,6 +96,7 @@ final class AppRouter {
 
     func showReminder(_ reminderID: UUID) {
         guard persistedReminderIDs.contains(reminderID) else { return }
+        refreshPendingFormIfClean(reminderID)
         selectedReminderID = reminderID
         route(to: .reminderEdit(reminderID))
     }
@@ -99,6 +109,7 @@ final class AppRouter {
         if selectedReminderID == reminderID {
             selectedReminderID = nil
         }
+        refreshPendingFormIfClean(reminderID)
     }
 
     func showCreate() {
@@ -152,6 +163,7 @@ final class AppRouter {
         }
         persistedReminderIDs.remove(reminderID)
         formsByID.removeValue(forKey: reminderID)
+        pendingFormRefreshes.removeValue(forKey: reminderID)
     }
 
     func prunePersistedReminders(keeping currentIDs: Set<UUID>) {
@@ -163,6 +175,7 @@ final class AppRouter {
 
     func reminderFormWasSaved(_ reminderID: UUID) {
         formsByID.removeValue(forKey: reminderID)
+        pendingFormRefreshes.removeValue(forKey: reminderID)
         compactPath.removeAll { $0.formReminderID == reminderID }
         if regularDestination?.formReminderID == reminderID {
             regularDestination = nil

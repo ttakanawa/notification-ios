@@ -647,6 +647,8 @@ final class AppEnvironment {
                     availableTags: presentations,
                     now: now
                 ))
+        } else {
+            router.refreshPendingFormIfClean(reminder.id)
         }
         return item
     }
