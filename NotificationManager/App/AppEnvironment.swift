@@ -203,18 +203,10 @@ final class AppEnvironment {
                 )
             }
         )
-        let formActions = ReminderFormActions(
-            save: { draft, capacity, expired in
-                try await saveUseCase.execute(
-                    draft: draft,
-                    capacityConsent: capacity,
-                    expiredScheduleConsent: expired
-                )
-            },
-            delete: { reminderID in
-                try await deleteUseCase.execute(reminderID: reminderID)
-                await relay.refreshPresentation()
-            }
+        let formActions = makeFormActions(
+            saveUseCase: saveUseCase,
+            deleteUseCase: deleteUseCase,
+            relay: relay
         )
         let actions = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -359,6 +351,26 @@ final class AppEnvironment {
             }
         )
         return environment
+    }
+
+    private static func makeFormActions(
+        saveUseCase: SaveReminderUseCase,
+        deleteUseCase: DeleteReminderUseCase,
+        relay: AppEnvironmentRelay
+    ) -> ReminderFormActions {
+        ReminderFormActions(
+            save: { draft, capacity, expired in
+                try await saveUseCase.execute(
+                    draft: draft,
+                    capacityConsent: capacity,
+                    expiredScheduleConsent: expired
+                )
+            },
+            delete: { reminderID in
+                try await deleteUseCase.execute(reminderID: reminderID)
+                await relay.refreshPresentation()
+            }
+        )
     }
 
     private static func makeLiveActivityPublication() -> LiveActivityPublication {
