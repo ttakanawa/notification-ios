@@ -3,7 +3,10 @@ import XCTest
 final class SettingsRecoveryUITests: XCTestCase {
     @MainActor
     func testListShowsICloudStatusBesideSettingsAndOpensSettings() {
-        let app = launch(scenario: "icloud-status")
+        let app = launch(
+            scenario: "icloud-status",
+            extraArguments: ["-AppleLanguages", "(en)", "-AppleLocale", "en_US"]
+        )
         let status = app.buttons["reminder-list.icloud-status"]
         let settings = app.buttons["reminder-list.settings"]
 
