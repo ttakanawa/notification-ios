@@ -48,6 +48,7 @@ final class AppEnvironment {
         >?
     private var schedulingStateObserver: SchedulingStatePresentationObserver?
     private var liveActivityRefreshTask: Task<Void, Never>?
+    private var latestReminderSnapshots: [UUID: ReminderSnapshot] = [:]
     private var snapshotGeneration: UInt64 = 0
     private var hasStarted = false
     private var notificationHandlingIsActive = false
@@ -202,18 +203,10 @@ final class AppEnvironment {
                 )
             }
         )
-        let formActions = ReminderFormActions(
-            save: { draft, capacity, expired in
-                try await saveUseCase.execute(
-                    draft: draft,
-                    capacityConsent: capacity,
-                    expiredScheduleConsent: expired
-                )
-            },
-            delete: { reminderID in
-                try await deleteUseCase.execute(reminderID: reminderID)
-                await relay.refreshPresentation()
-            }
+        let formActions = makeFormActions(
+            saveUseCase: saveUseCase,
+            deleteUseCase: deleteUseCase,
+            relay: relay
         )
         let actions = ReminderActionCoordinator(
             handlers: ReminderActionHandlers(
@@ -279,6 +272,12 @@ final class AppEnvironment {
                     availableTags: listModel.availableTags,
                     assistedRepeatInterpreter: assistedRepeatInterpreter
                 )
+            },
+            canDuplicateReminder: { reminderID in
+                relay.canDuplicateReminder(reminderID)
+            },
+            duplicateForm: { reminderID in
+                relay.makeDuplicateReminderForm(reminderID)
             },
             reminderSaved: { _ in
                 await relay.refreshPresentation()
@@ -352,6 +351,26 @@ final class AppEnvironment {
             }
         )
         return environment
+    }
+
+    private static func makeFormActions(
+        saveUseCase: SaveReminderUseCase,
+        deleteUseCase: DeleteReminderUseCase,
+        relay: AppEnvironmentRelay
+    ) -> ReminderFormActions {
+        ReminderFormActions(
+            save: { draft, capacity, expired in
+                try await saveUseCase.execute(
+                    draft: draft,
+                    capacityConsent: capacity,
+                    expiredScheduleConsent: expired
+                )
+            },
+            delete: { reminderID in
+                try await deleteUseCase.execute(reminderID: reminderID)
+                await relay.refreshPresentation()
+            }
+        )
     }
 
     private static func makeLiveActivityPublication() -> LiveActivityPublication {
@@ -446,11 +465,21 @@ final class AppEnvironment {
         deviceState: DeviceSchedulingStateSnapshot
     ) {
         let now = Date()
+        let previousReminderSnapshots = latestReminderSnapshots
+        latestReminderSnapshots = Dictionary(
+            uniqueKeysWithValues: snapshot.reminders.map { ($0.id, $0) }
+        )
         let currentIDs = Set(snapshot.reminders.map(\.id))
         router.prunePersistedReminders(keeping: currentIDs)
 
         let items = snapshot.reminders.map {
-            register($0, tags: snapshot.tags, deviceState: deviceState, now: now)
+            register(
+                $0,
+                tags: snapshot.tags,
+                deviceState: deviceState,
+                now: now,
+                refreshCleanForm: previousReminderSnapshots[$0.id] != $0
+            )
         }
         snapshotGeneration &+= 1
         let generation = snapshotGeneration
@@ -533,7 +562,8 @@ final class AppEnvironment {
         _ reminder: ReminderSnapshot,
         tags: [TagSnapshot],
         deviceState: DeviceSchedulingStateSnapshot,
-        now: Date
+        now: Date,
+        refreshCleanForm: Bool
     ) -> ReminderListItemPresentation {
         let presentations = Self.selectedTagPresentations(
             for: reminder,
@@ -609,14 +639,16 @@ final class AppEnvironment {
             earliestGroupOutcome: displayedEarliestOutcome,
             updatedAt: reminder.updatedAt
         )
-        if router.formModel(for: reminder.id) == nil {
-            router.registerFormIfAbsent(
+        if refreshCleanForm || router.formModel(for: reminder.id) == nil {
+            router.refreshFormIfClean(
                 makeReminderForm(
                     reminder,
                     savedRepeatSummary: repeatSummary,
                     availableTags: presentations,
                     now: now
                 ))
+        } else {
+            router.refreshPendingFormIfClean(reminder.id)
         }
         return item
     }
@@ -633,6 +665,24 @@ final class AppEnvironment {
             now: now,
             actions: formActions,
             availableTags: availableTags,
+            assistedRepeatInterpreter: assistedRepeatInterpreter
+        )
+    }
+
+    fileprivate func canDuplicateReminder(_ reminderID: UUID) -> Bool {
+        latestReminderSnapshots[reminderID]?.validSchedule != nil
+    }
+
+    fileprivate func makeDuplicateReminderForm(_ reminderID: UUID) -> ReminderFormModel? {
+        guard let reminder = latestReminderSnapshots[reminderID] else { return nil }
+        return ReminderFormModel(
+            duplicating: reminder,
+            savedRepeatPresentation: Self.repeatSummary(for: reminder).map(
+                SavedRepeatPresentation.standard
+            ),
+            now: Date(),
+            actions: formActions,
+            availableTags: listModel.availableTags,
             assistedRepeatInterpreter: assistedRepeatInterpreter
         )
     }
@@ -900,6 +950,14 @@ private enum AppEnvironmentError: Error {
 @MainActor
 private final class AppEnvironmentRelay {
     weak var environment: AppEnvironment?
+
+    func canDuplicateReminder(_ reminderID: UUID) -> Bool {
+        environment?.canDuplicateReminder(reminderID) ?? false
+    }
+
+    func makeDuplicateReminderForm(_ reminderID: UUID) -> ReminderFormModel? {
+        environment?.makeDuplicateReminderForm(reminderID)
+    }
 
     func refreshPresentation() async {
         await environment?.refreshPresentation()

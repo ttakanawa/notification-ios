@@ -31,6 +31,7 @@
             let scenario = scenarioName(in: arguments)
             let fixture = fixture(for: scenario)
             let enabledCapacityAction = Task14EnabledCapacityAction()
+            let listActions = Task14ListActionRelay()
             let actionCoordinator = ReminderActionCoordinator(
                 handlers: ReminderActionHandlers(
                     setEnabled: { command in
@@ -39,7 +40,7 @@
                         }
                         return .saved(command.reminderID)
                     },
-                    delete: { _ in }
+                    delete: { id in await listActions.delete(id) }
                 )
             )
             let listModel = ReminderListModel(
@@ -50,6 +51,7 @@
                 ),
                 actions: actionCoordinator
             )
+            listActions.model = listModel
             let createForm: @MainActor @Sendable () -> ReminderFormModel? =
                 switch scenario {
                 case "empty-list":
@@ -71,7 +73,23 @@
             let router = AppRouter(
                 actions: actionCoordinator,
                 tagManagementModel: tagModel,
-                createForm: createForm
+                createForm: createForm,
+                canDuplicateReminder: { id in
+                    guard let snapshot = fixture.snapshots.first(where: { $0.id == id }),
+                        case .valid = snapshot.schedule
+                    else { return false }
+                    return true
+                },
+                duplicateForm: { id in
+                    guard let snapshot = fixture.snapshots.first(where: { $0.id == id })
+                    else { return nil }
+                    return ReminderFormModel(
+                        duplicating: snapshot,
+                        savedRepeatPresentation: .standard(localizedSummary: "Every week"),
+                        now: evaluationNow,
+                        actions: inertFormActions
+                    )
+                }
             )
 
             for form in fixture.forms {
@@ -167,7 +185,8 @@
             )
             return Task14ScenarioFixture(
                 items: [item],
-                forms: [form]
+                forms: [form],
+                snapshots: [snapshot]
             )
         }
 
@@ -194,7 +213,8 @@
             )
             return Task14ScenarioFixture(
                 items: [item],
-                forms: [form]
+                forms: [form],
+                snapshots: [snapshot]
             )
         }
 
@@ -273,7 +293,8 @@
                         now: evaluationNow,
                         actions: inertFormActions
                     )
-                ]
+                ],
+                snapshots: [snapshot]
             )
         }
 
@@ -593,6 +614,21 @@
         }
     }
 
+    @MainActor
+    private final class Task14ListActionRelay {
+        weak var model: ReminderListModel?
+
+        func delete(_ reminderID: UUID) {
+            guard let model else { return }
+            model.publish(
+                ReminderListSnapshot(
+                    generation: model.snapshot.generation + 1,
+                    items: model.items.filter { $0.id != reminderID },
+                    availableTags: model.availableTags
+                ))
+        }
+    }
+
     private actor Task14DelayedTagRepository: ReminderRepository {
         let base: SwiftDataReminderRepository
 
@@ -637,5 +673,16 @@
     private struct Task14ScenarioFixture {
         let items: [ReminderListItemPresentation]
         let forms: [ReminderFormModel]
+        let snapshots: [ReminderSnapshot]
+
+        init(
+            items: [ReminderListItemPresentation],
+            forms: [ReminderFormModel],
+            snapshots: [ReminderSnapshot] = []
+        ) {
+            self.items = items
+            self.forms = forms
+            self.snapshots = snapshots
+        }
     }
 #endif
