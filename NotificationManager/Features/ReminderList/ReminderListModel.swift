@@ -39,9 +39,21 @@ final class ReminderActionCoordinator {
     private var confirmedDeleteID: UUID?
     private var actionGeneration: UInt64 = 0
     private var latestSnapshotGeneration: UInt64?
+    private var isFormPersistenceOperationInFlight = false
 
     init(handlers: ReminderActionHandlers) {
         self.handlers = handlers
+    }
+
+    func beginFormPersistenceOperation() -> Bool {
+        // Form saves and list actions both write the full reminder metadata.
+        guard !isBusy else { return false }
+        isFormPersistenceOperationInFlight = true
+        return true
+    }
+
+    func endFormPersistenceOperation() {
+        isFormPersistenceOperationInFlight = false
     }
 
     var enabledCapacityConfirmation: (reminderID: UUID, warning: CapacityWarning)? {
@@ -264,11 +276,12 @@ final class ReminderActionCoordinator {
     }
 
     var isBusy: Bool {
+        if isFormPersistenceOperationInFlight { return true }
         switch state {
         case .working, .requiresCapacityConfirmation:
-            true
+            return true
         default:
-            false
+            return false
         }
     }
 }

@@ -17,9 +17,10 @@ final class ReminderFormConfirmationCoordinator {
     @ObservationIgnored private var alertContext: Context?
     @ObservationIgnored private var capacityContext: Context?
     @ObservationIgnored private var pendingCapacityConfirmationContext: Context?
+    @ObservationIgnored private var persistenceActions: ReminderActionCoordinator?
 
     func save(model: ReminderFormModel, router: AppRouter) {
-        guard canAcceptRequest, beginPersistenceOperation() else { return }
+        guard canAcceptRequest, beginPersistenceOperation(router: router) else { return }
         let context = Context(model: model, router: router)
         Task { @MainActor in
             await router.performReminderSave(model.detachedDraft.id) {
@@ -53,7 +54,7 @@ final class ReminderFormConfirmationCoordinator {
 
         switch alertKind {
         case .expiredSchedule:
-            guard beginPersistenceOperation() else { return }
+            guard beginPersistenceOperation(router: context.router) else { return }
             guard context.model.consumeExpiredScheduleConfirmation() else {
                 finishWithoutPresentation()
                 return
@@ -66,7 +67,7 @@ final class ReminderFormConfirmationCoordinator {
                 synchronizePresentation(for: context)
             }
         case .delete:
-            guard beginPersistenceOperation() else { return }
+            guard beginPersistenceOperation(router: context.router) else { return }
             guard context.model.consumeDeleteConfirmation() else {
                 finishWithoutPresentation()
                 return
@@ -95,7 +96,7 @@ final class ReminderFormConfirmationCoordinator {
 
     func confirmCapacity() {
         guard let context = capacityContext,
-            beginPersistenceOperation()
+            beginPersistenceOperation(router: context.router)
         else {
             return
         }
@@ -130,14 +131,23 @@ final class ReminderFormConfirmationCoordinator {
             && pendingCapacityConfirmationContext == nil
     }
 
-    private func beginPersistenceOperation() -> Bool {
-        guard !isPersistenceOperationInFlight else { return false }
+    private func beginPersistenceOperation(router: AppRouter) -> Bool {
+        guard !isPersistenceOperationInFlight,
+            router.actions.beginFormPersistenceOperation()
+        else { return false }
+        persistenceActions = router.actions
         isPersistenceOperationInFlight = true
         return true
     }
 
-    private func synchronizePresentation(for context: Context) {
+    private func endPersistenceOperation() {
+        persistenceActions?.endFormPersistenceOperation()
+        persistenceActions = nil
         isPersistenceOperationInFlight = false
+    }
+
+    private func synchronizePresentation(for context: Context) {
+        endPersistenceOperation()
         capacityWarning = nil
         alertKind = nil
         capacityContext = nil
@@ -181,7 +191,7 @@ final class ReminderFormConfirmationCoordinator {
     }
 
     private func finishWithoutPresentation() {
-        isPersistenceOperationInFlight = false
+        endPersistenceOperation()
         clearAlertPresentation()
     }
 

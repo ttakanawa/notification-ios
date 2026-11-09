@@ -141,6 +141,7 @@ struct ReminderFormView: View {
 
     private var isFormMutationInFlight: Bool {
         confirmations.isPersistenceOperationInFlight
+            || router.actions.isBusy
             || model.saveState == .saving
             || tagModel?.isWorking == true
     }
