@@ -81,6 +81,30 @@
         }
       }
     },
+    "reminder.action.disable": {
+      "comment": "Turns off a reminder from its leading swipe action.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Disable" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "無効にする" } }
+      }
+    },
+    "reminder.action.duplicate": {
+      "comment": "Opens a new unsaved reminder with the saved reminder's content.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Duplicate" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "複製" } }
+      }
+    },
+    "reminder.action.enable": {
+      "comment": "Turns on a reminder from its leading swipe action.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": { "stringUnit": { "state": "translated", "value": "Enable" } },
+        "ja": { "stringUnit": { "state": "translated", "value": "有効にする" } }
+      }
+    },
     "reminder.action.delete-failed": {
       "comment": "User-facing text for the semantic key reminder.action.delete-failed.",
       "extractionState": "manual",

@@ -28,7 +28,10 @@ final class AppRouter {
     private(set) var layout: AppRouterLayout = .compact
     private var formsByID: [UUID: ReminderFormModel] = [:]
     private var persistedReminderIDs: Set<UUID> = []
+    @ObservationIgnored private var pendingFormRefreshes: [UUID: ReminderFormModel] = [:]
     @ObservationIgnored private let createForm: @MainActor () -> ReminderFormModel?
+    @ObservationIgnored private let canDuplicateReminder: @MainActor (UUID) -> Bool
+    @ObservationIgnored private let duplicateForm: @MainActor (UUID) -> ReminderFormModel?
     @ObservationIgnored private let reminderSaved: @MainActor @Sendable (UUID) async -> Void
 
     init(
@@ -38,6 +41,8 @@ final class AppRouter {
         tagManagementModel: TagManagementModel? = nil,
         appIconSelectionModel: AppIconSelectionModel? = nil,
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
+        canDuplicateReminder: @escaping @MainActor (UUID) -> Bool = { _ in false },
+        duplicateForm: @escaping @MainActor (UUID) -> ReminderFormModel? = { _ in nil },
         reminderSaved: @escaping @MainActor @Sendable (UUID) async -> Void = { _ in }
     ) {
         self.actions = actions
@@ -46,11 +51,14 @@ final class AppRouter {
         self.tagManagementModel = tagManagementModel
         self.appIconSelectionModel = appIconSelectionModel
         self.createForm = createForm
+        self.canDuplicateReminder = canDuplicateReminder
+        self.duplicateForm = duplicateForm
         self.reminderSaved = reminderSaved
     }
 
     func register(form: ReminderFormModel) {
         let id = form.detachedDraft.id
+        pendingFormRefreshes.removeValue(forKey: id)
         formsByID[id] = form
         if form.canDelete {
             persistedReminderIDs.insert(id)
@@ -63,10 +71,17 @@ final class AppRouter {
     }
 
     func refreshFormIfClean(_ form: ReminderFormModel) {
-        if let existing = formsByID[form.detachedDraft.id], existing.hasChanges {
+        let id = form.detachedDraft.id
+        if let existing = formsByID[id], existing.hasChanges {
+            pendingFormRefreshes[id] = form
             return
         }
         register(form: form)
+    }
+
+    func refreshPendingFormIfClean(_ reminderID: UUID) {
+        guard let form = pendingFormRefreshes[reminderID] else { return }
+        refreshFormIfClean(form)
     }
 
     func formModel(for reminderID: UUID) -> ReminderFormModel? {
@@ -81,6 +96,7 @@ final class AppRouter {
 
     func showReminder(_ reminderID: UUID) {
         guard persistedReminderIDs.contains(reminderID) else { return }
+        refreshPendingFormIfClean(reminderID)
         selectedReminderID = reminderID
         route(to: .reminderEdit(reminderID))
     }
@@ -93,11 +109,29 @@ final class AppRouter {
         if selectedReminderID == reminderID {
             selectedReminderID = nil
         }
+        refreshPendingFormIfClean(reminderID)
     }
 
     func showCreate() {
         guard let form = createForm() else { return }
         register(form: form)
+        route(to: .reminderCreate(form.detachedDraft.id))
+    }
+
+    func canDuplicate(_ reminderID: UUID) -> Bool {
+        persistedReminderIDs.contains(reminderID) && canDuplicateReminder(reminderID)
+    }
+
+    func showDuplicate(_ reminderID: UUID) {
+        guard canDuplicate(reminderID),
+            let form = duplicateForm(reminderID),
+            !form.canDelete,
+            formsByID[form.detachedDraft.id] == nil
+        else {
+            return
+        }
+        register(form: form)
+        selectedReminderID = nil
         route(to: .reminderCreate(form.detachedDraft.id))
     }
 
@@ -129,6 +163,7 @@ final class AppRouter {
         }
         persistedReminderIDs.remove(reminderID)
         formsByID.removeValue(forKey: reminderID)
+        pendingFormRefreshes.removeValue(forKey: reminderID)
     }
 
     func prunePersistedReminders(keeping currentIDs: Set<UUID>) {
@@ -140,6 +175,7 @@ final class AppRouter {
 
     func reminderFormWasSaved(_ reminderID: UUID) {
         formsByID.removeValue(forKey: reminderID)
+        pendingFormRefreshes.removeValue(forKey: reminderID)
         compactPath.removeAll { $0.formReminderID == reminderID }
         if regularDestination?.formReminderID == reminderID {
             regularDestination = nil
