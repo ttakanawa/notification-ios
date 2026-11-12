@@ -45,7 +45,7 @@ struct TagPickerView: View {
                         Label {
                             Text(verbatim: tag.name)
                         } icon: {
-                            Image(systemName: "tag")
+                            AppSymbolTile(systemName: "tag.fill", color: .purple)
                         }
                         .foregroundStyle(.primary)
 
@@ -58,7 +58,9 @@ struct TagPickerView: View {
                         )
                         .foregroundStyle(isSelected ? Color.red : Color.accentColor)
                         .imageScale(.large)
+                        .accessibilityHidden(true)
                     }
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
@@ -67,6 +69,7 @@ struct TagPickerView: View {
                     Text(verbatim: actionText(for: tag, isSelected: isSelected))
                 )
                 .accessibilityIdentifier("tags.picker.tag.\(tag.id.uuidString.lowercased())")
+                .accessibilityAddTraits(isSelected ? .isSelected : [])
             }
 
             if let creationName = suggestions.creationName {

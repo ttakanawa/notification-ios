@@ -12,192 +12,33 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                Toggle(
-                    LocalizedStringResource(
-                        "settings.notifications.this-device",
-                        table: "Settings"
-                    ),
-                    isOn: notificationsEnabledBinding
-                )
-                .disabled(model.isWorking)
-                .accessibilityIdentifier("settings.notifications-this-device")
-
-                Text(
-                    LocalizedStringResource(
-                        "settings.notifications.explanation",
-                        table: "Settings"
-                    )
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-
-                LabeledContent {
-                    Text(model.authorization.rawStatus.localizedResource)
-                        .accessibilityIdentifier("settings.authorization-status")
-                } label: {
-                    Text(
-                        LocalizedStringResource(
-                            "settings.authorization.title",
-                            table: "Settings"
-                        ))
-                }
-
-                Text(verbatim: authorizationRawValue)
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("settings.authorization-raw-value")
-
-                Button {
-                    openNotificationSettings()
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.open-os-settings",
-                            table: "Settings"
-                        ),
-                        systemImage: "gear"
-                    )
-                }
-                .accessibilityIdentifier("settings.open-os-settings")
-
-                if let error = model.actionError {
-                    Label(
-                        error.localizedResource,
-                        systemImage: "exclamationmark.triangle"
-                    )
-                    .foregroundStyle(.red)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("settings.action-error")
-                }
-            } header: {
-                Text(
-                    LocalizedStringResource(
-                        "settings.section.notifications",
-                        table: "Settings"
-                    ))
-            }
-
-            Section(
-                LocalizedStringResource(
-                    "settings.section.appearance",
-                    table: "Settings"
-                )
-            ) {
-                NavigationLink {
-                    AppIconPickerView(model: appIconModel)
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.app-icon",
-                            table: "Settings"
-                        ),
-                        systemImage: "app"
-                    )
-                }
-                .accessibilityIdentifier("settings.app-icon")
-            }
-
-            Section(
-                LocalizedStringResource(
-                    "settings.section.organization",
-                    table: "Settings"
-                )
-            ) {
-                NavigationLink {
-                    TagManagementView(model: tagModel)
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.tags",
-                            table: "Settings"
-                        ),
-                        systemImage: "tag"
-                    )
-                }
-                .accessibilityIdentifier("settings.tags")
-
-                NavigationLink {
-                    AboutPrivacyView()
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.about-privacy",
-                            table: "Settings"
-                        ),
-                        systemImage: "hand.raised"
-                    )
-                }
-                .accessibilityIdentifier("settings.about-privacy")
-            }
+            notificationSection
+            appearanceSection
+            organizationSection
+            iCloudSection
 
             if #available(iOS 26.0, *) {
                 Section {
                     NavigationLink {
                         AlarmKitTrialView()
                     } label: {
-                        Label(
-                            LocalizedStringResource(
+                        AppRowLabel(
+                            title: LocalizedStringResource(
                                 "settings.alarmkit-trial.link", table: "Settings"),
-                            systemImage: "alarm")
+                            systemImage: "alarm.fill", color: .orange)
                     }
                     .accessibilityIdentifier("settings.alarmkit-trial")
                 }
             }
-
-            Section {
-                LabeledContent {
-                    accountStatusValue
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.icloud.account.title",
-                            table: "Settings"
-                        ),
-                        systemImage: "person.crop.circle"
-                    )
-                }
-
-                LabeledContent {
-                    syncActivityValue
-                } label: {
-                    Label(
-                        LocalizedStringResource(
-                            "settings.icloud.activity.title",
-                            table: "Settings"
-                        ),
-                        systemImage: "arrow.triangle.2.circlepath"
-                    )
-                }
-
-                Text(
-                    LocalizedStringResource(
-                        "settings.icloud.explanation",
-                        table: "Settings"
-                    )
-                )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .accessibilityIdentifier("settings.icloud.explanation")
-            } header: {
-                Text(
-                    LocalizedStringResource(
-                        "settings.section.icloud",
-                        table: "Settings"
-                    ))
-            }
-            .background {
-                AccessibilityIdentifierContainer(identifier: "settings.icloud.section")
-            }
         }
+        .formStyle(.grouped)
         .navigationTitle(
             LocalizedStringResource(
                 "settings.title",
                 table: "Settings"
             )
         )
+        .navigationBarTitleDisplayMode(.inline)
         .task {
             await model.load()
             await iCloudModel.refreshAccountAvailability()
@@ -205,6 +46,151 @@ struct SettingsView: View {
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {
             AccessibilityIdentifierContainer(identifier: "settings.root")
+        }
+    }
+
+    private var notificationSection: some View {
+        Section {
+            Toggle(isOn: notificationsEnabledBinding) {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "settings.notifications.this-device", table: "Settings"),
+                    systemImage: "bell.badge.fill", color: .red)
+            }
+            .disabled(model.isWorking)
+            .accessibilityIdentifier("settings.notifications-this-device")
+
+            LabeledContent {
+                Text(model.authorization.rawStatus.localizedResource)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("settings.authorization-status")
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "settings.authorization.title", table: "Settings"),
+                    systemImage: "checkmark.shield.fill", color: .green)
+            }
+
+            Button {
+                openNotificationSettings()
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "settings.open-os-settings", table: "Settings"),
+                    systemImage: "gearshape.fill", color: .gray)
+            }
+            .accessibilityIdentifier("settings.open-os-settings")
+
+            if let error = model.actionError {
+                Label(
+                    error.localizedResource,
+                    systemImage: "exclamationmark.triangle"
+                )
+                .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityIdentifier("settings.action-error")
+            }
+        } header: {
+            Text(
+                LocalizedStringResource(
+                    "settings.section.notifications",
+                    table: "Settings"
+                ))
+        } footer: {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(
+                    LocalizedStringResource(
+                        "settings.notifications.explanation", table: "Settings"))
+                Text(verbatim: authorizationRawValue)
+                    .font(.caption.monospacedDigit())
+                    .accessibilityIdentifier("settings.authorization-raw-value")
+            }
+            .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var appearanceSection: some View {
+        Section(
+            LocalizedStringResource(
+                "settings.section.appearance",
+                table: "Settings"
+            )
+        ) {
+            NavigationLink {
+                AppIconPickerView(model: appIconModel)
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource("settings.app-icon", table: "Settings"),
+                    systemImage: "app.fill", color: .indigo)
+            }
+            .accessibilityIdentifier("settings.app-icon")
+        }
+    }
+
+    private var organizationSection: some View {
+        Section(
+            LocalizedStringResource(
+                "settings.section.organization",
+                table: "Settings"
+            )
+        ) {
+            NavigationLink {
+                TagManagementView(model: tagModel)
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource("settings.tags", table: "Settings"),
+                    systemImage: "tag.fill", color: .orange)
+            }
+            .accessibilityIdentifier("settings.tags")
+
+            NavigationLink {
+                AboutPrivacyView()
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource("settings.about-privacy", table: "Settings"),
+                    systemImage: "hand.raised.fill", color: .blue)
+            }
+            .accessibilityIdentifier("settings.about-privacy")
+        }
+    }
+
+    private var iCloudSection: some View {
+        Section {
+            LabeledContent {
+                accountStatusValue
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "settings.icloud.account.title", table: "Settings"),
+                    systemImage: "icloud.fill", color: .blue)
+            }
+
+            LabeledContent {
+                syncActivityValue
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "settings.icloud.activity.title", table: "Settings"),
+                    systemImage: "arrow.triangle.2.circlepath", color: .teal)
+            }
+        } header: {
+            Text(
+                LocalizedStringResource(
+                    "settings.section.icloud",
+                    table: "Settings"
+                ))
+        } footer: {
+            Text(
+                LocalizedStringResource(
+                    "settings.icloud.explanation",
+                    table: "Settings"
+                )
+            )
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityIdentifier("settings.icloud.explanation")
+        }
+        .background {
+            AccessibilityIdentifierContainer(identifier: "settings.icloud.section")
         }
     }
 

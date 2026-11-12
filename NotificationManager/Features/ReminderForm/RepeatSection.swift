@@ -30,11 +30,14 @@ struct RepeatSection: View {
                         .disabled(choice.requiresSourceDate && model.sourceDate == nil)
                 }
             } label: {
-                Text(
-                    LocalizedStringResource(
+                AppRowLabel(
+                    title: LocalizedStringResource(
                         "reminder.field.repeat",
                         table: "ReminderForm"
-                    ))
+                    ),
+                    systemImage: "repeat",
+                    color: .green
+                )
             }
             .disabled(!model.scheduleFieldsAreEditable)
             .accessibilityIdentifier("reminder-form.repeat-picker")
@@ -72,11 +75,14 @@ struct RepeatSection: View {
                         )
                     ).tag(true)
                 } label: {
-                    Text(
-                        LocalizedStringResource(
+                    AppRowLabel(
+                        title: LocalizedStringResource(
                             "reminder.field.repeat-end",
                             table: "ReminderForm"
-                        ))
+                        ),
+                        systemImage: "calendar.badge.checkmark",
+                        color: .red
+                    )
                 }
                 .disabled(!model.scheduleFieldsAreEditable)
                 .accessibilityIdentifier("reminder-form.repeat-end-picker")

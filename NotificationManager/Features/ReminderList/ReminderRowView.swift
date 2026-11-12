@@ -4,41 +4,47 @@ import SwiftUI
 struct ReminderRowView: View {
     @Environment(\.locale) private var locale
     @Environment(\.timeZone) private var deviceTimeZone
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let item: ReminderListItemPresentation
 
     private let scheduleFormatter = CompactScheduleTimeFormatter()
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(verbatim: item.title)
-                .font(.headline)
-                .multilineTextAlignment(.leading)
+        HStack(alignment: .center, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text(verbatim: item.title)
+                    .font(.headline)
+                    .multilineTextAlignment(.leading)
 
-            if let notes = item.displayNotes {
-                Text(verbatim: notes)
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .accessibilityIdentifier("reminder-row.notes")
-            }
+                if let notes = item.displayNotes {
+                    Text(verbatim: notes)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                        .accessibilityIdentifier("reminder-row.notes")
+                }
 
-            if item.nextPresentation != nil || item.displayRepeatSummary != nil {
-                CompactScheduleLineView(
-                    presentation: item.nextPresentation.map { nextPresentation in
-                        scheduleFormatter.presentation(
-                            for: nextPresentation.authoritativeAlertInstant,
-                            sourceTimeZoneIdentifier: item.sourceWallClock?.timeZoneIdentifier,
-                            locale: locale,
-                            deviceTimeZone: deviceTimeZone
-                        )
-                    },
-                    localizedRepeatSummary: item.displayRepeatSummary
-                )
+                if item.nextPresentation != nil || item.displayRepeatSummary != nil {
+                    CompactScheduleLineView(
+                        presentation: item.nextPresentation.map { nextPresentation in
+                            scheduleFormatter.presentation(
+                                for: nextPresentation.authoritativeAlertInstant,
+                                sourceTimeZoneIdentifier: item.sourceWallClock?.timeZoneIdentifier,
+                                locale: locale,
+                                deviceTimeZone: deviceTimeZone
+                            )
+                        },
+                        localizedRepeatSummary: item.displayRepeatSummary
+                    )
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Image(systemName: "chevron.forward")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+                .accessibilityHidden(true)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
         .contentShape(.rect)
-        .padding(.vertical, 4)
     }
 
 }

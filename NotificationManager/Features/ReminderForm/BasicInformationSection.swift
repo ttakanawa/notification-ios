@@ -12,6 +12,8 @@ struct BasicInformationSection: View {
                         table: "ReminderForm"
                     ))
             }
+            .font(.title3.weight(.semibold))
+            .padding(.vertical, 4)
             .textInputAutocapitalization(.sentences)
             .accessibilityIdentifier("reminder-form.title")
 
@@ -26,23 +28,31 @@ struct BasicInformationSection: View {
                         table: "ReminderForm"
                     ))
             }
-            .lineLimit(3...8)
+            .lineLimit(2...8)
+            .textInputAutocapitalization(.sentences)
             .accessibilityIdentifier("reminder-form.notes")
 
             if let issue = model.notesFieldIssue {
                 fieldError(issue, identifier: "reminder-form.notes-error")
             }
 
-            TextField(text: optionalTextBinding(\.urlString)) {
-                Text(
-                    LocalizedStringResource(
-                        "reminder.field.url",
-                        table: "ReminderForm"
-                    ))
+            HStack(spacing: 12) {
+                Image(systemName: "link")
+                    .foregroundStyle(.secondary)
+                    .accessibilityHidden(true)
+
+                TextField(text: optionalTextBinding(\.urlString)) {
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.field.url",
+                            table: "ReminderForm"
+                        ))
+                }
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .keyboardType(.URL)
+                .accessibilityIdentifier("reminder-form.url")
             }
-            .textInputAutocapitalization(.never)
-            .keyboardType(.URL)
-            .accessibilityIdentifier("reminder-form.url")
 
             if let issue = model.urlFieldIssue {
                 fieldError(issue, identifier: "reminder-form.url-error")
@@ -77,6 +87,7 @@ struct BasicInformationSection: View {
         identifier: String
     ) -> some View {
         Label(issue.localizedResource, systemImage: "exclamationmark.triangle")
+            .font(.footnote)
             .foregroundStyle(.red)
             .fixedSize(horizontal: false, vertical: true)
             .accessibilityIdentifier(identifier)

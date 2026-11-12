@@ -6,17 +6,21 @@ struct EarlyReminderSection: View {
 
     var body: some View {
         Section {
-            Picker(
-                LocalizedStringResource(
-                    "reminder.field.early-reminder",
-                    table: "ReminderForm"
-                ), selection: earlyChoiceBinding
-            ) {
+            Picker(selection: earlyChoiceBinding) {
                 ForEach(EarlyReminderChoice.allCases) { choice in
                     Text(choice.localizedResource)
                         .accessibilityIdentifier(choice.accessibilityIdentifier)
                         .tag(choice)
                 }
+            } label: {
+                AppRowLabel(
+                    title: LocalizedStringResource(
+                        "reminder.field.early-reminder",
+                        table: "ReminderForm"
+                    ),
+                    systemImage: "bell.badge.fill",
+                    color: .orange
+                )
             }
             .disabled(!model.scheduleFieldsAreEditable)
             .accessibilityIdentifier("reminder-form.early-choice")
@@ -54,12 +58,16 @@ struct EarlyReminderSection: View {
                     .accessibilityIdentifier("reminder-form.early-unit")
                 }
 
-                Toggle(
-                    LocalizedStringResource(
-                        "reminder.field.main-notification",
-                        table: "ReminderForm"
-                    ), isOn: mainEnabledBinding(early)
-                )
+                Toggle(isOn: mainEnabledBinding(early)) {
+                    AppRowLabel(
+                        title: LocalizedStringResource(
+                            "reminder.field.main-notification",
+                            table: "ReminderForm"
+                        ),
+                        systemImage: "bell.fill",
+                        color: .red
+                    )
+                }
                 .disabled(!model.scheduleFieldsAreEditable)
                 .accessibilityIdentifier("reminder-form.main-enabled")
             }

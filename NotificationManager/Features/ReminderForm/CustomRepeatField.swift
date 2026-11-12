@@ -48,6 +48,8 @@ struct CustomRepeatField: View {
             ) {
                 Task { await model.submitCustomRepeat() }
             }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
             .disabled(
                 model.customRepeatText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     || model.isInterpretingWithAppleIntelligence
@@ -59,6 +61,8 @@ struct CustomRepeatField: View {
                 EmptyView()
             case .failed(let error):
                 Label(error.localizedResource, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.red)
                     .fixedSize(horizontal: false, vertical: true)
                     .accessibilityIdentifier("reminder-form.custom.error")
             case .awaitingSuggestions(let suggestions):
@@ -78,6 +82,7 @@ struct CustomRepeatField: View {
                             Text(verbatim: suggestion)
                         }
                         .buttonStyle(.bordered)
+                        .controlSize(.large)
                         .accessibilityIdentifier("reminder-form.custom.suggestion-\(index)")
                     }
                     Button(
@@ -89,6 +94,7 @@ struct CustomRepeatField: View {
                         Task { await model.interpretCustomRepeatWithAppleIntelligence() }
                     }
                     .buttonStyle(.bordered)
+                    .controlSize(.large)
                     .accessibilityIdentifier("reminder-form.custom.assisted")
                     .disabled(model.isInterpretingWithAppleIntelligence)
                 }
@@ -103,13 +109,16 @@ struct CustomRepeatField: View {
                     Task { await model.confirmCustomRepeat() }
                 }
                 .buttonStyle(.borderedProminent)
+                .controlSize(.large)
                 .accessibilityIdentifier("reminder-form.custom.apply")
             case .confirmed(let preview):
                 Label(
                     LocalizedStringResource(
                         "reminder.form.custom.applied",
                         table: "ReminderForm"
-                    ), systemImage: "checkmark.circle")
+                    ), systemImage: "checkmark.circle"
+                )
+                .foregroundStyle(.green)
                 Text(verbatim: preview.canonicalEnglish)
                     .font(.caption)
             }

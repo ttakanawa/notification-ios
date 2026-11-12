@@ -8,8 +8,8 @@ struct ReminderLiveActivityWidget: Widget {
         ActivityConfiguration(for: ReminderActivityAttributes.self) { context in
             ReminderLiveActivityContent(context: context)
                 .padding()
-                .activityBackgroundTint(.black.opacity(0.9))
-                .activitySystemActionForegroundColor(.white)
+                .activityBackgroundTint(Color(uiColor: .secondarySystemGroupedBackground))
+                .activitySystemActionForegroundColor(.blue)
                 .widgetURL(
                     PunctualDeepLinkCodec().url(for: .reminder(context.attributes.reminderID)))
         } dynamicIsland: { context in
@@ -49,7 +49,7 @@ struct ReminderLiveActivityWidget: Widget {
                     .accessibilityLabel(Text(verbatim: context.state.title))
             }
             .widgetURL(PunctualDeepLinkCodec().url(for: .reminder(context.attributes.reminderID)))
-            .keylineTint(.orange)
+            .keylineTint(.blue)
         }
     }
 }
@@ -83,10 +83,11 @@ private struct ReminderLiveActivityContent: View {
                     .foregroundStyle(.secondary)
                 ReminderLiveActivityCounters(state: context.state)
                     .font(.title3.monospacedDigit())
+                    .foregroundStyle(.blue)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(.primary)
         .accessibilityElement(children: .combine)
     }
 }

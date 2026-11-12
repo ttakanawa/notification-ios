@@ -22,22 +22,16 @@ struct TagManagementView: View {
                 .onSubmit(createTag)
                 .accessibilityIdentifier("tags.management.new-name")
 
-                Button(
-                    LocalizedStringResource(
-                        "tags.action.create",
-                        table: "Tags"
-                    ), action: createTag
-                )
+                Button(action: createTag) {
+                    Label(
+                        LocalizedStringResource("tags.action.create", table: "Tags"),
+                        systemImage: "plus.circle.fill")
+                }
                 .disabled(model.isWorking || newName.isEmpty)
                 .accessibilityIdentifier("tags.management.create")
             }
 
             Section {
-                Text(verbatim: tagCountText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .accessibilityIdentifier("tags.management.count")
-
                 if model.tags.isEmpty {
                     Text(
                         LocalizedStringResource(
@@ -49,7 +43,10 @@ struct TagManagementView: View {
                 }
 
                 ForEach(model.tags, id: \.id) { tag in
-                    HStack(alignment: .firstTextBaseline, spacing: 12) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "tag.fill")
+                            .foregroundStyle(.orange)
+                            .accessibilityHidden(true)
                         Text(verbatim: tag.name)
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .fixedSize(horizontal: false, vertical: true)
@@ -66,6 +63,7 @@ struct TagManagementView: View {
                                 systemImage: "pencil"
                             )
                             .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
                         }
                         .buttonStyle(.borderless)
                         .accessibilityIdentifier(
@@ -83,6 +81,7 @@ struct TagManagementView: View {
                                 systemImage: "trash"
                             )
                             .labelStyle(.iconOnly)
+                            .frame(minWidth: 44, minHeight: 44)
                         }
                         .buttonStyle(.borderless)
                         .accessibilityIdentifier(
@@ -90,6 +89,9 @@ struct TagManagementView: View {
                         )
                     }
                 }
+            } header: {
+                Text(verbatim: tagCountText)
+                    .accessibilityIdentifier("tags.management.count")
             }
 
             if let error = model.actionError {
@@ -104,12 +106,15 @@ struct TagManagementView: View {
                 }
             }
         }
+        .listStyle(.insetGrouped)
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(
             LocalizedStringResource(
                 "tags.management.title",
                 table: "Tags"
             )
         )
+        .navigationBarTitleDisplayMode(.inline)
         .task { await model.load() }
         .alert(
             LocalizedStringResource(

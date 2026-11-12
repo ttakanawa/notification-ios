@@ -40,12 +40,14 @@ struct AboutPrivacyView: View {
                 ]
             )
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(
             LocalizedStringResource(
                 "privacy.title",
                 table: "Settings"
             )
         )
+        .navigationBarTitleDisplayMode(.inline)
         .accessibilityIdentifier("privacy.root")
     }
 
@@ -55,14 +57,10 @@ struct AboutPrivacyView: View {
     ) -> some View {
         Section(title) {
             ForEach(disclosures) { disclosure in
-                Label {
-                    Text(disclosure.localizedResource)
-                        .fixedSize(horizontal: false, vertical: true)
-                } icon: {
-                    Image(systemName: "info.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .accessibilityIdentifier("privacy.disclosure.\(disclosure.rawValue)")
+                Text(disclosure.localizedResource)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.vertical, 4)
+                    .accessibilityIdentifier("privacy.disclosure.\(disclosure.rawValue)")
             }
         }
     }

@@ -1,6 +1,78 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "reminder.list.empty.title": {
+      "comment": "Empty-state copy for the reminder list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーはありません"
+          }
+        }
+      }
+    },
+    "reminder.list.empty.message": {
+      "comment": "Empty-state copy for the reminder list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tap Add Reminder to set a time for something that matters."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "追加ボタンから、 忘れたくない予定を登録しましょう。"
+          }
+        }
+      }
+    },
+    "reminder.list.filtered-empty.title": {
+      "comment": "Empty-state copy for the reminder list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No Matching Reminders"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "該当するリマインダーはありません"
+          }
+        }
+      }
+    },
+    "reminder.list.filtered-empty.message": {
+      "comment": "Empty-state copy for the reminder list.",
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Try another tag or time zone to see more reminders."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タグやタイムゾーンを変更すると、 ほかのリマインダーを表示できます。"
+          }
+        }
+      }
+    },
     "reminder.live-activity.started": {
       "comment": "Scheduled Live Activity start alert. Placeholder 1 is the reminder title string, displayed verbatim.",
       "extractionState": "manual",

@@ -73,6 +73,8 @@ struct ReminderFormView: View {
                     )
                 }
             }
+            .formStyle(.grouped)
+            .scrollDismissesKeyboard(.interactively)
             .onChange(of: model.earlyReminderChoice) { _, choice in
                 guard choice == .custom else { return }
                 withAnimation {

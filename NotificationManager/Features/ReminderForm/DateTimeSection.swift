@@ -74,11 +74,14 @@ struct DateTimeSection: View {
                         set: { model.setLiveActivityEnabled($0) }
                     )
                 ) {
-                    Text(
-                        LocalizedStringResource(
+                    AppRowLabel(
+                        title: LocalizedStringResource(
                             "reminder.field.live-activity-enabled",
                             table: "ReminderForm"
-                        ))
+                        ),
+                        systemImage: "livephoto",
+                        color: .indigo
+                    )
                 }
                 .accessibilityIdentifier("reminder-form.live-activity-enabled")
 
@@ -102,6 +105,9 @@ struct DateTimeSection: View {
                     } label: {
                         if let identifier = model.timeZoneIdentifier {
                             Text(verbatim: identifier)
+                                .font(.subheadline)
+                                .lineLimit(1)
+                                .truncationMode(.middle)
                         } else {
                             Text(
                                 LocalizedStringResource(
@@ -111,11 +117,14 @@ struct DateTimeSection: View {
                         }
                     }
                 } label: {
-                    Text(
-                        LocalizedStringResource(
+                    AppRowLabel(
+                        title: LocalizedStringResource(
                             "reminder.field.time-zone",
                             table: "ReminderForm"
-                        ))
+                        ),
+                        systemImage: "globe",
+                        color: .cyan
+                    )
                 }
                 .accessibilityIdentifier("reminder-form.time-zone")
                 .sheet(isPresented: $isTimeZonePickerPresented) {
@@ -157,6 +166,16 @@ struct DateTimeSection: View {
                     identifier: "reminder-form.section.date-time"
                 )
             }
+        } footer: {
+            if model.scheduleFieldsAreEditable && model.liveActivityEnabled {
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.live-activity-help",
+                        table: "ReminderForm"
+                    )
+                )
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .accessibilityElement(children: .contain)
     }
@@ -184,15 +203,6 @@ struct DateTimeSection: View {
                     .accessibilityIdentifier("reminder-form.live-activity-error")
             }
 
-            Text(
-                LocalizedStringResource(
-                    "reminder.form.live-activity-help",
-                    table: "ReminderForm"
-                )
-            )
-            .font(.caption)
-            .foregroundStyle(.secondary)
-            .fixedSize(horizontal: false, vertical: true)
         }
     }
 
