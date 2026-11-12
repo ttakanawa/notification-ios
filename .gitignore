@@ -9,4 +9,5 @@ DerivedData/
 
 *.xcuserstate
 .DS_Store
-/.agents/skills/design-mobile-apps
+/.agents/skills/mobile-ios-design
+/.agents/skills/ui-ux-pro-max
