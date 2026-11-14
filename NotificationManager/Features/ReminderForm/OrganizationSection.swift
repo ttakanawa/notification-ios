@@ -7,11 +7,14 @@ struct OrganizationSection: View {
     var body: some View {
         Section {
             Toggle(isOn: $model.enabled) {
-                Text(
-                    LocalizedStringResource(
+                AppRowLabel(
+                    title: LocalizedStringResource(
                         "reminder.field.enabled",
                         table: "ReminderForm"
-                    ))
+                    ),
+                    systemImage: "bell.fill",
+                    color: .red
+                )
             }
             .accessibilityIdentifier("reminder-form.enabled")
 

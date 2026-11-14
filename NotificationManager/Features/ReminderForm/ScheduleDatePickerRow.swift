@@ -45,7 +45,7 @@ struct ScheduleDatePickerRow: View {
                     ),
                     displayedComponents: displayedComponents
                 ) {
-                    Text(title)
+                    rowLabel
                 }
                 .datePickerStyle(.compact)
                 .environment(\.timeZone, timeZone)
@@ -69,7 +69,7 @@ struct ScheduleDatePickerRow: View {
                     }
                     .accessibilityIdentifier(accessibilityIdentifier)
                 } label: {
-                    Text(title)
+                    rowLabel
                 }
             }
         }
@@ -81,6 +81,7 @@ struct ScheduleDatePickerRow: View {
                 ) {
                     Text(title)
                 }
+                .datePickerStyle(.wheel)
                 .environment(\.timeZone, timeZone)
                 .padding()
                 .navigationTitle(Text(title))
@@ -112,6 +113,16 @@ struct ScheduleDatePickerRow: View {
                     }
                 }
             }
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
         }
+    }
+
+    private var rowLabel: some View {
+        AppRowLabel(
+            title: title,
+            systemImage: displayedComponents.contains(.date) ? "calendar" : "clock.fill",
+            color: displayedComponents.contains(.date) ? .red : .blue
+        )
     }
 }

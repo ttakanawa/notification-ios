@@ -60,7 +60,8 @@ struct AdaptiveRootView: View {
                         )
                     }
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
         .sheet(
@@ -75,7 +76,8 @@ struct AdaptiveRootView: View {
                     onConfirm: reminderConfirmations.confirmCapacity,
                     onCancel: reminderConfirmations.cancelCapacity
                 )
-                .presentationDetents([.medium])
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
             }
         }
         .alert(

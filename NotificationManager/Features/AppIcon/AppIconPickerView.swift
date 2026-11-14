@@ -3,22 +3,16 @@ import SwiftUI
 struct AppIconPickerView: View {
     @Bindable var model: AppIconSelectionModel
 
-    private let columns = [
-        GridItem(.adaptive(minimum: 120, maximum: 180), spacing: 16)
-    ]
-
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+        List {
+            Section {
                 stateMessage
-
-                LazyVGrid(columns: columns, spacing: 20) {
-                    ForEach(AppIconOption.allCases) { option in
-                        optionButton(option)
-                    }
+                ForEach(AppIconOption.allCases) { option in
+                    optionButton(option)
                 }
-
-                if let error = model.actionError {
+            }
+            if let error = model.actionError {
+                Section {
                     Label(
                         error.localizedResource,
                         systemImage: "exclamationmark.triangle"
@@ -28,11 +22,12 @@ struct AppIconPickerView: View {
                     .accessibilityIdentifier("settings.app-icon.error")
                 }
             }
-            .padding()
         }
+        .listStyle(.insetGrouped)
         .navigationTitle(
             LocalizedStringResource("settings.app-icon.title", table: "Settings")
         )
+        .navigationBarTitleDisplayMode(.inline)
         .task { model.load() }
         .announcesAccessibilityErrors(accessibilityErrors)
         .background {
@@ -75,24 +70,26 @@ struct AppIconPickerView: View {
         return Button {
             Task { await model.select(option) }
         } label: {
-            VStack(spacing: 8) {
-                ZStack(alignment: .topTrailing) {
-                    Image(option.previewAssetName)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        )
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .symbolRenderingMode(.palette)
-                            .foregroundStyle(.white, Color.accentColor)
-                            .padding(6)
-                            .accessibilityHidden(true)
-                    }
-                }
+            HStack(spacing: 16) {
+                Image(option.previewAssetName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 60, height: 60)
+                    .clipShape(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    )
+                    .accessibilityHidden(true)
                 Text(option.localizedResource)
+                    .foregroundStyle(.primary)
+                Spacer(minLength: 8)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(.tint)
+                        .accessibilityHidden(true)
+                }
             }
+            .padding(.vertical, 8)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

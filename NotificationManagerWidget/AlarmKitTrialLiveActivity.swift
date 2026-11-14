@@ -21,9 +21,9 @@ struct AlarmKitTrialLiveActivity: Widget {
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding()
-            .foregroundStyle(.white)
-            .activityBackgroundTint(.black.opacity(0.9))
-            .activitySystemActionForegroundColor(.white)
+            .foregroundStyle(.primary)
+            .activityBackgroundTint(Color(uiColor: .secondarySystemGroupedBackground))
+            .activitySystemActionForegroundColor(.blue)
             .accessibilityElement(children: .combine)
         } dynamicIsland: { context in
             DynamicIsland {

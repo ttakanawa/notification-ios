@@ -19,7 +19,7 @@ struct LiveActivityDurationPickerRow: View {
             isPresented = true
         } label: {
             HStack {
-                Text(title)
+                AppRowLabel(title: title, systemImage: "timer", color: .indigo)
                     .foregroundStyle(.primary)
                 Spacer()
                 Text(verbatim: valueText)
@@ -31,6 +31,7 @@ struct LiveActivityDurationPickerRow: View {
                     .foregroundStyle(.tertiary)
                     .accessibilityHidden(true)
             }
+            .frame(minHeight: 44)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -80,7 +81,7 @@ struct LiveActivityDurationPickerRow: View {
                     }
                 }
             }
-            .presentationDetents([.medium])
+            .presentationDetents([.medium, .large])
             .presentationDragIndicator(.visible)
         }
     }

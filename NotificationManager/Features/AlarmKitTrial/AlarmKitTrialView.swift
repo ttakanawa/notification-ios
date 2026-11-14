@@ -12,17 +12,19 @@ struct AlarmKitTrialView: View {
     var body: some View {
         Form {
             Section {
-                Text(
-                    LocalizedStringResource(
-                        "settings.alarmkit-trial.description", table: "Settings")
-                )
-                .foregroundStyle(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 12) {
+                    AppSymbolTile(systemName: "alarm.fill", color: .orange)
+                    Text(
+                        LocalizedStringResource(
+                            "settings.alarmkit-trial.description", table: "Settings")
+                    )
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(.vertical, 8)
+            } footer: {
                 Text(
                     LocalizedStringResource("settings.alarmkit-trial.sound-note", table: "Settings")
                 )
-                .font(.footnote)
-                .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             }
 
@@ -52,9 +54,10 @@ struct AlarmKitTrialView: View {
                 Button {
                     Task { await model.start() }
                 } label: {
-                    Label(
-                        LocalizedStringResource("settings.alarmkit-trial.start", table: "Settings"),
-                        systemImage: "timer")
+                    AppRowLabel(
+                        title: LocalizedStringResource(
+                            "settings.alarmkit-trial.start", table: "Settings"),
+                        systemImage: "timer", color: .blue)
                 }
                 .disabled(
                     model.isWorking
@@ -65,10 +68,10 @@ struct AlarmKitTrialView: View {
                 Button(role: .destructive) {
                     Task { await model.cancel() }
                 } label: {
-                    Label(
-                        LocalizedStringResource(
+                    AppRowLabel(
+                        title: LocalizedStringResource(
                             "settings.alarmkit-trial.cancel", table: "Settings"),
-                        systemImage: "stop.circle")
+                        systemImage: "stop.fill", color: .red)
                 }
                 .disabled(!model.isWorking && model.activeAlarmID == nil)
                 .accessibilityIdentifier("alarmkit-trial.cancel")
@@ -96,6 +99,8 @@ struct AlarmKitTrialView: View {
                 .accessibilityIdentifier("alarmkit-trial.refresh")
             }
         }
+        .formStyle(.grouped)
+        .scrollDismissesKeyboard(.interactively)
         .navigationTitle(
             LocalizedStringResource("settings.alarmkit-trial.title", table: "Settings")
         )

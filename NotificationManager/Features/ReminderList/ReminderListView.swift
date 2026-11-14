@@ -13,14 +13,20 @@ struct ReminderListView: View {
 
     var body: some View {
         List {
-            TagFilterView(
-                tags: model.tagFilterChoices,
-                selectedTagID: $model.selectedTagID
-            )
-            TimeZoneFilterView(
-                identifiers: model.timeZoneFilterChoices,
-                selectedIdentifier: $model.selectedTimeZoneIdentifier
-            )
+            Section {
+                TagFilterView(
+                    tags: model.tagFilterChoices,
+                    selectedTagID: $model.selectedTagID
+                )
+                TimeZoneFilterView(
+                    identifiers: model.timeZoneFilterChoices,
+                    selectedIdentifier: $model.selectedTimeZoneIdentifier
+                )
+            }
+
+            if visibleReminderCount == 0 {
+                emptyState
+            }
 
             reminderSection(
                 LocalizedStringResource(
@@ -48,12 +54,14 @@ struct ReminderListView: View {
             )
         }
         .listStyle(.insetGrouped)
+        .listSectionSpacing(20)
         .navigationTitle(
             LocalizedStringResource(
                 "reminder.list.title",
                 table: "Reminder"
             )
         )
+        .navigationBarTitleDisplayMode(.large)
         .toolbar {
             ToolbarItemGroup(placement: .topBarLeading) {
                 Button {
@@ -61,9 +69,10 @@ struct ReminderListView: View {
                 } label: {
                     Label(
                         LocalizedStringResource("settings.title", table: "Settings"),
-                        systemImage: "gear"
+                        systemImage: "gearshape"
                     )
                 }
+                .tint(.primary)
                 .accessibilityIdentifier("reminder-list.settings")
 
                 if let iCloudModel = router.iCloudSyncStatusModel {
@@ -133,61 +142,111 @@ struct ReminderListView: View {
         identifier: String,
         items: [ReminderListItemPresentation]
     ) -> some View {
-        Section {
-            ForEach(items) { item in
-                VStack(alignment: .leading, spacing: 6) {
-                    Button {
-                        router.showReminder(item.id)
-                    } label: {
-                        ReminderRowView(item: item)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(actions.isBusy)
-                    .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
-                    .accessibilityAddTraits(
-                        router.selectedReminderID == item.id ? .isSelected : []
-                    )
+        if !items.isEmpty {
+            Section {
+                ForEach(items) { item in
+                    VStack(alignment: .leading, spacing: 6) {
+                        Button {
+                            router.showReminder(item.id)
+                        } label: {
+                            ReminderRowView(item: item)
+                        }
+                        .buttonStyle(.plain)
+                        .disabled(actions.isBusy)
+                        .accessibilityIdentifier("reminder-row.\(item.id.uuidString.lowercased())")
+                        .accessibilityAddTraits(
+                            router.selectedReminderID == item.id ? .isSelected : []
+                        )
 
-                    if let failure = actionFailure(for: item.id) {
-                        Label(
-                            failure.localizedResource,
-                            systemImage: "exclamationmark.triangle"
-                        )
-                        .foregroundStyle(.red)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .accessibilityIdentifier(
-                            "reminder-row.action-error.\(item.id.uuidString.lowercased())"
-                        )
-                    }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: true) {
-                    if !actions.isBusy {
-                        enabledButton(for: item)
-                            .tint(
-                                actions.enabledValue(for: item.id, fallback: item.enabled)
-                                    ? .orange : .green
+                        if let failure = actionFailure(for: item.id) {
+                            Label(
+                                failure.localizedResource,
+                                systemImage: "exclamationmark.triangle"
                             )
+                            .foregroundStyle(.red)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .accessibilityIdentifier(
+                                "reminder-row.action-error.\(item.id.uuidString.lowercased())"
+                            )
+                        }
                     }
-                }
-                .swipeActions(edge: .trailing, allowsFullSwipe: false) {
-                    if !actions.isBusy {
-                        deleteButton(for: item)
-                            .tint(.red)
+                    .listRowInsets(EdgeInsets(top: 12, leading: 16, bottom: 12, trailing: 16))
+                    .contextMenu {
+                        editButton(for: item)
                         if router.canDuplicate(item.id) {
                             duplicateButton(for: item)
-                                .tint(.indigo)
                         }
-                        editButton(for: item)
-                            .tint(.blue)
+                        enabledButton(for: item)
+                        deleteButton(for: item)
+                    }
+                    .swipeActions(edge: .leading, allowsFullSwipe: true) {
+                        if !actions.isBusy {
+                            enabledButton(for: item)
+                                .tint(
+                                    actions.enabledValue(for: item.id, fallback: item.enabled)
+                                        ? .orange : .green
+                                )
+                        }
+                    }
+                    .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                        if !actions.isBusy {
+                            deleteButton(for: item)
+                                .tint(.red)
+                            if router.canDuplicate(item.id) {
+                                duplicateButton(for: item)
+                                    .tint(.indigo)
+                            }
+                            editButton(for: item)
+                                .tint(.blue)
+                        }
                     }
                 }
-            }
-        } header: {
-            Text(title)
+            } header: {
+                HStack(alignment: .firstTextBaseline) {
+                    Text(title)
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Color.primary)
+                    Spacer(minLength: 8)
+                    Text(items.count, format: .number)
+                        .font(.subheadline.weight(.medium).monospacedDigit())
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+                }
+                .textCase(nil)
                 .background {
                     AccessibilityIdentifierContainer(identifier: identifier)
                 }
+            }
         }
+    }
+
+    private var visibleReminderCount: Int {
+        let sections = model.sections
+        return sections.upcoming.count + sections.needsAttention.count + sections.inactive.count
+    }
+
+    private var emptyState: some View {
+        ContentUnavailableView {
+            Label(
+                LocalizedStringResource(
+                    model.items.isEmpty
+                        ? "reminder.list.empty.title" : "reminder.list.filtered-empty.title",
+                    table: "Reminder"
+                ),
+                systemImage: model.items.isEmpty ? "bell" : "line.3.horizontal.decrease.circle"
+            )
+        } description: {
+            Text(
+                LocalizedStringResource(
+                    model.items.isEmpty
+                        ? "reminder.list.empty.message" : "reminder.list.filtered-empty.message",
+                    table: "Reminder"
+                )
+            )
+        }
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .accessibilityIdentifier("reminder-list.empty")
     }
 
     private func editButton(for item: ReminderListItemPresentation) -> some View {
@@ -239,7 +298,7 @@ struct ReminderListView: View {
     }
 
     private func deleteButton(for item: ReminderListItemPresentation) -> some View {
-        Button {
+        Button(role: .destructive) {
             actions.requestDelete(item.id)
         } label: {
             Label(

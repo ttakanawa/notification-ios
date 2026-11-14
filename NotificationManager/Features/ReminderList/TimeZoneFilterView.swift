@@ -5,56 +5,66 @@ struct TimeZoneFilterView: View {
     @Binding var selectedIdentifier: String?
 
     var body: some View {
-        Section {
-            Menu {
-                Button {
-                    selectedIdentifier = nil
-                } label: {
-                    filterLabel(
-                        LocalizedStringResource(
-                            "reminder.time-zone-filter.all",
-                            table: "Reminder"
-                        ),
-                        selected: selectedIdentifier == nil
-                    )
-                }
-                .accessibilityIdentifier("reminder.time-zone-filter.all")
-
-                ForEach(identifiers, id: \.self) { identifier in
-                    Button {
-                        selectedIdentifier = identifier
-                    } label: {
-                        Label {
-                            Text(verbatim: identifier)
-                        } icon: {
-                            Image(
-                                systemName: selectedIdentifier == identifier
-                                    ? "checkmark"
-                                    : "globe"
-                            )
-                        }
-                    }
-                    .accessibilityIdentifier("reminder.time-zone-filter.\(identifier)")
-                }
+        Menu {
+            Button {
+                selectedIdentifier = nil
             } label: {
-                Label {
-                    Text(verbatim: selectedTimeZoneName)
-                } icon: {
-                    Image(systemName: "globe")
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .accessibilityIdentifier("reminder.time-zone-filter.menu")
-            .accessibilityLabel(
-                Text(
+                filterLabel(
                     LocalizedStringResource(
-                        "reminder.time-zone-filter.menu",
+                        "reminder.time-zone-filter.all",
                         table: "Reminder"
-                    )
+                    ),
+                    selected: selectedIdentifier == nil
+                )
+            }
+            .accessibilityIdentifier("reminder.time-zone-filter.all")
+
+            ForEach(identifiers, id: \.self) { identifier in
+                Button {
+                    selectedIdentifier = identifier
+                } label: {
+                    Label {
+                        Text(verbatim: identifier)
+                    } icon: {
+                        Image(
+                            systemName: selectedIdentifier == identifier
+                                ? "checkmark"
+                                : "globe"
+                        )
+                    }
+                }
+                .accessibilityIdentifier("reminder.time-zone-filter.\(identifier)")
+            }
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: "globe")
+                    .foregroundStyle(Color.secondary)
+                    .accessibilityHidden(true)
+                Text(verbatim: selectedTimeZoneName)
+                    .foregroundStyle(Color.primary)
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(Color(uiColor: .tertiaryLabel))
+                    .accessibilityHidden(true)
+            }
+            .font(.subheadline)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(minHeight: 44)
+        }
+        .accessibilityIdentifier("reminder.time-zone-filter.menu")
+        .accessibilityLabel(
+            Text(
+                LocalizedStringResource(
+                    "reminder.time-zone-filter.menu",
+                    table: "Reminder"
                 )
             )
-            .accessibilityValue(Text(verbatim: selectedTimeZoneName))
-        }
+        )
+        .accessibilityValue(Text(verbatim: selectedTimeZoneName))
+        .listRowInsets(EdgeInsets(top: 0, leading: 14, bottom: 0, trailing: 14))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     private var selectedTimeZoneName: String {

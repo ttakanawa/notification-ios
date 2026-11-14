@@ -112,7 +112,9 @@ final class LocalizationAccessibilityUITests: XCTestCase {
         XCTAssertTrue(root.waitForExistence(timeout: 2))
         let removePending = app.buttons["data-unavailable.remove-pending"]
         let openSettings = app.buttons["data-unavailable.open-os-settings"]
+        scrollToHittable(removePending, in: app)
         XCTAssertTrue(removePending.waitForExistence(timeout: 1))
+        scrollToHittable(openSettings, in: app)
         XCTAssertTrue(openSettings.waitForExistence(timeout: 1))
         XCTAssertLessThan(removePending.frame.minY, openSettings.frame.minY)
         XCTAssertFalse(openSettings.label.localizedCaseInsensitiveContains("pending"))

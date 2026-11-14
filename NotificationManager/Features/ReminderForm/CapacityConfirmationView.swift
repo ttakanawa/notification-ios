@@ -23,51 +23,79 @@ struct CapacityConfirmationView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(alignment: .leading, spacing: 20) {
-                Label(
-                    LocalizedStringResource(
-                        "reminder.form.capacity-confirmation.title",
-                        table: "ReminderForm"
-                    ), systemImage: "tray.full"
-                )
-                .font(.title2.weight(.semibold))
-                .fixedSize(horizontal: false, vertical: true)
+            ScrollView {
+                VStack(alignment: .center, spacing: 20) {
+                    Image(systemName: "tray.full.fill")
+                        .font(.largeTitle)
+                        .foregroundStyle(.orange)
+                        .padding(16)
+                        .background(.orange.opacity(0.12), in: .circle)
+                        .accessibilityHidden(true)
 
-                Text(verbatim: capacityMessage)
+                    Text(
+                        LocalizedStringResource(
+                            "reminder.form.capacity-confirmation.title",
+                            table: "ReminderForm"
+                        )
+                    )
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                Spacer(minLength: 0)
+                    Text(verbatim: capacityMessage)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
 
-                Button(
-                    LocalizedStringResource(
-                        "reminder.form.capacity-confirmation.confirm",
-                        table: "ReminderForm"
-                    )
-                ) {
-                    onConfirm()
-                }
-                .buttonStyle(.borderedProminent)
-                .frame(maxWidth: .infinity)
-                .disabled(isPersistenceOperationInFlight)
-                .accessibilityIdentifier("reminder-form.capacity-confirm")
-
-                Button(
-                    LocalizedStringResource(
-                        "reminder.action.cancel",
-                        table: "Reminder"
-                    ), role: .cancel
-                ) {
-                    onCancel()
                 }
                 .frame(maxWidth: .infinity)
-                .disabled(isPersistenceOperationInFlight)
+                .padding(24)
             }
-            .padding()
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                confirmationActions
+                    .padding(.horizontal, 24)
+                    .padding(.top, 12)
+                    .padding(.bottom, 8)
+                    .background(.bar)
+            }
             .background {
                 AccessibilityIdentifierContainer(
                     identifier: "reminder-form.capacity-confirmation"
                 )
             }
+        }
+    }
+
+    private var confirmationActions: some View {
+        VStack(spacing: 8) {
+            Button {
+                onConfirm()
+            } label: {
+                Text(
+                    LocalizedStringResource(
+                        "reminder.form.capacity-confirmation.confirm",
+                        table: "ReminderForm"
+                    )
+                )
+                .frame(maxWidth: .infinity, minHeight: 24)
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .disabled(isPersistenceOperationInFlight)
+            .accessibilityIdentifier("reminder-form.capacity-confirm")
+
+            Button(role: .cancel) {
+                onCancel()
+            } label: {
+                Text(
+                    LocalizedStringResource(
+                        "reminder.action.cancel",
+                        table: "Reminder"
+                    )
+                )
+                .frame(maxWidth: .infinity, minHeight: 44)
+            }
+            .disabled(isPersistenceOperationInFlight)
         }
     }
 

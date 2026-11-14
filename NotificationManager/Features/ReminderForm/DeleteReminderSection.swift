@@ -11,16 +11,16 @@ struct DeleteReminderSection: View {
                 guard !isPersistenceOperationInFlight else { return }
                 onRequestDelete()
             } label: {
-                Text(
+                Label(
                     LocalizedStringResource(
                         "reminder.action.delete",
                         table: "Reminder"
-                    )
+                    ),
+                    systemImage: "trash"
                 )
                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             .foregroundStyle(.red)
             .disabled(isPersistenceOperationInFlight || model.saveState == .saving)
             .accessibilityIdentifier("reminder-form.delete")

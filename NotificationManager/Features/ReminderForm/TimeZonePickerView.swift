@@ -168,16 +168,29 @@ struct TimeZonePickerView: View {
 
         NavigationStack {
             List {
-                TextField(text: $query) {
-                    Text(
-                        LocalizedStringResource(
-                            "reminder.form.time-zone-picker.search",
-                            table: "ReminderForm"
-                        ))
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundStyle(.secondary)
+                        .accessibilityHidden(true)
+
+                    TextField(text: $query) {
+                        Text(
+                            LocalizedStringResource(
+                                "reminder.form.time-zone-picker.search",
+                                table: "ReminderForm"
+                            ))
+                    }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .submitLabel(.search)
+                    .accessibilityIdentifier("reminder-form.time-zone-search")
                 }
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .accessibilityIdentifier("reminder-form.time-zone-search")
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .background(.quaternary, in: .rect(cornerRadius: 12))
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 12, trailing: 0))
+                .listRowSeparator(.hidden)
 
                 if let filteredChoices {
                     choiceRows(filteredChoices)
@@ -186,12 +199,26 @@ struct TimeZonePickerView: View {
                         .frame(maxWidth: .infinity)
                 }
             }
+            .listStyle(.insetGrouped)
+            .scrollDismissesKeyboard(.interactively)
             .navigationTitle(
                 LocalizedStringResource(
                     "reminder.form.time-zone-picker.title",
                     table: "ReminderForm"
-                ))
+                )
+            )
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button(role: .cancel) {
+                        dismiss()
+                    } label: {
+                        Text(LocalizedStringResource("reminder.action.cancel", table: "Reminder"))
+                    }
+                }
+            }
         }
+        .presentationDragIndicator(.visible)
         .accessibilityIdentifier("reminder-form.time-zone-picker")
         .task(id: locale.identifier) {
             choices = nil
@@ -221,7 +248,7 @@ struct TimeZonePickerView: View {
                     dismiss()
                 } label: {
                     HStack {
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 4) {
                             Text(choice.locationName)
                             if let detailName = choice.detailName {
                                 Text(detailName)
@@ -234,9 +261,13 @@ struct TimeZonePickerView: View {
 
                         if choice.identifier == selectedIdentifier {
                             Image(systemName: "checkmark")
+                                .font(.body.weight(.semibold))
+                                .foregroundStyle(.tint)
                                 .accessibilityHidden(true)
                         }
                     }
+                    .padding(.vertical, 4)
+                    .frame(minHeight: 44)
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)

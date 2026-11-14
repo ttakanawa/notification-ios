@@ -101,9 +101,8 @@ struct UpcomingRemindersWidgetView: View {
         } icon: {
             Image(systemName: "bell.fill")
         }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.secondary)
-        .textCase(.uppercase)
+        .font(.caption.weight(.semibold))
+        .foregroundStyle(.blue)
         .accessibilityElement(children: .combine)
     }
 
