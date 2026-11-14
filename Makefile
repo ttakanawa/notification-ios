@@ -6,6 +6,13 @@ SIMULATOR_NAME ?= iPhone 17e
 SIMULATOR_OS ?= latest
 SIMULATOR_DESTINATION := platform=iOS Simulator,name=$(SIMULATOR_NAME),OS=$(SIMULATOR_OS)
 
+SOURCEKIT_ARCH ?= $(shell uname -m)
+SOURCEKIT_CONFIGURATION ?= Debug
+SOURCEKIT_DESTINATION ?= generic/platform=iOS Simulator
+SOURCEKIT_ACTION ?= build-for-testing
+# Optional normal-build arguments, e.g. -derivedDataPath '/path with spaces'.
+SOURCEKIT_BUILD_ARGS ?=
+
 SWIFT_PATHS := \
 	NotificationManager \
 	NotificationManagerWidget \
@@ -29,7 +36,8 @@ LOCALIZATION_CATALOGS := \
 
 .PHONY: help format lint test-unit test-integration test-ui build-release \
 	validate-localizations test-localization-validator validate-testflight \
-	test-package test-testflight-validator test-ci-scripts ci-check
+	test-package test-testflight-validator test-ci-scripts ci-check \
+	sourcekit verify-sourcekit test-sourcekit
 
 help:
 	@echo "make format                       Format maintained Swift sources"
@@ -38,6 +46,9 @@ help:
 	@echo "make test-integration             Run Xcode integration tests"
 	@echo "make test-ui                      Run Xcode UI tests"
 	@echo "make build-release                Build Release for iOS Simulator"
+	@echo "make sourcekit                    Update Swift compilation database and indexes, including tests"
+	@echo "make verify-sourcekit             Verify SourceKit-LSP settings, types and cross-file references"
+	@echo "make test-sourcekit               Test compilation database generation and failure handling"
 	@echo "make validate-localizations       Validate string catalogs and source coverage"
 	@echo "make test-localization-validator  Test localization validator fixtures"
 	@echo "make validate-testflight          Validate TestFlight configuration"
@@ -74,6 +85,19 @@ build-release:
 		-configuration Release \
 		-destination 'generic/platform=iOS Simulator' \
 		CODE_SIGNING_ALLOWED=NO
+
+sourcekit:
+	uv run --no-project Scripts/generate_compile_commands.py \
+		--arch '$(SOURCEKIT_ARCH)' --action '$(SOURCEKIT_ACTION)' -- \
+		-project '$(PROJECT)' -scheme '$(SCHEME)' \
+		-configuration '$(SOURCEKIT_CONFIGURATION)' \
+		-destination '$(SOURCEKIT_DESTINATION)' $(SOURCEKIT_BUILD_ARGS)
+
+verify-sourcekit:
+	uv run --no-project Scripts/verify_sourcekit.py
+
+test-sourcekit:
+	PYTHONDONTWRITEBYTECODE=1 uv run --no-project --python '>=3.9' -m unittest discover -s Scripts/Tests -p 'test_*.py'
 
 validate-localizations:
 	swift Scripts/validate-localizations.swift $(LOCALIZATION_CATALOGS) --source-root .
