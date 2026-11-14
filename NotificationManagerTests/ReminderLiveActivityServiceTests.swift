@@ -9,6 +9,27 @@ import Testing
 struct ReminderLiveActivityServiceTests {
     private let now = Date(timeIntervalSince1970: 1_800_000_000)
 
+    @Test func intentDismissalIsObservedByAnAlreadyRunningServiceAndDoesNotHideNextOccurrence()
+        async throws
+    {
+        let context = try makeContext()
+        let first = event(startOffset: -60)
+        await context.service.reconcile(events: [first], now: now)
+        context.defaults.set(
+            [first.id: first.notificationDate.addingTimeInterval(8 * 3_600).timeIntervalSince1970],
+            forKey: LiveActivityOccurrenceDismissalStore.userDismissalsKey)
+        let next = ReminderLiveActivityEvent(
+            reminderID: first.reminderID, title: first.title,
+            startDate: now.addingTimeInterval(3_600), endDate: now.addingTimeInterval(4_200))
+
+        await context.service.reconcile(events: [first, next], now: now)
+        await context.service.reconcile(events: [first, next], now: now)
+
+        #expect(context.client.requested == [first, next])
+        #expect(context.client.records.map(\.eventID) == [next.id])
+        #expect(context.client.ended.count == 1)
+    }
+
     @Test func schedulesFutureOccurrenceOnlyOnSupportedSystems() async throws {
         let context = try makeContext()
         let event = event(startOffset: 60)

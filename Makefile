@@ -25,6 +25,7 @@ LOCALIZATION_CATALOGS := \
 	NotificationManager/Resources/Settings.xcstrings \
 	NotificationManager/Resources/Tags.xcstrings \
 	NotificationManager/Resources/Recovery.xcstrings \
+	NotificationManager/Resources/Customization.xcstrings \
 	NotificationManagerWidget/Resources/Widget.xcstrings
 
 .PHONY: help format lint test-unit test-integration test-ui build-release \

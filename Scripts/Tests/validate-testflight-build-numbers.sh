@@ -91,6 +91,20 @@ marketing_diagnostic="marketing versions must match"
 
 expect_success "current project"
 
+mutate_setting "$app_debug_id" PUNCTUAL_APP_ATTEST_ENVIRONMENT invalid
+expect_failure "invalid App Attest environment" "App Attest build settings"
+reset_project
+mutate_setting "$app_debug_id" PUNCTUAL_END_API_ENVIRONMENT invalid
+expect_failure "invalid API signing environment" "API signing build settings"
+reset_project
+fixture_privacy="$fixture_root/NotificationManager/Resources/PrivacyInfo.xcprivacy"
+cp "$fixture_privacy" "$temporary_directory/original-privacy.plist"
+plutil -replace NSPrivacyCollectedDataTypes -json '[]' "$fixture_privacy"
+expect_failure "undisclosed end notification data" "privacy manifest must declare end notification data"
+cp "$temporary_directory/original-privacy.plist" "$fixture_privacy"
+expect_success "App Attest and privacy fixtures restored"
+
+
 # CloudKit's one delegate registration is allowed; unrelated registrations and
 # global APNs token collection remain rejected.
 fixture_delegate="$fixture_root/NotificationManager/App/NotificationApplicationDelegate.swift"

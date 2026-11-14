@@ -1,0 +1,15 @@
+{
+  "description": "Nonsecret deterministic protocol fixture; no private key or real APNs token. LF separators, trailing LF, UTF-8. Hash raw body bytes, not reserialized JSON.",
+  "environment": "development",
+  "keyId": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=",
+  "challengeId": "2613870f-8cb1-4cb9-933e-510fc63113d6",
+  "challenge": "ICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=",
+  "method": "PUT",
+  "path": "/v1/end-jobs/8f5b583d-c03a-4c35-9ad7-6c18cda0c063",
+  "rawBody": "{\"activityEndsAt\":\"2026-11-16T10:00:00Z\",\"contentStateVersion\":1,\"endsAt\":\"2026-11-16T10:00:00Z\",\"notificationAt\":\"2026-11-16T09:30:00Z\",\"pushToken\":\"000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f\",\"revision\":\"12\",\"startsAt\":\"2026-11-16T09:00:00Z\"}",
+  "bodySHA256Hex": "2d1eb51d94f3390e755eac52623c3d2e2fe0f1824400d3cb110ea783a3e50ee4",
+  "signingMessage": "punctual-api-v1\ndevelopment\nAAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=\n2613870f-8cb1-4cb9-933e-510fc63113d6\nICEiIyQlJicoKSorLC0uLzAxMjM0NTY3ODk6Ozw9Pj8=\nPUT\n/v1/end-jobs/8f5b583d-c03a-4c35-9ad7-6c18cda0c063\n2d1eb51d94f3390e755eac52623c3d2e2fe0f1824400d3cb110ea783a3e50ee4\n",
+  "clientDataHashHex": "9f701df9f79c663091d8c338274d962787111d7cf66ef3b85a02955a9ac68005",
+  "emptyBodySHA256Hex": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "attestationClientDataHashHex": "72dbb7336c76780023f83da4c355f2eeea85733b13d3477697917790c1229084"
+}

@@ -51,6 +51,8 @@ final class AppEnvironment {
     private var cloudChangeTask: Task<Void, Never>?
     private var liveActivityRefreshTask: Task<Void, Never>?
     private var latestReminderSnapshots: [UUID: ReminderSnapshot] = [:]
+    private var latestLiveActivityEvents: [String: ReminderLiveActivityEvent] = [:]
+    private var globalCustomization: DisplayCustomization?
     private var snapshotGeneration: UInt64 = 0
     private var hasStarted = false
     private var notificationHandlingIsActive = false
@@ -157,6 +159,10 @@ final class AppEnvironment {
         widgetSnapshotPublication: @escaping WidgetSnapshotPublication
     ) throws -> AppEnvironment {
         let (repository, cloudService) = try makeRetainedPersistence(container: container)
+        let relay = AppEnvironmentRelay()
+        let customizationPurchase = DisplayCustomizationPurchaseModel(entitlementChanged: {
+            await relay.environment?.modelSnapshotChanged()
+        })
         let eligibilityIndexStore = notificationDelegate.eligibilityIndex
         let stateStore = DeviceSchedulingStateStore()
         let worker = NotificationReconcileWorker(
@@ -165,7 +171,13 @@ final class AppEnvironment {
             authorizationProvider: authorizationService,
             notificationCenter: notificationCenter,
             eligibilityIndexStore: eligibilityIndexStore,
-            stateStore: stateStore
+            stateStore: stateStore,
+            displayConfiguration: {
+                let purchased = await customizationPurchase.isPurchased
+                let data = await repository.globalDisplayCustomizationData()
+                return .init(
+                    isPurchased: purchased, global: DisplayCustomization.decodeSupported(data))
+            }
         )
         let saveUseCase = SaveReminderUseCase(
             repository: repository,
@@ -185,10 +197,12 @@ final class AppEnvironment {
             repository: repository,
             normalizer: TagNameNormalizerV1()
         )
-        let relay = AppEnvironmentRelay()
         let presentationRefreshCoordinator = LatestPresentationRefreshCoordinator(
             loadSnapshot: {
-                try? await repository.fetchCompleteSnapshot()
+                let global = await repository.globalDisplayCustomizationData()
+                relay.environment?.globalCustomization = DisplayCustomization.decodeSupported(
+                    global)
+                return try? await repository.fetchCompleteSnapshot()
             },
             publish: { snapshot, deviceState in
                 relay.publish(snapshot, deviceState: deviceState)
@@ -266,6 +280,9 @@ final class AppEnvironment {
             iCloudSyncStatusModel: iCloudSyncStatusModel,
             tagManagementModel: tagModel,
             appIconSelectionModel: appIconModel,
+            customizationPurchaseModel: customizationPurchase,
+            makeCustomizationEditor: customizationEditorFactory(
+                repository: repository, purchase: customizationPurchase, relay: relay),
             createForm: {
                 ReminderFormModel(
                     newReminderID: UUID(),
@@ -285,24 +302,9 @@ final class AppEnvironment {
                 await relay.refreshPresentation()
             }
         )
-        let lifecycle = AppLifecycleCoordinator(
-            eligibilityIndexStore: eligibilityIndexStore,
-            requestReconcile: { reason in
-                await worker.requestReconcile(reason)
-            },
-            requestForegroundReconcile: { permit in
-                await worker.requestForegroundReconcile(ifValid: permit)
-            },
-            enterBackground: { permit in
-                await worker.enterBackground(ifValid: permit)
-            },
-            refreshDeviceState: {
-                await settingsModel.load()
-            },
-            refreshModelSnapshot: {
-                await relay.refreshPresentation()
-            }
-        )
+        let lifecycle = makeLifecycle(
+            eligibilityIndexStore: eligibilityIndexStore, worker: worker,
+            settingsModel: settingsModel, relay: relay)
         let notificationHandlingActivation: NotificationHandlingActivation = {
             notificationDelegate.bind(
                 reminderLookup: { reminderID in
@@ -342,7 +344,8 @@ final class AppEnvironment {
                 await responseSnapshotPreparer.prepare(reminderID: reminderID)
             },
             widgetSnapshotPublication: widgetSnapshotPublication,
-            liveActivityPublication: makeLiveActivityPublication(),
+            liveActivityPublication: makeLiveActivityPublication(
+                repository: repository, relay: relay),
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
         relay.environment = environment
@@ -355,6 +358,59 @@ final class AppEnvironment {
             }
         )
         return environment
+    }
+
+    private static func customizationEditorFactory(
+        repository: RetainedReminderRepository, purchase: DisplayCustomizationPurchaseModel,
+        relay: AppEnvironmentRelay
+    ) -> @MainActor (UUID?) -> DisplayCustomizationEditorModel? {
+        return { reminderID in
+            DisplayCustomizationEditorModel(
+                load: {
+                    if let reminderID {
+                        guard let reminder = try await repository.reminder(id: reminderID)
+                        else {
+                            throw AppEnvironmentError.reminderNotFound(reminderID)
+                        }
+                        return reminder.displayCustomizationData
+                    }
+                    return await repository.globalDisplayCustomizationData()
+                },
+                save: { data in
+                    if let reminderID {
+                        _ = try await repository.saveDisplayCustomizationData(
+                            data, reminderID: reminderID)
+                    } else {
+                        try await repository.saveGlobalDisplayCustomizationData(data)
+                    }
+                    await relay.environment?.modelSnapshotChanged()
+                },
+                canEdit: { purchase.isPurchased })
+        }
+    }
+
+    private static func makeLifecycle(
+        eligibilityIndexStore: ForegroundEligibilityIndexStore, worker: NotificationReconcileWorker,
+        settingsModel: NotificationSettingsModel, relay: AppEnvironmentRelay
+    ) -> AppLifecycleCoordinator {
+        return AppLifecycleCoordinator(
+            eligibilityIndexStore: eligibilityIndexStore,
+            requestReconcile: { reason in
+                await worker.requestReconcile(reason)
+            },
+            requestForegroundReconcile: { permit in
+                await worker.requestForegroundReconcile(ifValid: permit)
+            },
+            enterBackground: { permit in
+                await worker.enterBackground(ifValid: permit)
+            },
+            refreshDeviceState: {
+                await settingsModel.load()
+            },
+            refreshModelSnapshot: {
+                await relay.refreshPresentation()
+            }
+        )
     }
 
     private static func makeRetainedPersistence(
@@ -409,10 +465,26 @@ final class AppEnvironment {
         )
     }
 
-    private static func makeLiveActivityPublication() -> LiveActivityPublication {
+    private static func makeLiveActivityPublication(
+        repository: RetainedReminderRepository, relay: AppEnvironmentRelay
+    ) -> LiveActivityPublication {
         let service = ReminderLiveActivityService()
+        let remote = ReminderLiveActivityRemoteCoordinator()
         return { events, allowStarts in
+            let generation = relay.environment?.snapshotGeneration
             await service.reconcile(events: events, allowStarts: allowStarts)
+            guard relay.environment?.snapshotGeneration == generation else { return }
+            await remote.publish(
+                events: events,
+                authorization: { event in
+                    guard let environment = relay.environment,
+                        environment.latestLiveActivityEvents[event.id] == event,
+                        let snapshot = environment.latestReminderSnapshots[event.reminderID]
+                    else { return false }
+                    let permitted = await repository.canPublish(snapshot)
+                    return permitted && environment.latestLiveActivityEvents[event.id] == event
+                        && environment.latestReminderSnapshots[event.reminderID] == snapshot
+                })
         }
     }
 
@@ -450,6 +522,8 @@ final class AppEnvironment {
     func start() async {
         guard !hasStarted, let lifecycleCoordinator else { return }
         hasStarted = true
+        router.customizationPurchaseModel?.start()
+        await router.customizationPurchaseModel?.refreshEntitlement()
         router.iCloudSyncStatusModel?.start()
         lifecycleCoordinator.startObservingSystemChanges()
         await AppEnvironmentStartSequence.run(
@@ -463,6 +537,7 @@ final class AppEnvironment {
     }
 
     func enterForeground() async {
+        await router.customizationPurchaseModel?.refreshEntitlement()
         await router.iCloudSyncStatusModel?.refreshAccountAvailability()
         guard let lifecycleCoordinator else { return }
         if !hasStarted {
@@ -534,11 +609,16 @@ final class AppEnvironment {
                 let events = try liveActivityProjector.project(
                     reminders: snapshot.reminders,
                     notificationsEnabled: deviceState.deviceNotificationsEnabled,
-                    now: now
+                    now: now,
+                    isCustomizationPurchased: router.customizationPurchaseModel?.isPurchased
+                        ?? false,
+                    globalCustomization: globalCustomization
                 )
                 let rangeEnd = try liveActivityProjector.nextRangeEnd(
                     reminders: snapshot.reminders, after: now)
                 scheduleLiveActivityRefresh(events: events, rangeEnd: rangeEnd, now: now)
+                latestLiveActivityEvents = Dictionary(
+                    events.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
                 Task { [weak self] in
                     guard let self, snapshotGeneration == generation else { return }
                     await liveActivityPublication(

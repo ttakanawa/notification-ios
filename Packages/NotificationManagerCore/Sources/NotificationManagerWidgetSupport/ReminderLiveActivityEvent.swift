@@ -12,16 +12,18 @@ public struct ReminderLiveActivityEvent: Sendable, Equatable, Identifiable {
     public let startDate: Date
     public let endDate: Date
     public let notificationDate: Date
+    public let displayText: LiveActivityDisplayText?
 
     public init(
         reminderID: UUID, title: String, startDate: Date, endDate: Date,
-        notificationDate: Date? = nil
+        notificationDate: Date? = nil, displayText: LiveActivityDisplayText? = nil
     ) {
         self.reminderID = reminderID
         self.title = title
         self.startDate = startDate
         self.endDate = endDate
         self.notificationDate = notificationDate ?? startDate
+        self.displayText = displayText
     }
 
     public var id: String {

@@ -12,6 +12,7 @@
             public let notificationDate: Date
             public let displayVersion: Int
             public let notificationHasOccurred: Bool
+            public let displayText: LiveActivityDisplayText?
 
             public init(event: ReminderLiveActivityEvent, notificationHasOccurred: Bool = false) {
                 title = event.title
@@ -21,6 +22,7 @@
                 notificationDate = event.notificationDate
                 displayVersion = Self.currentDisplayVersion
                 self.notificationHasOccurred = notificationHasOccurred
+                displayText = event.displayText
             }
 
             public init(from decoder: any Decoder) throws {
@@ -34,11 +36,14 @@
                 displayVersion = try values.decodeIfPresent(Int.self, forKey: .displayVersion) ?? 1
                 notificationHasOccurred =
                     try values.decodeIfPresent(Bool.self, forKey: .notificationHasOccurred) ?? false
+                displayText = try values.decodeIfPresent(
+                    LiveActivityDisplayText.self, forKey: .displayText)
             }
 
             private enum CodingKeys: String, CodingKey {
                 case title, startDate, endDate, activityEndDate, notificationDate, displayVersion
                 case notificationHasOccurred
+                case displayText
             }
         }
 

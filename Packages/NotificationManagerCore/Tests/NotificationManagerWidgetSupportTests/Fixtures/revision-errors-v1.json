@@ -1,0 +1,62 @@
+{
+  "description": "Canonical HTTP 409 revision error responses for shared Rust, Workers and Swift tests. All revision values are positive UInt64 decimal strings and must not pass through floating-point decoding. requestId is a deterministic sample; the service generates a fresh UUID for each error response.",
+  "cases": [
+    {
+      "name": "stale_revision",
+      "method": "PUT",
+      "currentRevision": "18446744073709551615",
+      "currentStatus": "scheduled",
+      "requestRevision": "18446744073709551614",
+      "statusCode": 409,
+      "response": {
+        "error": {
+          "code": "STALE_REVISION",
+          "message": "STALE REVISION",
+          "requestId": "7b4a6391-84c2-4dfe-8be6-caa8c61407d9",
+          "details": {
+            "currentRevision": "18446744073709551615",
+            "status": "scheduled"
+          }
+        }
+      }
+    },
+    {
+      "name": "revision_conflict",
+      "method": "PUT",
+      "currentRevision": "18446744073709551615",
+      "currentStatus": "scheduled",
+      "requestRevision": "18446744073709551615",
+      "statusCode": 409,
+      "response": {
+        "error": {
+          "code": "REVISION_CONFLICT",
+          "message": "REVISION CONFLICT",
+          "requestId": "7b4a6391-84c2-4dfe-8be6-caa8c61407d9",
+          "details": {
+            "currentRevision": "18446744073709551615",
+            "status": "scheduled"
+          }
+        }
+      }
+    },
+    {
+      "name": "dispatch_started",
+      "method": "PUT",
+      "currentRevision": "18446744073709551614",
+      "currentStatus": "retrying",
+      "requestRevision": "18446744073709551615",
+      "statusCode": 409,
+      "response": {
+        "error": {
+          "code": "DISPATCH_STARTED",
+          "message": "DISPATCH STARTED",
+          "requestId": "7b4a6391-84c2-4dfe-8be6-caa8c61407d9",
+          "details": {
+            "currentRevision": "18446744073709551614",
+            "status": "retrying"
+          }
+        }
+      }
+    }
+  ]
+}

@@ -23,7 +23,7 @@ final class ReminderLiveActivityService {
     private var suppressedUntil: [String: Double]
 
     init(
-        defaults: UserDefaults = .standard,
+        defaults: UserDefaults = LiveActivityOccurrenceDismissalStore.preferences,
         client: any ReminderLiveActivityClient = SystemReminderLiveActivityClient(),
         schedulesExpiration: Bool = true,
         canStart: @escaping @MainActor () -> Bool = {
@@ -90,6 +90,12 @@ final class ReminderLiveActivityService {
         let recordIDs = Set(records.map(\.id))
         let eventByID = Dictionary(
             events.filter(\.isValid).map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        let userDismissals =
+            defaults.dictionary(forKey: LiveActivityOccurrenceDismissalStore.userDismissalsKey)
+            as? [String: Double] ?? [:]
+        for (eventID, expiry) in userDismissals where expiry > now.timeIntervalSince1970 {
+            suppressedUntil[eventID] = max(suppressedUntil[eventID] ?? -.infinity, expiry)
+        }
         extendSuppressionWindows(using: eventByID)
         suppressedUntil = suppressedUntil.filter { $0.value > now.timeIntervalSince1970 }
 

@@ -6,6 +6,8 @@ struct SettingsView: View {
     @Bindable var iCloudModel: ICloudSyncStatusModel
     @Bindable var tagModel: TagManagementModel
     @Bindable var appIconModel: AppIconSelectionModel
+    var customization: DisplayCustomizationPurchaseModel?
+    var makeCustomizationEditor: () -> DisplayCustomizationEditorModel? = { nil }
 
     @Environment(\.locale) private var locale
     @Environment(\.openURL) private var openURL
@@ -124,6 +126,17 @@ struct SettingsView: View {
                     systemImage: "app.fill", color: .indigo)
             }
             .accessibilityIdentifier("settings.app-icon")
+            if let customization, let editor = makeCustomizationEditor() {
+                NavigationLink {
+                    DisplayCustomizationView(purchase: customization, editor: editor)
+                } label: {
+                    AppRowLabel(
+                        title: LocalizedStringResource(
+                            "customization.title", table: "Customization"),
+                        systemImage: "text.bubble.fill", color: .purple)
+                }
+                .accessibilityIdentifier("settings.display-customization")
+            }
         }
     }
 

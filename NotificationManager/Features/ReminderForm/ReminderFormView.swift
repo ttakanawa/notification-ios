@@ -66,11 +66,35 @@ struct ReminderFormView: View {
                     )
                 }
                 if model.canDelete {
+                    if let purchase = router.customizationPurchaseModel,
+                        let editor = router.makeCustomizationEditor(model.detachedDraft.id)
+                    {
+                        Section {
+                            NavigationLink {
+                                DisplayCustomizationView(
+                                    purchase: purchase, editor: editor, isGlobal: false)
+                            } label: {
+                                Label(
+                                    LocalizedStringResource(
+                                        "customization.title", table: "Customization"),
+                                    systemImage: "text.bubble")
+                            }
+                            .disabled(isFormMutationInFlight)
+                        }
+                    }
                     DeleteReminderSection(
                         model: model,
                         isPersistenceOperationInFlight: isFormMutationInFlight,
                         onRequestDelete: requestDelete
                     )
+                } else if router.customizationPurchaseModel != nil {
+                    Section {
+                        Text(
+                            LocalizedStringResource(
+                                "customization.save-first", table: "Customization")
+                        )
+                        .font(.footnote).foregroundStyle(.secondary)
+                    }
                 }
             }
             .formStyle(.grouped)

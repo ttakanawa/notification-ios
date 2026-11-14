@@ -74,11 +74,22 @@ printf '%s' "$entitlements_json" | jq -e \
 printf '%s' "$entitlements_json" | jq -e '
     (keys | sort) == [
         "aps-environment",
+        "com.apple.developer.devicecheck.appattest-environment",
         "com.apple.developer.icloud-container-identifiers",
         "com.apple.developer.icloud-services",
         "com.apple.security.application-groups"
     ]
-' >/dev/null || fail "app entitlements must preserve APS and CloudKit plus the App Group"
+' >/dev/null || fail "app entitlements must preserve APS, App Attest, CloudKit and the App Group"
+
+# Build settings keep service signing and the signed Apple entitlement separate.
+# shellcheck disable=SC2016
+assert_equal '$(PUNCTUAL_APP_ATTEST_ENVIRONMENT)' "$(printf '%s' "$entitlements_json" | jq -r '."com.apple.developer.devicecheck.appattest-environment"')" "App Attest entitlement"
+# shellcheck disable=SC2016
+assert_equal '$(PUNCTUAL_END_API_ENVIRONMENT)' "$(printf '%s' "$info_json" | jq -r '.PunctualEndAPIEnvironment')" "API signing environment"
+# shellcheck disable=SC2016
+assert_equal '$(PUNCTUAL_APP_ATTEST_ENVIRONMENT)' "$(printf '%s' "$info_json" | jq -r '.PunctualAppAttestEnvironment')" "App Attest storage environment"
+assert_equal "2" "$(count_project_setting 'PUNCTUAL_APP_ATTEST_ENVIRONMENT = (development|production);')" "App Attest build settings"
+assert_equal "2" "$(count_project_setting 'PUNCTUAL_END_API_ENVIRONMENT = (development|production);')" "API signing build settings"
 
 printf '%s' "$widget_entitlements_json" | jq -e '
     . == {
@@ -666,11 +677,19 @@ printf '%s' "$privacy_json" | jq -e '.NSPrivacyTracking == false' >/dev/null \
     || fail "privacy manifest must declare tracking false"
 printf '%s' "$privacy_json" | jq -e '.NSPrivacyTrackingDomains == []' >/dev/null \
     || fail "privacy manifest must not declare tracking domains"
-printf '%s' "$privacy_json" | jq -e '.NSPrivacyCollectedDataTypes == []' >/dev/null \
-    || fail "privacy manifest must not declare collected data"
+printf '%s' "$privacy_json" | jq -e '
+    (.NSPrivacyCollectedDataTypes | map(.NSPrivacyCollectedDataType) | sort) == [
+        "NSPrivacyCollectedDataTypeDeviceID",
+        "NSPrivacyCollectedDataTypeOtherDataTypes",
+        "NSPrivacyCollectedDataTypeOtherUserContent"
+    ] and all(.NSPrivacyCollectedDataTypes[];
+        .NSPrivacyCollectedDataTypeLinked == true and
+        .NSPrivacyCollectedDataTypeTracking == false and
+        .NSPrivacyCollectedDataTypePurposes == ["NSPrivacyCollectedDataTypePurposeAppFunctionality"])
+' >/dev/null || fail "privacy manifest must declare end notification data for app functionality only"
 printf '%s' "$privacy_json" | jq -e \
-    '.NSPrivacyAccessedAPITypes == [{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryUserDefaults","NSPrivacyAccessedAPITypeReasons":["CA92.1"]}]' >/dev/null \
-    || fail "privacy manifest must declare only UserDefaults reason CA92.1"
+    '.NSPrivacyAccessedAPITypes == [{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryUserDefaults","NSPrivacyAccessedAPITypeReasons":["CA92.1","1C8F.1"]}]' >/dev/null \
+    || fail "privacy manifest must declare only local and App Group UserDefaults reasons"
 
 # Manual CKSyncEngine scheduling needs CloudKit silent notifications. Keep the
 # sole registration in the application delegate; device APNs tokens are not used.

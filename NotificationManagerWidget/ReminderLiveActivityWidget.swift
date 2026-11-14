@@ -15,8 +15,11 @@ struct ReminderLiveActivityWidget: Widget {
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
-                    ReminderLiveActivityAppIcon(size: 24)
-                        .accessibilityHidden(true)
+                    HStack(spacing: 4) {
+                        ReminderLiveActivityAppIcon(size: 24)
+                            .accessibilityHidden(true)
+                        ReminderLiveActivityCloseButton(context: context)
+                    }
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     ReminderLiveActivityCounters(state: context.state, alignment: .trailing)
@@ -25,12 +28,7 @@ struct ReminderLiveActivityWidget: Widget {
                 }
                 DynamicIslandExpandedRegion(.bottom) {
                     VStack(alignment: .leading, spacing: 6) {
-                        Text(verbatim: context.state.title)
-                            .font(.headline)
-                            .lineLimit(2)
-                        ReminderLiveActivityRange(state: context.state)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                        ReminderLiveActivityText(state: context.state)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, 12)
@@ -75,20 +73,76 @@ private struct ReminderLiveActivityContent: View {
             ReminderLiveActivityAppIcon(size: 32)
                 .accessibilityHidden(true)
             VStack(alignment: .leading, spacing: 6) {
-                Text(verbatim: context.state.title)
-                    .font(.headline)
-                    .lineLimit(2)
-                ReminderLiveActivityRange(state: context.state)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                ReminderLiveActivityCounters(state: context.state)
-                    .font(.title3.monospacedDigit())
-                    .foregroundStyle(.blue)
+                ReminderLiveActivityText(state: context.state)
+                if context.state.displayText == nil {
+                    ReminderLiveActivityCounters(state: context.state)
+                        .font(.title3.monospacedDigit())
+                        .foregroundStyle(.blue)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .combine)
+            ReminderLiveActivityCloseButton(context: context)
         }
         .foregroundStyle(.primary)
-        .accessibilityElement(children: .combine)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct ReminderLiveActivityText: View {
+    let state: ReminderActivityAttributes.ContentState
+    @Environment(\.locale) private var locale
+
+    var body: some View {
+        if let display = state.displayText {
+            text(display.title).font(.headline).lineLimit(2)
+            text(display.body).font(.caption).lineLimit(4).foregroundStyle(.secondary)
+        } else {
+            Text(verbatim: state.title).font(.headline).lineLimit(2)
+            ReminderLiveActivityRange(state: state).font(.caption).foregroundStyle(.secondary)
+        }
+    }
+
+    private func text(_ segments: [DisplayTextSegment]) -> Text {
+        segments.reduce(Text(verbatim: "")) { result, segment in
+            switch segment.kind {
+            case .text:
+                result + Text(verbatim: segment.text)
+            case .remaining:
+                result
+                    + Text(
+                        .currentDate,
+                        format: ReminderLiveActivityTimePresentation.countdown(
+                            startDate: state.startDate, notificationDate: state.notificationDate
+                        ).locale(locale))
+            case .elapsed:
+                result
+                    + Text(
+                        timerInterval: ReminderLiveActivityTimePresentation.elapsedInterval(
+                            since: state.notificationDate),
+                        countsDown: false, showsHours: false)
+            }
+        }
+    }
+}
+
+private struct ReminderLiveActivityCloseButton: View {
+    let context: ActivityViewContext<ReminderActivityAttributes>
+
+    var body: some View {
+        Button(
+            intent: DismissReminderLiveActivityIntent(
+                eventID: context.attributes.eventID,
+                notificationDate: context.state.notificationDate)
+        ) {
+            Image(systemName: "xmark")
+                .font(.body.weight(.semibold))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(
+            Text(LocalizedStringResource("widget.live-activity.close", table: "Widget")))
     }
 }
 

@@ -21,6 +21,9 @@ final class AppRouter {
     let iCloudSyncStatusModel: ICloudSyncStatusModel?
     let tagManagementModel: TagManagementModel?
     let appIconSelectionModel: AppIconSelectionModel?
+    let customizationPurchaseModel: DisplayCustomizationPurchaseModel?
+    @ObservationIgnored let makeCustomizationEditor:
+        @MainActor (UUID?) -> DisplayCustomizationEditorModel?
     var compactPath: [AppRouterDestination] = []
     var regularDestination: AppRouterDestination?
     var selectedReminderID: UUID?
@@ -40,6 +43,9 @@ final class AppRouter {
         iCloudSyncStatusModel: ICloudSyncStatusModel? = nil,
         tagManagementModel: TagManagementModel? = nil,
         appIconSelectionModel: AppIconSelectionModel? = nil,
+        customizationPurchaseModel: DisplayCustomizationPurchaseModel? = nil,
+        makeCustomizationEditor: @escaping @MainActor (UUID?) -> DisplayCustomizationEditorModel? =
+            { _ in nil },
         createForm: @escaping @MainActor () -> ReminderFormModel? = { nil },
         canDuplicateReminder: @escaping @MainActor (UUID) -> Bool = { _ in false },
         duplicateForm: @escaping @MainActor (UUID) -> ReminderFormModel? = { _ in nil },
@@ -50,6 +56,8 @@ final class AppRouter {
         self.iCloudSyncStatusModel = iCloudSyncStatusModel
         self.tagManagementModel = tagManagementModel
         self.appIconSelectionModel = appIconSelectionModel
+        self.customizationPurchaseModel = customizationPurchaseModel
+        self.makeCustomizationEditor = makeCustomizationEditor
         self.createForm = createForm
         self.canDuplicateReminder = canDuplicateReminder
         self.duplicateForm = duplicateForm

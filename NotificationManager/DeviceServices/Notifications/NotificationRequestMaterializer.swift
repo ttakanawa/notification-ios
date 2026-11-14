@@ -1,6 +1,7 @@
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
+import NotificationManagerWidgetSupport
 import UserNotifications
 
 public struct MaterializationInput: Sendable {
@@ -8,17 +9,20 @@ public struct MaterializationInput: Sendable {
     public let locale: Locale
     public let evaluationNow: Date
     public let recurrenceEnvironment: any RecurrenceEnvironment
+    public let displayTemplate: DisplayTemplate?
 
     public init(
         reminder: ReminderSnapshot,
         locale: Locale,
         evaluationNow: Date,
-        recurrenceEnvironment: any RecurrenceEnvironment
+        recurrenceEnvironment: any RecurrenceEnvironment,
+        displayTemplate: DisplayTemplate? = nil
     ) {
         self.reminder = reminder
         self.locale = locale
         self.evaluationNow = evaluationNow
         self.recurrenceEnvironment = recurrenceEnvironment
+        self.displayTemplate = displayTemplate
     }
 }
 
@@ -111,7 +115,7 @@ public struct NotificationRequestMaterializer: Sendable {
             for: request,
             schedule: schedule
         )
-        let text = formatter.content(
+        let defaultText = formatter.content(
             for: NotificationTextInput(
                 title: input.reminder.title,
                 notes: input.reminder.notes,
@@ -120,6 +124,7 @@ public struct NotificationRequestMaterializer: Sendable {
             ),
             locale: input.locale
         )
+        let text = customizedText(input: input, request: request, schedule: schedule) ?? defaultText
 
         let content = UNMutableNotificationContent()
         content.title = truncator.truncate(text.title, maximumBytes: 256, ellipsis: text.ellipsis)
@@ -138,6 +143,43 @@ public struct NotificationRequestMaterializer: Sendable {
             content: content,
             trigger: trigger
         )
+    }
+
+    private func customizedText(
+        input: MaterializationInput, request: LogicalNotificationRequest,
+        schedule: ScheduleDefinition
+    ) -> NotificationText? {
+        guard let template = input.displayTemplate else { return nil }
+        let timeZone = TimeZone(identifier: schedule.source.timeZoneIdentifier) ?? .gmt
+        let formatter = DateFormatter()
+        formatter.locale = input.locale
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .none
+        formatter.timeStyle = .short
+        let date: Date
+        switch request.payload {
+        case .oneShot(let instant, _): date = instant
+        case .repeating(let components, _):
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            guard
+                let time = calendar.date(
+                    from: DateComponents(
+                        year: 2_000, month: 1, day: 1, hour: components.hour,
+                        minute: components.minute,
+                        second: components.second))
+            else { return nil }
+            date = time
+        }
+        guard
+            let rendered = try? DisplayTemplateRenderer.notification(
+                title: template.title, body: template.body,
+                values: DisplayTemplateValues(
+                    title: input.reminder.title, notes: input.reminder.notes,
+                    notificationTime: formatter.string(from: date),
+                    timeZone: schedule.source.timeZoneIdentifier))
+        else { return nil }
+        return NotificationText(title: rendered.title, body: rendered.body, ellipsis: "…")
     }
 
     private func notificationTrigger(
