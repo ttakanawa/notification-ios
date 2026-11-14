@@ -38,6 +38,8 @@ struct ReminderLiveActivityProjector: Sendable {
         reminders: [ReminderSnapshot],
         notificationsEnabled: Bool,
         now: Date,
+        isCustomizationPurchased: Bool = false,
+        globalCustomization: DisplayCustomization? = nil,
         environment: any RecurrenceEnvironment = FoundationRecurrenceEnvironment()
     ) throws -> [ReminderLiveActivityEvent] {
         guard notificationsEnabled, now.timeIntervalSince1970.isFinite else { return [] }
@@ -68,7 +70,11 @@ struct ReminderLiveActivityProjector: Sendable {
                         -TimeInterval(window.beforeSeconds)),
                     endDate: occurrence.instant.addingTimeInterval(
                         TimeInterval(window.afterSeconds)),
-                    notificationDate: occurrence.instant
+                    notificationDate: occurrence.instant,
+                    displayText: isCustomizationPurchased
+                        ? displayText(
+                            reminder: reminder, global: globalCustomization,
+                            notificationDate: occurrence.instant, timeZone: timeZone) : nil
                 )
                 guard event.isValid, event.activityEndDate > now else { continue }
                 events.append(event)
@@ -80,5 +86,24 @@ struct ReminderLiveActivityProjector: Sendable {
             if $0.startDate != $1.startDate { return $0.startDate < $1.startDate }
             return $0.id < $1.id
         }
+    }
+
+    private func displayText(
+        reminder: ReminderSnapshot, global: DisplayCustomization?, notificationDate: Date,
+        timeZone: TimeZone
+    ) -> LiveActivityDisplayText? {
+        guard let template = reminder.displayCustomization?.liveActivity ?? global?.liveActivity
+        else { return nil }
+        let formatter = DateFormatter()
+        formatter.locale = .current
+        formatter.timeZone = timeZone
+        formatter.dateStyle = .short
+        formatter.timeStyle = .short
+        return try? DisplayTemplateRenderer.liveActivity(
+            title: template.title, body: template.body,
+            values: DisplayTemplateValues(
+                title: reminder.title, notes: reminder.notes,
+                notificationTime: formatter.string(from: notificationDate),
+                timeZone: timeZone.identifier))
     }
 }

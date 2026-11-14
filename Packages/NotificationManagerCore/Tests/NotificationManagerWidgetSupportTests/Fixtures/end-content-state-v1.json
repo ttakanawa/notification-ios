@@ -1,0 +1,35 @@
+{
+  "description": "contentStateVersion=1. Date values inside content-state use the Swift Codable reference epoch (2001-01-01), not Unix. APNs timestamp/dismissal-date/expiration use Unix seconds. New optional presentation fields must decode with defaults so this end payload remains valid.",
+  "request": {
+    "revision": "12",
+    "pushToken": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "startsAt": "2026-11-16T09:00:00Z",
+    "notificationAt": "2026-11-16T09:30:00Z",
+    "endsAt": "2026-11-16T10:00:00Z",
+    "activityEndsAt": "2026-11-16T10:00:00Z",
+    "contentStateVersion": 1
+  },
+  "sentAt": "2026-11-16T10:00:00Z",
+  "headers": {
+    "apns-push-type": "liveactivity",
+    "apns-topic": "org.tknw.punctual.push-type.liveactivity",
+    "apns-priority": "10",
+    "apns-expiration": "1794862800"
+  },
+  "payload": {
+    "aps": {
+      "timestamp": 1794823200,
+      "event": "end",
+      "dismissal-date": 1794823199,
+      "content-state": {
+        "title": "",
+        "startDate": 816512400,
+        "endDate": 816516000,
+        "activityEndDate": 816516000,
+        "notificationDate": 816514200,
+        "displayVersion": 8,
+        "notificationHasOccurred": true
+      }
+    }
+  }
+}

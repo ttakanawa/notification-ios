@@ -206,13 +206,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "This app uses no app-operated server, analytics SDK, or advertising SDK."
+            "value": "The end notification server receives App Attest verification data, activity push tokens and timing. It receives no reminder titles, notes or templates. This app uses no analytics or advertising SDK. APNs delivery and exact dismissal time are not guaranteed."
           }
         },
         "ja": {
           "stringUnit": {
             "state": "translated",
-            "value": "このアプリは、アプリ独自のサーバー、分析 SDK、広告 SDK を使用しません。"
+            "value": "終了通知サーバーに App Attest の検証データ、 ライブアクティビティの配信トークンと時刻を送信します。 タイトル、 メモ、 テンプレートは送信しません。 分析・広告 SDK は使用しません。 APNs の配信と正確な終了時刻は保証されません。"
           }
         }
       }

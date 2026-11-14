@@ -37,6 +37,12 @@
     <false/>
     <key>NSSupportsLiveActivities</key>
     <true/>
+    <key>PunctualEndAPIBaseURL</key>
+    <string>$(PUNCTUAL_END_API_ORIGIN)</string>
+    <key>PunctualEndAPIEnvironment</key>
+    <string>$(PUNCTUAL_END_API_ENVIRONMENT)</string>
+    <key>PunctualAppAttestEnvironment</key>
+    <string>$(PUNCTUAL_APP_ATTEST_ENVIRONMENT)</string>
     <key>NSAlarmKitUsageDescription</key>
     <string>Allow alarms to show a test countdown and display your message at the chosen time.</string>
     <key>UIBackgroundModes</key>

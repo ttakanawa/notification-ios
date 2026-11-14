@@ -71,7 +71,7 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
             activity = try Activity.request(
                 attributes: attributes,
                 content: content,
-                pushType: nil,
+                pushType: .token,
                 style: .standard,
                 alertConfiguration: AlertConfiguration(
                     title: LocalizedStringResource("common.app-name", table: "Common"),
@@ -87,7 +87,8 @@ struct SystemReminderLiveActivityClient: ReminderLiveActivityClient {
                 start: event.startDate
             )
         } else {
-            activity = try Activity.request(attributes: attributes, content: content, pushType: nil)
+            activity = try Activity.request(
+                attributes: attributes, content: content, pushType: .token)
         }
         return activity.id
     }

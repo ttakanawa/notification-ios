@@ -76,6 +76,7 @@ write_fixture_catalogs() {
     mv "$catalog_root/Reminder.updated.xcstrings" "$catalog_root/Reminder.xcstrings"
     write_catalog "$catalog_root/NotificationText.xcstrings" localization.repeat.one-time Once
     write_catalog "$catalog_root/Settings.xcstrings" settings.title Settings
+    write_catalog "$catalog_root/Customization.xcstrings" customization.title Customize
     write_tags_catalog "$catalog_root/Tags.xcstrings"
     write_catalog "$catalog_root/Recovery.xcstrings" recovery.error.data-unavailable Unavailable
     write_catalog "$catalog_root/Widget.xcstrings" widget.state.no-upcoming "No upcoming reminders"
@@ -91,6 +92,7 @@ run_validator() {
         "$catalog_root/Settings.xcstrings" \
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
+        "$catalog_root/Customization.xcstrings" \
         --source-root "$source_root"
 }
 
@@ -105,6 +107,7 @@ run_validator_with_widget() {
         "$catalog_root/Settings.xcstrings" \
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
+        "$catalog_root/Customization.xcstrings" \
         "$catalog_root/Widget.xcstrings" \
         "$@" \
         --source-root "$source_root"
@@ -146,9 +149,9 @@ write_fixture_catalogs
 
 success_output=$(run_validator "$valid_source_root")
 case "$success_output" in
-    *"Validated 8 localization keys across 7 catalogs for English and Japanese."*) ;;
+    *"Validated 9 localization keys across 8 catalogs for English and Japanese."*) ;;
     *)
-        echo "Seven-catalog success summary was not emitted." >&2
+        echo "Eight-catalog success summary was not emitted." >&2
         echo "$success_output" >&2
         exit 1
         ;;
@@ -156,7 +159,7 @@ esac
 
 widget_success_output=$(run_validator_with_widget "$valid_source_root")
 case "$widget_success_output" in
-    *"Validated 9 localization keys across 8 catalogs for English and Japanese."*) ;;
+    *"Validated 10 localization keys across 9 catalogs for English and Japanese."*) ;;
     *)
         echo "Optional Widget-catalog success summary was not emitted." >&2
         echo "$widget_success_output" >&2
@@ -167,7 +170,7 @@ esac
 write_catalog "$catalog_root/InfoPlist.xcstrings" NSAlarmKitUsageDescription "Allow trial alarms"
 info_success_output=$(run_validator_with_widget "$valid_source_root" "$catalog_root/InfoPlist.xcstrings")
 case "$info_success_output" in
-    *"Validated 10 localization keys across 9 catalogs for English and Japanese."*) ;;
+    *"Validated 11 localization keys across 10 catalogs for English and Japanese."*) ;;
     *)
         echo "Optional InfoPlist-catalog success summary was not emitted." >&2
         echo "$info_success_output" >&2
@@ -240,6 +243,7 @@ expect_failure_containing \
         "$catalog_root/Settings.xcstrings" \
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
+        "$catalog_root/Customization.xcstrings" \
         "$catalog_root/Unknown.xcstrings" \
         --source-root "$valid_source_root"
 
@@ -253,6 +257,7 @@ expect_failure_containing \
         "$catalog_root/Settings.xcstrings" \
         "$catalog_root/Tags.xcstrings" \
         "$catalog_root/Recovery.xcstrings" \
+        "$catalog_root/Customization.xcstrings" \
         "$catalog_root/Common.xcstrings" \
         --source-root "$valid_source_root"
 

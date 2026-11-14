@@ -72,6 +72,16 @@ public struct NotificationReconcileTimerState: Sendable, Equatable {
 }
 
 public actor NotificationReconcileWorker: ReconcileRequesting {
+    public struct DisplayConfiguration: Sendable {
+        public let isPurchased: Bool
+        public let global: DisplayCustomization?
+
+        public init(isPurchased: Bool = false, global: DisplayCustomization? = nil) {
+            self.isPurchased = isPurchased
+            self.global = global
+        }
+    }
+
     private struct MaterializedRequest {
         let logical: LogicalNotificationRequest
         let request: UNNotificationRequest
@@ -87,6 +97,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
     private let materializer: any NotificationRequestMaterializing
     private let recurrenceEnvironmentProvider: @Sendable () -> any RecurrenceEnvironment
     private let localeProvider: @Sendable () -> Locale
+    private let displayConfiguration: @Sendable () async -> DisplayConfiguration
     private let clock: NotificationReconcileClock
     private let retryDelays: [TimeInterval]
     private let triggerInspector:
@@ -118,6 +129,9 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             FoundationRecurrenceEnvironment()
         },
         localeProvider: @escaping @Sendable () -> Locale = { .current },
+        displayConfiguration: @escaping @Sendable () async -> DisplayConfiguration = {
+            DisplayConfiguration()
+        },
         clock: NotificationReconcileClock = .continuous,
         retryDelays: [TimeInterval] = [1, 2, 4, 8, 16, 32, 60],
         triggerInspector:
@@ -135,6 +149,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
         self.materializer = materializer
         self.recurrenceEnvironmentProvider = recurrenceEnvironmentProvider
         self.localeProvider = localeProvider
+        self.displayConfiguration = displayConfiguration
         self.clock = clock
         self.retryDelays = retryDelays
         self.triggerInspector = triggerInspector
@@ -283,6 +298,7 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
             return false
         }
 
+        let display = await displayConfiguration()
         let remindersByID = Dictionary(uniqueKeysWithValues: snapshot.reminders.map { ($0.id, $0) })
         var outcomes = logicalPlan.outcomes
         var materialized: [MaterializedRequest] = []
@@ -299,7 +315,10 @@ public actor NotificationReconcileWorker: ReconcileRequesting {
                         reminder: reminder,
                         locale: locale,
                         evaluationNow: evaluationNow,
-                        recurrenceEnvironment: environment
+                        recurrenceEnvironment: environment,
+                        displayTemplate: display.isPurchased
+                            ? reminder.displayCustomization?.notification
+                                ?? display.global?.notification : nil
                     )
                 )
                 materialized.append(MaterializedRequest(logical: logical, request: request))

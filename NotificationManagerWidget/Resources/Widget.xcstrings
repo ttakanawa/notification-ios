@@ -1,6 +1,24 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "widget.live-activity.close": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Close this Live Activity"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "今回のライブアクティビティを閉じる"
+          }
+        }
+      },
+      "comment": "Accessibility label for the free button that dismisses only this occurrence on this device."
+    },
     "widget.live-activity.countdown-prefix": {
       "comment": "Prefix on the countdown row of the two-row Live Activity. Preserve the trailing space.",
       "extractionState": "manual",

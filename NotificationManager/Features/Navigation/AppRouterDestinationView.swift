@@ -29,7 +29,9 @@ struct AppRouterDestinationView: View {
                         model: settings,
                         iCloudModel: iCloud,
                         tagModel: tags,
-                        appIconModel: appIcons
+                        appIconModel: appIcons,
+                        customization: router.customizationPurchaseModel,
+                        makeCustomizationEditor: { router.makeCustomizationEditor(nil) }
                     )
                 } else {
                     unavailable

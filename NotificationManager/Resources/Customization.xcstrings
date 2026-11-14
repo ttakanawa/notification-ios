@@ -1,0 +1,636 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "customization.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Display customization"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示のカスタマイズ"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.notification": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notifications"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.live-activity": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Live Activities"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "ライブアクティビティ"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.use-template": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Use a custom template"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テンプレートを使用"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.template-title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title template"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトルのテンプレート"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.template-body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Body template"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "本文のテンプレート"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.insert-field": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Insert a field"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "表示する項目を挿入"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.presets": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose a preset"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "プリセットを選択"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.preset-title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title only"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトルのみ"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.preset-details": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title and details"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトルと詳細"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.preview": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sample preview"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "サンプルプレビュー"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.purchased": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Customization unlocked"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "カスタマイズ購入済み"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.purchase-help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "One purchase unlocks notification and Live Activity templates on your devices. Closing a Live Activity is free for everyone."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "一度の購入で通知とライブアクティビティの表示を変更できます。 × ボタンはすべてのユーザーが無料で使用できます。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.restore": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restore purchases"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入を復元"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.retry": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reload product"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "商品情報を再取得"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for purchase approval."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入の承認を待っています。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.product-unavailable": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Product information could not be loaded. Please try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "商品情報を取得できませんでした。 再度お試しください。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.purchase-error": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The purchase or restore could not be completed. Please try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "購入または復元を完了できませんでした。 再度お試しください。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.global-help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These defaults apply when a reminder has no template for that display. Templates sync when iCloud sync is enabled. A device without this purchase uses the standard display and keeps your templates."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "リマインダーに個別の設定がない場合に適用されます。 テンプレートは iCloud 同期の対象です。 未購入の端末では標準表示を使い、 設定は保持します。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.reminder-help": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "These templates override the corresponding defaults for this reminder. Turn off a template to use the default. Changes are saved separately from other reminder edits."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "このリマインダーでは共通設定より優先されます。 オフにすると共通設定を使用します。 この設定はリマインダーの他の編集とは別に保存されます。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.privacy": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Template text stays on your devices and in your iCloud. The end notification server receives only activity timing and delivery information. Timer fields are available only in Live Activities. Oversize or invalid templates use the standard display."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "テンプレートの内容は端末と iCloud に保存します。 終了通知サーバーには表示時刻と配信情報のみを送信します。 タイマー項目はライブアクティビティで使用できます。 表示上限を超えた場合や無効なテンプレートの場合は標準表示になります。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.unsupported": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This customization was created by a newer app version. It will be kept unchanged unless you explicitly replace it."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "新しいバージョンのアプリで作成された設定です。 明示的に置き換えるまで元のデータを保持します。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.replace": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace customization"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を置き換える"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.replace-confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Replace the existing customization? Saving will overwrite the original data."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "既存の設定を置き換えますか？ 保存すると元の設定が上書きされます。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.error.load": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not load customization. Reopen this screen to try again."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定を読み込めませんでした。 この画面を開き直してください。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.error.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Could not save customization. Your edits are still here."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "保存できませんでした。 編集内容はこの画面に残っています。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.error.template": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Check the field names and braces. Titles must not be empty. Timers are for Live Activities only. Templates must fit the display size limit."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "項目名と波括弧を確認してください。 タイトルは必須です。 タイマーはライブアクティビティ専用です。 テンプレートは表示サイズの上限内にしてください。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.save-first": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Save the reminder first to customize its display."
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "個別の表示を変更するには、 先にリマインダーを保存してください。"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Title"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "タイトル"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.notes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notes"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "メモ"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.remaining": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remaining time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "残り時間"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.elapsed": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Elapsed time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "経過時間"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.notification-time": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notification time"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "通知時刻"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    },
+    "customization.field.time-zone": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Source time zone"
+          }
+        },
+        "ja": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "設定タイムゾーン"
+          }
+        }
+      },
+      "comment": "Display customization editor text. Braced field names in templates are literal variable names and must not be translated."
+    }
+  },
+  "version": "1.0"
+}

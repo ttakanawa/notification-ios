@@ -28,6 +28,7 @@ private enum CatalogTable: String, CaseIterable {
     case settings = "Settings"
     case tags = "Tags"
     case recovery = "Recovery"
+    case customization = "Customization"
     case widget = "Widget"
     case infoPlist = "InfoPlist"
 
@@ -62,6 +63,8 @@ private enum CatalogTable: String, CaseIterable {
                 || key.hasPrefix("recovery.")
         case .widget:
             key.hasPrefix("widget.")
+        case .customization:
+            key.hasPrefix("customization.")
         case .infoPlist:
             key == "NSAlarmKitUsageDescription"
         }
@@ -816,7 +819,7 @@ private struct LocalizationValidator {
 
     private static func semanticReferences(in source: String) -> Set<String> {
         let pattern =
-            #"\"((?:reminder|settings|tags|common|data_unavailable|notification_unavailable|privacy|recovery|localization|widget)(?:\.[a-z0-9_-]+)+)\""#
+            #"\"((?:reminder|settings|tags|common|data_unavailable|notification_unavailable|privacy|recovery|localization|customization|widget)(?:\.[a-z0-9_-]+)+)\""#
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return [] }
         let range = NSRange(source.startIndex..<source.endIndex, in: source)
         return Set(
@@ -831,7 +834,7 @@ private struct LocalizationValidator {
     ) -> Set<ExplicitTableReference> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization|widget)"
+            + "notification_unavailable|privacy|recovery|localization|customization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let pattern =
             "(?:LocalizedStringResource\\s*\\(\\s*|"
@@ -1021,7 +1024,7 @@ private struct LocalizationValidator {
     private static func interpolatedSemanticKeys(in source: String) -> Set<String> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization|widget)"
+            + "notification_unavailable|privacy|recovery|localization|customization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
         let modifierKinds = regularExpressionAlternation(for: localizedModifierKinds)
@@ -1077,7 +1080,7 @@ private struct LocalizationValidator {
     private static func interpolatedSemanticKey(in value: String) -> String? {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization|widget)"
+            + "notification_unavailable|privacy|recovery|localization|customization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let pattern = "^(\(semanticKey))\\s*\\\\\\("
         guard let expression = try? NSRegularExpression(pattern: pattern) else { return nil }
@@ -1095,7 +1098,7 @@ private struct LocalizationValidator {
     ) -> Set<ImplicitSemanticLookup> {
         let semanticKey =
             "(?:reminder|settings|tags|common|data_unavailable|"
-            + "notification_unavailable|privacy|recovery|localization|widget)"
+            + "notification_unavailable|privacy|recovery|localization|customization|widget)"
             + "(?:\\.[a-z0-9_-]+)+"
         let initializerKinds = regularExpressionAlternation(for: localizedInitializerKinds)
         let viewPattern =
