@@ -95,6 +95,7 @@ extension RetainedReminderRepository {
             throw RetainedStoreError.staleAccount
         }
         var next = archive
+        var imported: [RetainedCloudRevision] = []
         var cache = next.legacyCurrent[account, default: [:]]
         for record in records {
             let data = try RetainedCoding.encode(record)
@@ -114,6 +115,7 @@ extension RetainedReminderRepository {
                 let tombstone = RetainedCloudRevision(
                     entityKey: key, parents: previous.map { [$0] } ?? [], payload: nil)
                 next.revisions[tombstone.id.uuidString] = tombstone
+                imported.append(tombstone)
                 next.legacyHeads[account, default: [:]][key] = tombstone.id.uuidString
                 next.legacyCommitted[account, default: [:]][tombstone.id.uuidString] =
                     tombstone.fingerprint
@@ -186,6 +188,7 @@ extension RetainedReminderRepository {
                 payload: payload
             )
             next.revisions[revision.id.uuidString] = revision
+            imported.append(revision)
             next.legacyHeads[account, default: [:]][key] = revision.id.uuidString
             // Legacy cloud data is committed, but the immutable V1 copy must also be sent.
             next.legacyCommitted[account, default: [:]][revision.id.uuidString] =
@@ -193,5 +196,9 @@ extension RetainedReminderRepository {
         }
         next.legacyTokens[account] = token
         try commit(next)
+        for revision in imported {
+            sessionAcknowledgments[account, default: [:]][revision.id.uuidString] =
+                revision.fingerprint
+        }
     }
 }

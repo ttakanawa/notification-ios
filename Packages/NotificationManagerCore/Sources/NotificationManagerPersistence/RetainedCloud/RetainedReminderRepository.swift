@@ -12,6 +12,7 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
     private var proposedAccount: String?
     var phase: RetainedSyncPhase = .checking
     private var systemLocalOnly = false
+    var sessionAcknowledgments: [String: [String: String]] = [:]
     private var cloudImportSessions: Set<UUID> = []
     private var observers: [UUID: AsyncStream<Void>.Continuation] = [:]
 
@@ -253,8 +254,7 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
         }
         if let global = self.current("customization/global") { required.append(global) }
         return required.allSatisfy {
-            archive.acknowledgments[account]?[$0.id.uuidString] == $0.fingerprint
-                || archive.legacyCommitted[account]?[$0.id.uuidString] == $0.fingerprint
+            sessionAcknowledgments[account]?[$0.id.uuidString] == $0.fingerprint
         }
     }
 
@@ -364,11 +364,15 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
             throw RetainedStoreError.invalidRevision
         }
         if archive.acknowledgments[account]?[revision.id.uuidString] == revision.fingerprint {
+            sessionAcknowledgments[account, default: [:]][revision.id.uuidString] =
+                revision.fingerprint
+            notify()
             return
         }
         var next = archive
         next.acknowledgments[account, default: [:]][revision.id.uuidString] = revision.fingerprint
         try commit(next)
+        sessionAcknowledgments[account, default: [:]][revision.id.uuidString] = revision.fingerprint
     }
 
     public func importRevision(_ revision: RetainedCloudRevision, account: String) throws {
@@ -382,12 +386,16 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
         if archive.revisions[revision.id.uuidString] == revision,
             archive.acknowledgments[account]?[revision.id.uuidString] == revision.fingerprint
         {
+            sessionAcknowledgments[account, default: [:]][revision.id.uuidString] =
+                revision.fingerprint
+            notify()
             return
         }
         var next = archive
         next.revisions[revision.id.uuidString] = revision
         next.acknowledgments[account, default: [:]][revision.id.uuidString] = revision.fingerprint
         try commit(next)
+        sessionAcknowledgments[account, default: [:]][revision.id.uuidString] = revision.fingerprint
     }
 
     public func recoveryRevisions() -> [RetainedCloudRevision] {
@@ -403,6 +411,31 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
             throw RetainedStoreError.invalidRevision
         }
         try append(entityKey: revision.entityKey, payload: revision.payload)
+    }
+
+    /// Disk receipts are an optimization, not proof about the currently signed database.
+    /// Revalidate visible heads after process restart before releasing publication.
+    public func revisionsNeedingReceiptValidation(account: String) -> [RetainedCloudRevision] {
+        guard currentAccount == account, phase == .syncing else { return [] }
+        return Set(archive.revisions.values.map(\.entityKey)).compactMap { current($0) }.filter {
+            sessionAcknowledgments[account]?[$0.id.uuidString] != $0.fingerprint
+                && (archive.acknowledgments[account]?[$0.id.uuidString] == $0.fingerprint
+                    || archive.legacyCommitted[account]?[$0.id.uuidString] == $0.fingerprint)
+        }
+    }
+
+    /// A positively missing saved record means archived receipts must be rebuilt. All
+    /// immutable values remain pending; no timestamp or inferred environment can release them.
+    public func resetCloudReceipts(account: String) throws {
+        guard currentAccount == account, phase == .syncing else {
+            throw RetainedStoreError.staleAccount
+        }
+        var next = archive
+        next.acknowledgments[account] = [:]
+        next.legacyCommitted[account] = [:]
+        try commit(next)
+        sessionAcknowledgments[account] = [:]
+        notify()
     }
 
     public func beginCloudImport(account: String) throws -> UUID {
@@ -437,6 +470,7 @@ public actor RetainedReminderRepository: ReminderRepository, ReminderCloudCommit
         next.engineStates.removeValue(forKey: account)
         next.acceptedAccount = nil
         try commit(next)
+        sessionAcknowledgments[account] = [:]
         currentAccount = nil
         proposedAccount = account
         phase = .confirmationRequired

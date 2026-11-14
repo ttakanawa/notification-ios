@@ -48,8 +48,12 @@ and permit publication after a local save. Offline or indeterminate identity doe
 not imply a different account and does not permit cloud-mode publication.
 
 Container ID, build environment and the real container user-record name scope
-receipts and engine state. Launch/resume, account notifications, network recovery,
-local edits, manual retry, and CloudKit notifications invoke a verified sync pass.
+receipts and engine state. Archived receipts alone do not open the gate after
+process restart: visible heads are re-read from the current signed CloudKit
+database and their exact payloads verified. A positively missing saved record
+invalidates cached receipts and queues retained versions again. This also avoids
+trusting a receipt from a differently signed CloudKit environment. Launch/resume,
+account notifications, network recovery, local edits, manual retry, and CloudKit notifications invoke a verified sync pass.
 The [sync service](../Packages/NotificationManagerCore/Sources/NotificationManagerPersistence/RetainedCloud/RetainedCloudSyncService.swift#L5)
 uses manual CKSyncEngine scheduling. It never enables automatic resumption into a
 new account. The account is checked before engine creation and immediately before
@@ -135,13 +139,13 @@ across restart, unknown identities, refusal, account-scoped receipts, late
 acknowledgments with equal timestamps, imported-commit gating, future/corrupt raw
 payload preservation, UUID/tag migration, encrypted legacy values/assets and CDMR
 relationships, causal deletion conflicts, restore copies, failed local saves,
-corrupt-archive refusal and shared-scene serialization. No test changes the real
-Apple Account, removes CloudKit data, or requires production credentials.
+corrupt-archive refusal, shared-scene serialization and restart receipt
+revalidation. No test changes the real Apple Account, removes CloudKit data, or requires production credentials.
 
 Validation on 2026-11-15: the full CI check passed, including strict Swift
 format/SwiftLint (zero violations), all 336 English/Japanese localization keys,
 localization fixtures, distribution checks/mutation fixtures, Xcode Cloud hook
-fixtures and all 381 core package tests (including 17 retained-persistence cases).
+fixtures and all 382 core package tests (including 18 retained-persistence cases).
 ShellCheck passed for both changed distribution scripts. Debug and Release iOS
 Simulator builds passed, and all Xcode test targets built successfully.
 
@@ -170,3 +174,6 @@ are sync opportunities, not a guarantee of immediate background delivery.
 - [Apple: cancelOperations](https://developer.apple.com/documentation/cloudkit/cksyncengine-5sie5/canceloperations())
   notes that in-flight work can complete after cancellation; generation/account
   checks remain necessary.
+- [Apple: CloudKit container environments](https://developer.apple.com/documentation/cloudkit/ckcontainer)
+  explains that the signed entitlement selects development versus production;
+  cached local receipts therefore require validation against the current database.

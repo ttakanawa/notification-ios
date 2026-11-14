@@ -122,6 +122,7 @@ public actor RetainedCloudSyncService: CKSyncEngineDelegate {
             guard activeGeneration == generation, try await verifiedAccount() == account else {
                 return
             }
+            try await validateReceipts(account: account, generation: activeGeneration)
             await finishImport()
             engine.state.add(pendingDatabaseChanges: [.saveZone(CKRecordZone(zoneID: zoneID))])
             let pending = await repository.pendingRevisions(account: account)
@@ -135,6 +136,32 @@ public actor RetainedCloudSyncService: CKSyncEngineDelegate {
             // No receipt is fabricated on an error. All revisions remain durable for retry.
             if attempt == generation { await repository.markSyncFailed() }
             await finishImport()
+        }
+    }
+
+    private func validateReceipts(account: String, generation expected: UInt64) async throws {
+        let revisions = await repository.revisionsNeedingReceiptValidation(account: account)
+        for start in stride(from: 0, to: revisions.count, by: 100) {
+            let batch = Array(revisions[start..<min(start + 100, revisions.count)])
+            let ids = batch.map { CKRecord.ID(recordName: $0.id.uuidString, zoneID: zoneID) }
+            let results = try await container.privateCloudDatabase.records(for: ids)
+            guard expected == generation, try await verifiedAccount() == account else {
+                throw RetainedStoreError.staleAccount
+            }
+            for revision in batch {
+                let id = CKRecord.ID(recordName: revision.id.uuidString, zoneID: zoneID)
+                guard let result = results[id] else { throw RetainedStoreError.invalidRevision }
+                do {
+                    let saved = try Self.revision(result.get())
+                    guard saved == revision else {
+                        throw RetainedStoreError.immutableRevisionCollision
+                    }
+                    try await repository.acknowledge(saved, account: account)
+                } catch let error as CKError where error.code == .unknownItem {
+                    try await repository.resetCloudReceipts(account: account)
+                    return
+                }
+            }
         }
     }
 
@@ -248,6 +275,13 @@ public actor RetainedCloudSyncService: CKSyncEngineDelegate {
             (try? await verifiedAccount()) == account
         else { return nil }
         let pending = await repository.pendingRevisions(account: account)
+        let pendingNames = Set(pending.map { $0.id.uuidString })
+        let obsolete = syncEngine.state.pendingRecordZoneChanges.filter { change in
+            guard case .saveRecord(let id) = change, id.zoneID == zoneID else { return false }
+            return !pendingNames.contains(id.recordName)
+        }
+        // A receipt may have persisted before the engine's pending-state checkpoint.
+        syncEngine.state.remove(pendingRecordZoneChanges: obsolete)
         let requested = Set(
             syncEngine.state.pendingRecordZoneChanges.compactMap { change -> String? in
                 guard context.options.scope.contains(change), case .saveRecord(let id) = change,

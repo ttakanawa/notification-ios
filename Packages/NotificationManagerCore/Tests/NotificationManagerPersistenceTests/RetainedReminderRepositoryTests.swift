@@ -61,6 +61,10 @@ import Testing
         let reopened = try RetainedReminderRepository(url: fixture.url)
         #expect(await !reopened.canPublish(edited))
         #expect(try await reopened.checkAccount(accountA))
+        #expect(await !reopened.canPublish(edited))
+        for revision in await reopened.revisionsNeedingReceiptValidation(account: accountA) {
+            try await reopened.acknowledge(revision, account: accountA)
+        }
         #expect(await reopened.canPublish(edited))
     }
 
@@ -361,6 +365,28 @@ import Testing
         #expect(await !fixture.repository.canPublish(saved))
         await fixture.repository.finishCloudImport(second)
         #expect(await fixture.repository.canPublish(saved))
+    }
+
+    @Test func missingCloudCopyCannotReuseCachedReceiptAfterRestart() async throws {
+        let fixture = try fixture()
+        defer { fixture.clean() }
+        #expect(try await fixture.repository.checkAccount(accountA))
+        let saved = try await fixture.repository.save(mutation())
+        let revision = try #require(
+            await fixture.repository.pendingRevisions(account: accountA).first)
+        try await fixture.repository.acknowledge(revision, account: accountA)
+        let reopened = try RetainedReminderRepository(url: fixture.url)
+        #expect(try await reopened.checkAccount(accountA))
+        #expect(await !reopened.canPublish(saved))
+        #expect(
+            await reopened.revisionsNeedingReceiptValidation(account: accountA).map(\.id) == [
+                revision.id
+            ])
+        try await reopened.resetCloudReceipts(account: accountA)
+        #expect(await !reopened.canPublish(saved))
+        #expect(await reopened.pendingRevisions(account: accountA).map(\.id) == [revision.id])
+        try await reopened.acknowledge(revision, account: accountA)
+        #expect(await reopened.canPublish(saved))
     }
 
     private func mutation(
