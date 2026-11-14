@@ -44,6 +44,7 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     private var routeResponse: ResponseRouter
     private var openURL: URLOpener
     private var reconcileAfterNotification: @Sendable (AppLifecycleTrigger) async -> Void
+    var cloudRefresh: @Sendable () async -> Void = {}
     private var isInstalled = false
     private var responseQueue: [QueuedNotificationResponse] = []
     private var responseDrainTask: Task<Void, Never>?
@@ -349,10 +350,19 @@ final class NotificationApplicationDelegate: NSObject, UNUserNotificationCenterD
     extension NotificationApplicationDelegate: UIApplicationDelegate {
         func application(
             _ application: UIApplication,
+            didReceiveRemoteNotification userInfo: [AnyHashable: Any]
+        ) async -> UIBackgroundFetchResult {
+            await cloudRefresh()
+            return .newData
+        }
+
+        func application(
+            _ application: UIApplication,
             didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? =
                 nil
         ) -> Bool {
             install()
+            application.registerForRemoteNotifications()
             return true
         }
     }

@@ -2,8 +2,8 @@
 
 set -eu
 
-script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repository_root=$(CDPATH= cd -- "$script_directory/../.." && pwd)
+script_directory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repository_root=$(CDPATH='' cd -- "$script_directory/../.." && pwd)
 temporary_directory=$(mktemp -d)
 fixture_root="$temporary_directory/project"
 fixture_project="$fixture_root/NotificationManager.xcodeproj/project.pbxproj"
@@ -90,6 +90,22 @@ build_diagnostic="build numbers must be matching positive integers"
 marketing_diagnostic="marketing versions must match"
 
 expect_success "current project"
+
+# CloudKit's one delegate registration is allowed; unrelated registrations and
+# global APNs token collection remain rejected.
+fixture_delegate="$fixture_root/NotificationManager/App/NotificationApplicationDelegate.swift"
+cp "$fixture_delegate" "$temporary_directory/original-delegate.swift"
+printf '%s\n' 'application.registerForRemoteNotifications()' \
+    > "$fixture_root/Packages/NotificationManagerCore/Sources/UnauthorizedRegistration.swift"
+expect_failure "registration outside delegate" "registration must occur only in the application delegate"
+rm "$fixture_root/Packages/NotificationManagerCore/Sources/UnauthorizedRegistration.swift"
+printf '%s\n' 'application.registerForRemoteNotifications()' >> "$fixture_delegate"
+expect_failure "duplicate delegate registration" "registration count"
+cp "$temporary_directory/original-delegate.swift" "$fixture_delegate"
+printf '%s\n' 'func didRegisterForRemoteNotifications() {}' >> "$fixture_delegate"
+expect_failure "global APNs token collection" "must not collect or forward device APNs tokens"
+cp "$temporary_directory/original-delegate.swift" "$fixture_delegate"
+expect_success "CloudKit registration fixture restored"
 
 # Select valid values that differ from the source project after version bumps.
 mismatched_build_number=$(jq -r --arg configuration_id "$app_debug_id" '

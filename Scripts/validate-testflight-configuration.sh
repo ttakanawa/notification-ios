@@ -2,8 +2,8 @@
 
 set -eu
 
-script_directory=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-repository_root=$(CDPATH= cd -- "$script_directory/.." && pwd)
+script_directory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+repository_root=$(CDPATH='' cd -- "$script_directory/.." && pwd)
 info_plist="$repository_root/NotificationManager/SupportingFiles/Info.plist"
 entitlements="$repository_root/NotificationManager/SupportingFiles/NotificationManager.entitlements"
 widget_info_plist="$repository_root/NotificationManagerWidget/SupportingFiles/Info.plist"
@@ -40,9 +40,14 @@ widget_entitlements_json=$(plutil -convert json -o - "$widget_entitlements")
 project_json=$(plutil -convert json -o - "$project_file")
 
 assert_equal "Punctual" "$(printf '%s' "$info_json" | jq -r '.CFBundleDisplayName')" "CFBundleDisplayName"
+# Xcode build-setting references must remain literal in the plist comparison.
+# shellcheck disable=SC2016
 assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$info_json" | jq -r '.CFBundleShortVersionString')" "CFBundleShortVersionString"
+# shellcheck disable=SC2016
 assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$info_json" | jq -r '.CFBundleVersion')" "CFBundleVersion"
+# shellcheck disable=SC2016
 assert_equal '$(MARKETING_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleShortVersionString')" "Widget CFBundleShortVersionString"
+# shellcheck disable=SC2016
 assert_equal '$(CURRENT_PROJECT_VERSION)' "$(printf '%s' "$widget_info_json" | jq -r '.CFBundleVersion')" "Widget CFBundleVersion"
 
 printf '%s' "$info_json" | jq -e '.UIBackgroundModes == ["remote-notification"]' >/dev/null \
@@ -667,9 +672,18 @@ printf '%s' "$privacy_json" | jq -e \
     '.NSPrivacyAccessedAPITypes == [{"NSPrivacyAccessedAPIType":"NSPrivacyAccessedAPICategoryUserDefaults","NSPrivacyAccessedAPITypeReasons":["CA92.1"]}]' >/dev/null \
     || fail "privacy manifest must declare only UserDefaults reason CA92.1"
 
-if rg -n 'registerForRemoteNotifications|didRegisterForRemoteNotifications|didFailToRegisterForRemoteNotifications' \
-    "$repository_root/NotificationManager" "$repository_root/Packages" >/dev/null; then
-    fail "remote-notification registration code is not allowed"
+# Manual CKSyncEngine scheduling needs CloudKit silent notifications. Keep the
+# sole registration in the application delegate; device APNs tokens are not used.
+notification_delegate="$repository_root/NotificationManager/App/NotificationApplicationDelegate.swift"
+registration_files=$(rg -l 'registerForRemoteNotifications|didRegisterForRemoteNotifications|didFailToRegisterForRemoteNotifications' \
+    "$repository_root/NotificationManager" "$repository_root/Packages" || true)
+[ "$registration_files" = "$notification_delegate" ] \
+    || fail "CloudKit remote-notification registration must occur only in the application delegate"
+registration_count=$(rg -c 'application\.registerForRemoteNotifications\(\)' "$notification_delegate" || true)
+assert_equal "1" "$registration_count" "CloudKit remote-notification registration count"
+if rg -n 'didRegisterForRemoteNotifications|didFailToRegisterForRemoteNotifications' \
+    "$notification_delegate" >/dev/null; then
+    fail "CloudKit registration must not collect or forward device APNs tokens"
 fi
 
 echo "Punctual distribution identity and capability checks passed."

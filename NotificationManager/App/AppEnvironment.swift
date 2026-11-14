@@ -1,3 +1,4 @@
+import CloudKit
 import Foundation
 import NotificationManagerApplication
 import NotificationManagerDomain
@@ -23,7 +24,7 @@ final class AppEnvironment {
     )
 
     let container: ModelContainer?
-    let repository: SwiftDataReminderRepository?
+    let repository: RetainedReminderRepository?
     let eligibilityIndexStore: ForegroundEligibilityIndexStore
     let listModel: ReminderListModel
     let router: AppRouter
@@ -47,6 +48,7 @@ final class AppEnvironment {
             DeviceSchedulingStateSnapshot
         >?
     private var schedulingStateObserver: SchedulingStatePresentationObserver?
+    private var cloudChangeTask: Task<Void, Never>?
     private var liveActivityRefreshTask: Task<Void, Never>?
     private var latestReminderSnapshots: [UUID: ReminderSnapshot] = [:]
     private var snapshotGeneration: UInt64 = 0
@@ -54,6 +56,7 @@ final class AppEnvironment {
     private var notificationHandlingIsActive = false
 
     deinit {
+        cloudChangeTask?.cancel()
         liveActivityRefreshTask?.cancel()
     }
 
@@ -103,7 +106,7 @@ final class AppEnvironment {
 
     private init(
         container: ModelContainer,
-        repository: SwiftDataReminderRepository,
+        repository: RetainedReminderRepository,
         eligibilityIndexStore: ForegroundEligibilityIndexStore,
         listModel: ReminderListModel,
         router: AppRouter,
@@ -152,8 +155,8 @@ final class AppEnvironment {
         notificationCenter: SystemNotificationCenterClient,
         cleanupService: NotificationCleanupService,
         widgetSnapshotPublication: @escaping WidgetSnapshotPublication
-    ) -> AppEnvironment {
-        let repository = SwiftDataReminderRepository(container: container)
+    ) throws -> AppEnvironment {
+        let (repository, cloudService) = try makeRetainedPersistence(container: container)
         let eligibilityIndexStore = notificationDelegate.eligibilityIndex
         let stateStore = DeviceSchedulingStateStore()
         let worker = NotificationReconcileWorker(
@@ -246,10 +249,9 @@ final class AppEnvironment {
             pendingCleaner: cleanupService,
             reconciler: worker
         )
-        let iCloudSyncStatusModel = ICloudSyncStatusModel()
-        let appIconModel = AppIconSelectionModel(
-            service: UIApplicationAppIconService()
-        )
+        let iCloudSyncStatusModel = ICloudSyncStatusModel(
+            repository: repository, cloudService: cloudService)
+        let appIconModel = AppIconSelectionModel(service: UIApplicationAppIconService())
         let tagModel = TagManagementModel(
             repository: repository,
             useCase: tagUseCase,
@@ -344,6 +346,8 @@ final class AppEnvironment {
             presentationRefreshCoordinator: presentationRefreshCoordinator
         )
         relay.environment = environment
+        notificationDelegate.cloudRefresh = { await cloudService.refresh() }
+        environment.observeRetainedChanges(repository: repository)
         environment.schedulingStateObserver = SchedulingStatePresentationObserver(
             stateStore: stateStore,
             refreshPresentation: { [weak environment] state in
@@ -351,6 +355,38 @@ final class AppEnvironment {
             }
         )
         return environment
+    }
+
+    private static func makeRetainedPersistence(
+        container: ModelContainer
+    ) throws -> (RetainedReminderRepository, RetainedCloudSyncService) {
+        let legacy = try RetainedLegacySnapshot(container: container)
+        guard let storeURL = container.configurations.first?.url else {
+            throw PersistenceError.storeFailure
+        }
+        let repository = try RetainedReminderRepository.open(
+            url: storeURL.appendingPathExtension("retained-v1.json"), legacy: legacy
+        )
+        #if DEBUG
+            let cloudEnvironment = "development"
+        #else
+            let cloudEnvironment = "production"
+        #endif
+        let cloudContainer = CKContainer.default()
+        let cloudService = RetainedCloudSyncService(
+            repository: repository, container: cloudContainer,
+            accountScope: "\(cloudContainer.containerIdentifier ?? "default")/\(cloudEnvironment)"
+        )
+        return (repository, cloudService)
+    }
+
+    private func observeRetainedChanges(repository: RetainedReminderRepository) {
+        cloudChangeTask = Task { [weak self] in
+            for await _ in await repository.changes() {
+                guard !Task.isCancelled else { return }
+                await self?.modelSnapshotChanged()
+            }
+        }
     }
 
     private static func makeFormActions(
@@ -427,6 +463,7 @@ final class AppEnvironment {
     }
 
     func enterForeground() async {
+        await router.iCloudSyncStatusModel?.refreshAccountAvailability()
         guard let lifecycleCoordinator else { return }
         if !hasStarted {
             await start()

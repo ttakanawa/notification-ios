@@ -1,6 +1,7 @@
 import CloudKit
 import CoreData
 import Foundation
+import NotificationManagerPersistence
 import Observation
 
 enum ICloudAccountAvailability: Sendable, Equatable {
@@ -84,6 +85,14 @@ final class ICloudSyncStatusModel {
     typealias AccountStatus = @MainActor @Sendable () async throws -> ICloudAccountAvailability
 
     private(set) var accountAvailability: ICloudAccountAvailability
+    private(set) var isSyncEnabled = true
+    private(set) var retainedPhase: RetainedSyncPhase?
+    private(set) var recoveryCopies: [RetainedCloudRevision] = []
+    private(set) var actionFailed = false
+    @ObservationIgnored private let repository: RetainedReminderRepository?
+    @ObservationIgnored private let cloudService: RetainedCloudSyncService?
+    @ObservationIgnored private var retainedObservation: Task<Void, Never>?
+
     private(set) var syncActivity: ICloudSyncActivity
 
     @ObservationIgnored private let notificationCenter: NotificationCenter
@@ -96,6 +105,8 @@ final class ICloudSyncStatusModel {
     @ObservationIgnored private var hasStarted = false
 
     init(
+        repository: RetainedReminderRepository? = nil,
+        cloudService: RetainedCloudSyncService? = nil,
         accountAvailability: ICloudAccountAvailability = .checking,
         syncActivity: ICloudSyncActivity = .notObserved,
         notificationCenter: NotificationCenter = .default,
@@ -104,6 +115,8 @@ final class ICloudSyncStatusModel {
             return ICloudAccountAvailability(cloudKitStatus: status)
         }
     ) {
+        self.repository = repository
+        self.cloudService = cloudService
         self.accountAvailability = accountAvailability
         self.syncActivity = syncActivity
         self.notificationCenter = notificationCenter
@@ -114,24 +127,35 @@ final class ICloudSyncStatusModel {
         guard !hasStarted else { return }
         hasStarted = true
 
-        observationTokens.append(
-            notificationCenter.addObserver(
-                forName: NSPersistentCloudKitContainer.eventChangedNotification,
-                object: nil,
-                queue: .main
-            ) { [weak self] notification in
-                guard
-                    let event = notification.userInfo?[
-                        NSPersistentCloudKitContainer.eventNotificationUserInfoKey
-                    ] as? NSPersistentCloudKitContainer.Event
-                else {
-                    return
+        if repository == nil {
+            observationTokens.append(
+                notificationCenter.addObserver(
+                    forName: NSPersistentCloudKitContainer.eventChangedNotification,
+                    object: nil,
+                    queue: .main
+                ) { [weak self] notification in
+                    guard
+                        let event = notification.userInfo?[
+                            NSPersistentCloudKitContainer.eventNotificationUserInfoKey
+                        ] as? NSPersistentCloudKitContainer.Event
+                    else {
+                        return
+                    }
+                    let snapshot = ICloudSyncEvent(event)
+                    Task { @MainActor [weak self] in
+                        self?.receive(snapshot)
+                    }
+                })
+        }
+        if let repository {
+            retainedObservation = Task { [weak self] in
+                for await _ in await repository.changes() {
+                    guard !Task.isCancelled else { return }
+                    await self?.refreshRetainedStatus()
                 }
-                let snapshot = ICloudSyncEvent(event)
-                Task { @MainActor [weak self] in
-                    self?.receive(snapshot)
-                }
-            })
+            }
+        }
+        Task { await cloudService?.start() }
         observationTokens.append(
             notificationCenter.addObserver(
                 forName: .CKAccountChanged,
@@ -139,6 +163,7 @@ final class ICloudSyncStatusModel {
                 queue: .main
             ) { [weak self] _ in
                 Task { @MainActor [weak self] in
+                    await self?.cloudService?.suspendForAccountChange()
                     await self?.refreshAccountAvailability()
                 }
             })
@@ -148,7 +173,57 @@ final class ICloudSyncStatusModel {
         }
     }
 
+    func setSyncEnabled(_ enabled: Bool) async {
+        do {
+            actionFailed = false
+            if let cloudService {
+                try await cloudService.setEnabled(enabled)
+            } else if let repository {
+                try await repository.setSyncEnabled(enabled)
+            } else {
+                isSyncEnabled = enabled
+            }
+        } catch { actionFailed = true }
+        await refreshRetainedStatus()
+    }
+
+    func confirmAccount(_ accepted: Bool) async {
+        do {
+            actionFailed = false
+            if let cloudService {
+                try await cloudService.confirmAccount(accepted)
+            } else {
+                try await repository?.confirmAccount(accepted)
+            }
+        } catch { actionFailed = true }
+        await refreshRetainedStatus()
+    }
+
+    func restore(_ revision: RetainedCloudRevision) async {
+        do {
+            actionFailed = false
+            try await repository?.restoreRevision(revision.id)
+        } catch { actionFailed = true }
+        await refreshRetainedStatus()
+    }
+
+    private func refreshRetainedStatus() async {
+        guard let repository else { return }
+        let status = await repository.status()
+        isSyncEnabled = status.isEnabled
+        retainedPhase = status.phase
+        recoveryCopies = await repository.recoveryRevisions()
+        switch status.phase {
+        case .off, .unavailable, .confirmationRequired: syncActivity = .notObserved
+        case .checking: syncActivity = .inProgress
+        case .failed: syncActivity = .failed
+        case .syncing: syncActivity = status.pendingRevisionCount == 0 ? .succeeded : .inProgress
+        }
+    }
+
     func refreshAccountAvailability() async {
+        await cloudService?.refresh()
+        await refreshRetainedStatus()
         accountRefreshGeneration &+= 1
         let generation = accountRefreshGeneration
         let availability: ICloudAccountAvailability
@@ -162,6 +237,7 @@ final class ICloudSyncStatusModel {
     }
 
     func receive(_ event: ICloudSyncEvent) {
+        guard repository == nil else { return }
         guard let endDate = event.endDate else {
             activeEventIdentifiers.insert(event.identifier)
             syncActivity = .inProgress
