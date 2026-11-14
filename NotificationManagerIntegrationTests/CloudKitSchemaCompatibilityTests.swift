@@ -15,7 +15,7 @@ final class CloudKitSchemaCompatibilityTests: XCTestCase {
         let configuration = ModelContainerFactory.productionConfiguration(url: storeURL)
 
         XCTAssertFalse(configuration.isStoredInMemoryOnly)
-        XCTAssertTrue(
+        XCTAssertFalse(
             String(reflecting: configuration.cloudKitDatabase).contains("_automatic: true"))
         XCTAssertNoThrow(try configuration.validate())
 

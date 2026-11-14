@@ -72,7 +72,7 @@ final class AppBootstrapper {
             }
             let compositionRoot = PersistenceCompositionRoot(
                 makeEnvironment: { container in
-                    AppEnvironment.production(
+                    try AppEnvironment.production(
                         container: container,
                         notificationDelegate: notificationDelegate,
                         preferenceStore: preferenceStore,

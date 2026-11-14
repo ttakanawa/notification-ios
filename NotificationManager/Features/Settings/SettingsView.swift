@@ -15,7 +15,7 @@ struct SettingsView: View {
             notificationSection
             appearanceSection
             organizationSection
-            iCloudSection
+            ICloudSettingsSection(model: iCloudModel)
 
             if #available(iOS 26.0, *) {
                 Section {
@@ -151,72 +151,6 @@ struct SettingsView: View {
                     systemImage: "hand.raised.fill", color: .blue)
             }
             .accessibilityIdentifier("settings.about-privacy")
-        }
-    }
-
-    private var iCloudSection: some View {
-        Section {
-            LabeledContent {
-                accountStatusValue
-            } label: {
-                AppRowLabel(
-                    title: LocalizedStringResource(
-                        "settings.icloud.account.title", table: "Settings"),
-                    systemImage: "icloud.fill", color: .blue)
-            }
-
-            LabeledContent {
-                syncActivityValue
-            } label: {
-                AppRowLabel(
-                    title: LocalizedStringResource(
-                        "settings.icloud.activity.title", table: "Settings"),
-                    systemImage: "arrow.triangle.2.circlepath", color: .teal)
-            }
-        } header: {
-            Text(
-                LocalizedStringResource(
-                    "settings.section.icloud",
-                    table: "Settings"
-                ))
-        } footer: {
-            Text(
-                LocalizedStringResource(
-                    "settings.icloud.explanation",
-                    table: "Settings"
-                )
-            )
-            .fixedSize(horizontal: false, vertical: true)
-            .accessibilityIdentifier("settings.icloud.explanation")
-        }
-        .background {
-            AccessibilityIdentifierContainer(identifier: "settings.icloud.section")
-        }
-    }
-
-    private var accountStatusValue: some View {
-        HStack(spacing: 8) {
-            if iCloudModel.accountAvailability == .checking {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityHidden(true)
-            }
-            Text(iCloudModel.accountAvailability.localizedResource)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("settings.icloud.account-status")
-        }
-    }
-
-    private var syncActivityValue: some View {
-        HStack(spacing: 8) {
-            if iCloudModel.syncActivity == .inProgress {
-                ProgressView()
-                    .controlSize(.small)
-                    .accessibilityHidden(true)
-            }
-            Text(iCloudModel.syncActivity.localizedResource)
-                .foregroundStyle(.secondary)
-                .accessibilityIdentifier("settings.icloud.activity-status")
         }
     }
 

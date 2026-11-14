@@ -4,7 +4,7 @@ import SwiftData
 @MainActor
 struct PersistenceCompositionRoot {
     typealias ContainerFactory = @MainActor (ModelConfiguration) throws -> ModelContainer
-    typealias EnvironmentFactory = @MainActor (ModelContainer) -> AppEnvironment
+    typealias EnvironmentFactory = @MainActor (ModelContainer) throws -> AppEnvironment
 
     let configuration: ModelConfiguration
     private let makeContainer: ContainerFactory
@@ -42,6 +42,6 @@ struct PersistenceCompositionRoot {
             try debugSchemaBootstrapper.initializeIfRequested(configuration: configuration)
         #endif
         let container = try makeContainer(configuration)
-        return makeEnvironment(container)
+        return try makeEnvironment(container)
     }
 }

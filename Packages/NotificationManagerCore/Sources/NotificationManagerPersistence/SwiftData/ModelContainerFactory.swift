@@ -14,7 +14,7 @@ public enum ModelContainerFactory {
                 schema: schema,
                 url: url,
                 allowsSave: true,
-                cloudKitDatabase: .automatic
+                cloudKitDatabase: .none
             )
         }
         return ModelConfiguration(
@@ -22,7 +22,7 @@ public enum ModelContainerFactory {
             schema: schema,
             isStoredInMemoryOnly: false,
             allowsSave: true,
-            cloudKitDatabase: .automatic
+            cloudKitDatabase: .none
         )
     }
 

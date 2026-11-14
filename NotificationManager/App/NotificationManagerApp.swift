@@ -81,6 +81,7 @@ private struct ReadyAppRoot: View {
 
     var body: some View {
         content
+            .modifier(ICloudAccountConfirmation(model: environment.router.iCloudSyncStatusModel))
             .task { await environment.start() }
             .onChange(of: scenePhase) { _, phase in
                 Task {

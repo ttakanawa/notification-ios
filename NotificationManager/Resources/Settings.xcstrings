@@ -1,6 +1,18 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "settings.icloud.switch": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Sync with iCloud on this device"}}, "ja": {"stringUnit": {"state": "translated", "value": "このデバイスで iCloud と同期"}}}},
+    "settings.icloud.off": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Off — saved on this device"}}, "ja": {"stringUnit": {"state": "translated", "value": "オフ（このデバイスに保存）"}}}},
+    "settings.icloud.confirmation-needed": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Confirmation needed"}}, "ja": {"stringUnit": {"state": "translated", "value": "確認が必要です"}}}},
+    "settings.icloud.retry": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Check and sync now"}}, "ja": {"stringUnit": {"state": "translated", "value": "確認して同期する"}}}},
+    "settings.icloud.recovery": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Saved recovery versions"}}, "ja": {"stringUnit": {"state": "translated", "value": "保存された復旧用バージョン"}}}},
+    "settings.icloud.save-failed": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Could not save the change. Your retained data is unchanged. Try again."}}, "ja": {"stringUnit": {"state": "translated", "value": "変更を保存できませんでした。 保持されたデータは変更されていません。 もう一度お試しください。"}}}},
+    "settings.icloud.deleted-version": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "This version records a deletion. Earlier values remain recoverable."}}, "ja": {"stringUnit": {"state": "translated", "value": "このバージョンは削除を記録しています。 以前の値は復旧できます。"}}}},
+    "settings.icloud.restore-version": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Use this version"}}, "ja": {"stringUnit": {"state": "translated", "value": "このバージョンを使用"}}}},
+    "settings.icloud.confirm.title": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Sync retained data to this Apple Account?"}}, "ja": {"stringUnit": {"state": "translated", "value": "保持されたデータをこの Apple Account と同期しますか？"}}}},
+    "settings.icloud.confirm.message": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "This device has retained data from another or unverified account. Continuing uploads reminders, tags, display preferences and recovery versions to the current Apple Account and merges its cloud data. Declining turns off sync on this device until you turn it on again."}}, "ja": {"stringUnit": {"state": "translated", "value": "このデバイスには別のアカウントまたは未確認のアカウント由来のデータがあります。 続行すると、 リマインダー、 タグ、 表示設定、 復旧用バージョンを現在の Apple Account にアップロードし、 クラウドのデータと統合します。 拒否すると、 再びオンにするまでこのデバイスの同期はオフになります。"}}}},
+    "settings.icloud.confirm.refuse": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Keep sync off"}}, "ja": {"stringUnit": {"state": "translated", "value": "同期をオフにする"}}}},
+    "settings.icloud.confirm.accept": {"comment": "iCloud retention and account consent UI.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Merge and sync"}}, "ja": {"stringUnit": {"state": "translated", "value": "統合して同期"}}}},
     "settings.alarmkit-trial.refresh-state": {
       "comment": "Refreshes the tracked trial's current state from AlarmKit.",
       "extractionState": "manual",
@@ -1033,24 +1045,7 @@
         }
       }
     },
-    "settings.icloud.explanation": {
-      "comment": "Clarifies that the displayed iCloud status is limited to activity observed on this device and is not a global completion guarantee.",
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Shows iCloud activity observed on this device. It does not guarantee that every device is up to date."
-          }
-        },
-        "ja": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "このデバイスで観測した iCloud の処理状況です。すべてのデバイスへの反映完了を保証するものではありません。"
-          }
-        }
-      }
-    },
+    "settings.icloud.explanation": {"comment": "Clarifies that the displayed iCloud status is limited to activity observed on this device and is not a global completion guarantee.", "extractionState": "manual", "localizations": {"en": {"stringUnit": {"state": "translated", "value": "Reminders, tags and display preferences stay on this device when sync is off or you sign out. Turning sync on merges cloud data and keeps recovery versions of conflicting values. Older app versions do not receive changes made by this version."}}, "ja": {"stringUnit": {"state": "translated", "value": "同期をオフにした場合やサインアウトした場合も、 リマインダー、 タグ、 表示設定はこのデバイスに保持されます。 同期をオンにするとクラウドのデータを統合し、 競合した値の復旧用バージョンを保持します。 古いバージョンのアプリには、 このバージョンでの変更は反映されません。"}}}},
     "settings.notifications.explanation": {
       "comment": "User-facing text for the semantic key settings.notifications.explanation.",
       "extractionState": "manual",

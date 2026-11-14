@@ -10,6 +10,11 @@ public struct ReminderSnapshot: Sendable, Equatable, Identifiable {
     public let tagIDs: Set<UUID>
     public let createdAt: Date
     public let updatedAt: Date
+    public let displayCustomizationData: Data?
+
+    public var displayCustomization: DisplayCustomization? {
+        DisplayCustomization.decodeSupported(displayCustomizationData)
+    }
 
     public init(
         id: UUID,
@@ -20,7 +25,8 @@ public struct ReminderSnapshot: Sendable, Equatable, Identifiable {
         schedule: ScheduleReadState,
         tagIDs: Set<UUID>,
         createdAt: Date,
-        updatedAt: Date
+        updatedAt: Date,
+        displayCustomizationData: Data? = nil
     ) {
         self.id = id
         self.title = title
@@ -31,5 +37,6 @@ public struct ReminderSnapshot: Sendable, Equatable, Identifiable {
         self.tagIDs = tagIDs
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.displayCustomizationData = displayCustomizationData
     }
 }
