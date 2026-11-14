@@ -6,6 +6,9 @@ worktrees/
 xcuserdata/
 DerivedData/
 /TestFlight/
+/compile_commands.json
+/.compile_commands.*.tmp
+__pycache__/
 
 *.xcuserstate
 .DS_Store
